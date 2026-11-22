@@ -12,7 +12,7 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 CHUNK_SIZE = 16
 EARTH_SURFACE_KM2 = 510_072_000.0
@@ -367,6 +367,14 @@ BLIND_MATERIALS: Dict[str, BlindMaterial] = {
         color_hex="#818cf8",
         magnetic=1.0,
     ),
+    "wheeled_cart": BlindMaterial(
+        code="wheeled_cart",
+        formula="Axle-Mounted Timber & Stone Disks",
+        sensory_name="rolling wooden frame on round disks",
+        observer_label="Wheeled Transport Cart (Mechanical Tech!)",
+        color_hex="#ca8a04",
+        hardness=0.65,
+    ),
 }
 
 
@@ -432,12 +440,16 @@ FAUNA_CATALOG = {
 @dataclass
 class WildAnimal:
     id: str
-    species: str  # 8-species multi-niche terrestrial/aquatic/avian food web
+    species: str  # 24-species + dynamically evolved daughter species!
     x: float
     y: float
     energy: float = 85.0
     health: float = 100.0
     alive: bool = True
+    generation: int = 1
+    size_gene: float = 1.0
+    speed_gene: float = 1.0
+    coat_color: str = ""
     tameness: float = 0.0  # Rises ONLY if sentient beings voluntarily share food nearby
     tamed_by: str = ""
     target_xy: Optional[Tuple[float, float]] = None
@@ -464,7 +476,7 @@ class MortalRemains:
 @dataclass
 class WorldStructure:
     id: str
-    kind: str  # "hearth" | "shelter" | "granary" | "monolith" | "cairn"
+    kind: str  # "hearth"|"shelter"|"granary"|"monolith"|"cairn"|"palisade"|"watercraft"|"kiln"|"crop_plot"|"open_creation"
     sensory_name: str
     x: float
     y: float
@@ -475,6 +487,9 @@ class WorldStructure:
     fuel: float = 0.0
     stored_food: int = 0
     inscription: str = ""
+    water_crossing: bool = False
+    crop_timer: int = 0
+    blueprint_3d: Optional[List[Dict[str, Any]]] = None
 
 
 SEASONS = ["Spring", "Summer", "Autumn", "Deep Winter"]
@@ -503,6 +518,7 @@ class CosmosWorld:
         self.animals: Dict[str, WildAnimal] = {}
         self._animal_seq: int = 0
         self.extinct_fauna: Dict[str, int] = {}  # Permanent extinction ledger (species -> day extinct)!
+        self.evolved_fauna: Dict[str, Dict[str, Any]] = {}  # Newly speciated wild species!
         self.thermal_vents: List[Tuple[float, float]] = []
 
         # Generate the Central Crossroads + all 3 distant Continental Homelands!
@@ -567,6 +583,9 @@ class CosmosWorld:
 
     def is_walkable(self, x: float, y: float) -> bool:
         if self.elevation_at(x, y) < -0.02:
+            # Bridges, rafts & timber causeways built by inhabitants allow crossing rivers & straits!
+            if any(st.water_crossing and math.hypot(st.x - x, st.y - y) <= 4.0 for st in self.structures.values()):
+                return True
             return False
         gx, gy = int(round(x)), int(round(y))
         for dy in (-1, 0, 1):
@@ -838,39 +857,120 @@ class CosmosWorld:
                 if biome != "water":
                     self._seed_tile_resources(tx, ty, biome, self.rng, initial=False)
 
-        # TRUE LOTKA-VOLTERRA ECOLOGY: Species reproduce ONLY if >=2 wild parents survive!
-        # If overhunted to 0, that species goes PERMANENTLY EXTINCT (no magic respawn)!
-        if self.tick_count % 260 == 0:
+        # TRUE LOTKA-VOLTERRA TROPHIC WEB + DARWINIAN ALLOPATRIC SPECIATION!
+        if self.tick_count % 220 == 0:
             by_species: Dict[str, List[WildAnimal]] = {}
             for a in self.animals.values():
                 if a.alive:
                     by_species.setdefault(a.species, []).append(a)
-            for sp, spec in FAUNA_CATALOG.items():
+            all_specs = {**FAUNA_CATALOG, **self.evolved_fauna}
+            for sp, spec in list(all_specs.items()):
                 living_sp = by_species.get(sp, [])
                 if len(living_sp) == 0 and sp not in self.extinct_fauna:
                     self.extinct_fauna[sp] = self.day
-                elif 2 <= len(living_sp) < spec["cap"] and self.rng.random() < 0.42:
-                    parent = self.rng.choice(living_sp)
+                elif 2 <= len(living_sp) < spec["cap"] and self.rng.random() < 0.44:
+                    p1, p2 = self.rng.sample(living_sp, 2)
+                    if p1.energy < 42.0 or p2.energy < 42.0:
+                        continue
+                    p1.energy -= 14.0
+                    p2.energy -= 14.0
+                    zone = classify_climate_zone(p1.x, p1.y)
+                    # Bergmann's & Allen's evolutionary pressure: larger in cold boreal, faster in open savanna
+                    size_bias = 0.04 if zone == "boreal_highland" else (-0.02 if zone == "equatorial_savanna" else 0.0)
+                    spd_bias = 0.04 if zone == "equatorial_savanna" else 0.0
+                    child_size = round(max(0.55, min(1.65, (p1.size_gene + p2.size_gene) * 0.5 + self.rng.gauss(size_bias, 0.06))), 2)
+                    child_spd = round(max(0.55, min(1.65, (p1.speed_gene + p2.speed_gene) * 0.5 + self.rng.gauss(spd_bias, 0.06))), 2)
+                    child_gen = max(p1.generation, p2.generation) + 1
+                    child_sp = sp
+                    child_coat = p1.coat_color
+
+                    # Allopatric Speciation when accumulated genetic divergence crosses threshold!
+                    if (
+                        sp in FAUNA_CATALOG
+                        and child_gen >= 3
+                        and (abs(child_size - 1.0) >= 0.22 or abs(child_spd - 1.0) >= 0.22)
+                        and len(self.evolved_fauna) < 16
+                    ):
+                        prefix = "frost" if zone == "boreal_highland" else ("sun" if zone == "equatorial_savanna" else "emerald")
+                        new_code = f"{prefix}_{sp}"
+                        if new_code not in self.evolved_fauna and new_code not in FAUNA_CATALOG:
+                            coat_palette = {"frost": "#bae6fd", "sun": "#fb923c", "emerald": "#4ade80"}[prefix]
+                            new_spec = dict(spec)
+                            new_spec["speed"] = round(spec["speed"] * child_spd, 2)
+                            new_spec["hp"] = round(spec["hp"] * child_size, 1)
+                            new_spec["cap"] = 6
+                            new_spec["ancestor"] = sp
+                            new_spec["born_day"] = self.day
+                            new_spec["coat_color"] = coat_palette
+                            new_spec["label"] = f"{prefix.capitalize()}-{sp.capitalize()} (Evolved Daughter Species!)"
+                            self.evolved_fauna[new_code] = new_spec
+                        if new_code in self.evolved_fauna:
+                            child_sp = new_code
+                            child_coat = self.evolved_fauna[new_code]["coat_color"]
+
                     self._animal_seq += 1
                     dom = spec["domain"]
                     if dom == "water":
-                        ax, ay = self.find_nearest_water_spot(parent.x + self.rng.uniform(-4.0, 4.0), parent.y + self.rng.uniform(-4.0, 4.0))
+                        ax, ay = self.find_nearest_water_spot(p1.x + self.rng.uniform(-4.0, 4.0), p1.y + self.rng.uniform(-4.0, 4.0))
                     elif dom == "air":
-                        ax, ay = round(parent.x + self.rng.uniform(-5.0, 5.0), 2), round(parent.y + self.rng.uniform(-5.0, 5.0), 2)
+                        ax, ay = round(p1.x + self.rng.uniform(-5.0, 5.0), 2), round(p1.y + self.rng.uniform(-5.0, 5.0), 2)
                     else:
-                        ax, ay = self.find_nearest_dry_spot(parent.x + self.rng.uniform(-4.0, 4.0), parent.y + self.rng.uniform(-4.0, 4.0))
+                        ax, ay = self.find_nearest_dry_spot(p1.x + self.rng.uniform(-4.0, 4.0), p1.y + self.rng.uniform(-4.0, 4.0))
                     self.animals[f"W-{self._animal_seq:03d}"] = WildAnimal(
                         id=f"W-{self._animal_seq:03d}",
-                        species=sp,
+                        species=child_sp,
                         x=ax,
                         y=ay,
-                        health=spec["hp"],
+                        energy=82.0,
+                        health=round(spec["hp"] * child_size, 1),
+                        generation=child_gen,
+                        size_gene=child_size,
+                        speed_gene=child_spd,
+                        coat_color=child_coat,
                     )
+
+        # Animal-on-Animal Trophic Chain (Carnivores hunt wild herbivores; herbivores graze flora!)
+        if self.tick_count % 35 == 0:
+            living_fauna = [a for a in self.animals.values() if a.alive]
+            for an in living_fauna:
+                spec = self.evolved_fauna.get(an.species) or FAUNA_CATALOG.get(an.species, FAUNA_CATALOG["lumigrazer"])
+                an.energy = max(0.0, an.energy - 0.85)
+                if an.energy <= 0.0:
+                    an.alive = False  # Natural starvation if food web collapses!
+                    continue
+                if an.energy < 62.0:
+                    hostility = spec.get("hostile", "none")
+                    if hostility in ("night", "day", "always", "pack", "ambush"):
+                        # Wild predator hunts wild prey nearby!
+                        prey = next(
+                            (
+                                p for p in living_fauna
+                                if p.alive and p.id != an.id
+                                and (self.evolved_fauna.get(p.species) or FAUNA_CATALOG.get(p.species, {})).get("hostile") == "none"
+                                and math.hypot(p.x - an.x, p.y - an.y) <= 4.5
+                            ),
+                            None,
+                        )
+                        if prey is not None:
+                            prey.health -= 48.0
+                            if prey.health <= 0:
+                                prey.alive = False
+                                an.energy = min(100.0, an.energy + 55.0)
+                    else:
+                        # Wild herbivore grazes local flora (or regenerates on lush grass)
+                        gx, gy = int(round(an.x)), int(round(an.y))
+                        items = self.resources.get((gx, gy), [])
+                        plant = next((c for c in items if c in ("orb_sweet", "grain_seed", "orb_root")), None)
+                        if plant:
+                            self.remove_resource_at(gx, gy, plant)
+                            an.energy = min(100.0, an.energy + 42.0)
+                        elif classify_biome(gx, gy, self.seed) in ("meadow", "savanna", "forest", "water", "riverbank"):
+                            an.energy = min(100.0, an.energy + 18.0)
 
         for animal in list(self.animals.values()):
             if not animal.alive:
                 continue
-            spec = FAUNA_CATALOG.get(animal.species, FAUNA_CATALOG["lumigrazer"])
+            spec = self.evolved_fauna.get(animal.species) or FAUNA_CATALOG.get(animal.species, FAUNA_CATALOG["lumigrazer"])
             dom = spec["domain"]
             # Pollinators naturally fertilize meadow berries underneath them
             if animal.species == "pollenwing" and self.tick_count % 90 == 0 and self.rng.random() < 0.28:
@@ -915,7 +1015,12 @@ class CosmosWorld:
         for sid, st in self.structures.items():
             if st.kind == "hearth" and st.fuel > 0:
                 st.fuel = max(0.0, st.fuel - 0.08)
-            st.durability -= 0.004 if st.kind != "monolith" else 0.0004
+            elif st.kind == "crop_plot":
+                st.crop_timer += 1
+                if st.crop_timer >= 130:
+                    st.crop_timer = 0
+                    self._add_resource_at(int(round(st.x)), int(round(st.y)), "grain_seed")
+            st.durability -= 0.004 if st.kind not in ("monolith", "cairn") else 0.0003
             if st.durability <= 0:
                 dead_ids.append(sid)
         for sid in dead_ids:
@@ -1213,6 +1318,101 @@ class CosmosWorld:
                 st,
                 "breakthrough",
                 "Erected a fortified timber palisade wall protecting the settlement from dangerous beasts!",
+            )
+
+        # 10. Watercraft / River Bridge (Buoyant Timber + Fiber near River/Coast — unlocks ocean/river crossing!)
+        near_water = any(
+            self.elevation_at(x + dx, y + dy) < 0.0
+            for dx in (-3.0, 0.0, 3.0)
+            for dy in (-3.0, 0.0, 3.0)
+        )
+        if near_water and (
+            {code_a, code_b} in ({"rod_porous", "fiber_dry"}, {"rod_porous", "resin_gold"})
+        ):
+            lvl = insight_map.get("naval_lore", 0) + 1
+            insight_map["naval_lore"] = lvl
+            if lvl >= 2:
+                self._struct_seq += 1
+                wx, wy = self.find_nearest_water_spot(x, y)
+                bp = [
+                    {"shape": "box", "sx": 1.6, "sy": 0.16, "sz": 1.1, "px": 0, "py": 0.08, "pz": 0, "color": "#92400e"},
+                    {"shape": "cylinder", "sx": 0.06, "sy": 1.25, "sz": 0.06, "px": 0, "py": 0.7, "pz": 0, "color": "#78350f"},
+                    {"shape": "box", "sx": 0.05, "sy": 0.75, "sz": 0.72, "px": 0.05, "py": 0.82, "pz": 0, "color": "#fde68a"},
+                ]
+                st = WorldStructure(
+                    id=f"S-{self._struct_seq}",
+                    kind="watercraft",
+                    sensory_name="buoyant lashed-log sail raft",
+                    x=wx,
+                    y=wy,
+                    creator_id=actor_id,
+                    creator_lineage=actor_lineage,
+                    created_day=self.day,
+                    durability=420.0,
+                    water_crossing=True,
+                    blueprint_3d=bp,
+                )
+                self.structures[st.id] = st
+                return (
+                    None,
+                    st,
+                    "breakthrough",
+                    "Constructed a buoyant lashed-log watercraft capable of crossing rivers and seas!",
+                )
+
+        # 11. Wheeled Transport Cart (Hardwood Timber + Quarry Stone/Clay Disk)
+        if {code_a, code_b} == {"rod_porous", "slab_dense"} and insight_map.get("build_lore", 0) >= 2:
+            lvl = insight_map.get("wheel_lore", 0) + 1
+            insight_map["wheel_lore"] = lvl
+            if lvl >= 2:
+                return (
+                    "wheeled_cart",
+                    None,
+                    "breakthrough",
+                    "Mounted carved stone disks onto a wooden axle, inventing the wheeled transport cart!",
+                )
+
+        # 12. Open-Ended Generative Creation Engine (Unbounded Physical Synthesis -> Real 3D Procedural Structure!)
+        total_mastery = sum(insight_map.values())
+        if total_mastery >= 4 and (mat_a.hardness + mat_b.hardness + mat_a.malleability + mat_b.bindability) >= 1.1:
+            pair_key = f"open_{min(code_a, code_b)}_{max(code_a, code_b)}"
+            lvl = insight_map.get(pair_key, 0) + 1
+            insight_map[pair_key] = lvl
+            if lvl < 2:
+                return (
+                    None,
+                    None,
+                    "partial_insight",
+                    f"Tested physical resonance of {mat_a.sensory_name} with {mat_b.sensory_name}; structure taking form.",
+                )
+            self._struct_seq += 1
+            sx, sy = self.find_nearest_dry_spot(x, y)
+            tall = 0.7 + (mat_a.hardness + mat_b.hardness) * 0.65
+            arch_shape = "cone" if (mat_a.luster + mat_b.luster) > 0.7 else ("cylinder" if mat_a.metallic > 0.5 else "box")
+            bp = [
+                {"shape": "cylinder", "sx": 0.62, "sy": 0.22, "sz": 0.62, "px": 0, "py": 0.11, "pz": 0, "color": mat_a.color_hex},
+                {"shape": arch_shape, "sx": 0.36, "sy": round(tall, 2), "sz": 0.36, "px": 0, "py": round(0.22 + tall * 0.5, 2), "pz": 0, "color": mat_b.color_hex},
+            ]
+            if max(mat_a.luster, mat_b.luster, mat_a.metallic, mat_b.metallic) >= 0.8:
+                bp.append({"shape": "torus", "sx": 0.34, "sy": 0.06, "sz": 0.34, "px": 0, "py": round(0.28 + tall, 2), "pz": 0, "color": "#fde047"})
+            st = WorldStructure(
+                id=f"S-{self._struct_seq}",
+                kind="open_creation",
+                sensory_name=f"novel {mat_a.sensory_name} & {mat_b.sensory_name} apparatus",
+                x=sx,
+                y=sy,
+                creator_id=actor_id,
+                creator_lineage=actor_lineage,
+                created_day=self.day,
+                durability=450.0,
+                blueprint_3d=bp,
+            )
+            self.structures[st.id] = st
+            return (
+                None,
+                st,
+                "breakthrough",
+                f"OPEN-ENDED INVENTION! {actor_id} synthesized {mat_a.observer_label} + {mat_b.observer_label} into a novel 3D apparatus!",
             )
 
         return None, None, "inert", "Examined both terrestrial materials without reaction."

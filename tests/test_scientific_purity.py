@@ -113,3 +113,24 @@ def test_sqlite_warehouse_and_sha256_ledger(tmp_path: Path) -> None:
         )
         assert rec["seq_hash"] == hashlib.sha256(canonical.encode("utf-8")).hexdigest()
         prev = rec["seq_hash"]
+
+
+def test_darwinian_speciation_and_open_ended_3d_blueprint() -> None:
+    world = CosmosWorld(seed=4201)
+    # 1. Cross-lineage fertile hybridization creates a new registered sentient lineage
+    g_syl = KobGenome.random_founder(world.rng, "Sylphid")
+    g_ves = KobGenome.random_founder(world.rng, "Vespera")
+    hybrid = KobGenome.crossover(g_syl, g_ves, world.rng)
+    assert hybrid.lineage == "Sylp-Vesp"
+
+    # 2. Open-ended physical synthesis produces a real 3D procedural blueprint without hardcoded recipe
+    insights = {"base_lore": 5}
+    _, st1, kind1, _ = world.attempt_empirical_experiment(
+        "copper_ore", "magnetite_ore", ["copper_ore", "magnetite_ore"], insights, 4.0, 4.0, "S-001"
+    )
+    assert st1 is None and kind1 == "partial_insight"
+    _, st2, kind2, _ = world.attempt_empirical_experiment(
+        "copper_ore", "magnetite_ore", ["copper_ore", "magnetite_ore"], insights, 4.0, 4.0, "S-001"
+    )
+    assert kind2 == "breakthrough"
+    assert st2 is not None and st2.blueprint_3d is not None and len(st2.blueprint_3d) >= 2

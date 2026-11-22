@@ -51,6 +51,8 @@ VALID_INTENTS = frozenset(
         "warm_up",
         "socialize",
         "share",
+        "barter",
+        "plant_seed",
         "pool_nest",
         "confront",
         "tinker",
@@ -103,12 +105,27 @@ class KobGenome:
             val = (a + b) * 0.5 + rng.gauss(0.0, 0.075)
             return round(min(0.99, max(0.02, val)), 2)
 
-        lineage = p1.lineage if rng.random() < 0.5 else p2.lineage
-        palette = (
-            (p1.body_color, p1.accent_color)
-            if rng.random() < 0.5
-            else (p2.body_color, p2.accent_color)
-        )
+        if p1.lineage != p2.lineage:
+            pair = sorted([p1.lineage[:4], p2.lineage[:4]])
+            lineage = f"{pair[0]}-{pair[1]}"
+            if lineage not in LINEAGE_SPECS:
+                s1 = LINEAGE_SPECS.get(p1.lineage, LINEAGE_SPECS["Sylphid"])
+                s2 = LINEAGE_SPECS.get(p2.lineage, LINEAGE_SPECS["Vespera"])
+                LINEAGE_SPECS[lineage] = {
+                    "prefix": "H",
+                    "reproduction_mode": "Symbiotic Hybrid Genesis",
+                    "palettes": [(p1.body_color, p2.accent_color), (p2.body_color, p1.accent_color)],
+                    "ColdBias": round((s1["ColdBias"] + s2["ColdBias"]) * 0.5, 2),
+                    "SpeedMul": round((s1["SpeedMul"] + s2["SpeedMul"]) * 0.5, 2),
+                }
+            palette = (p1.body_color, p2.accent_color)
+        else:
+            lineage = p1.lineage
+            palette = (
+                (p1.body_color, p1.accent_color)
+                if rng.random() < 0.5
+                else (p2.body_color, p2.accent_color)
+            )
         return cls(
             lineage=lineage,
             curiosity=mix(p1.curiosity, p2.curiosity),
@@ -210,7 +227,11 @@ class KobAgent:
 
     @property
     def has_tool(self) -> bool:
-        return "composite_tool" in self.inventory
+        return "composite_tool" in self.inventory or "bronze_tool" in self.inventory
+
+    @property
+    def has_cart(self) -> bool:
+        return "wheeled_cart" in self.inventory
 
     def live_biography_summary(self) -> str:
         held = BLIND_MATERIALS[self.held_item].observer_label if self.held_item else "empty hands"
@@ -283,11 +304,11 @@ class KobAgent:
             f"- Other beings: {others_desc}.\n"
             f"- Memories: {recent_mem}.\n\n"
             "Nothing is forbidden or commanded—follow your own drives freely: "
-            "forage, warm_up, socialize, share, pool_nest, confront, tinker, hunt, migrate, rest, "
-            "vigil (stand beside a fallen body), leave_offering (drop held item by fallen body), or bury_cairn (cover fallen body with stone).\n"
+            "forage, warm_up, socialize, share, barter (exchange held items), plant_seed (sow seeds in soil), "
+            "pool_nest, confront, tinker, hunt, migrate, rest, vigil, leave_offering, or bury_cairn.\n"
             "Use zero modern, mechanical, or artificial concepts. Reply ONLY with valid JSON:\n"
             '{"thought": "brief first-person inner thought (max 20 words)", '
-            '"intent": "forage|warm_up|socialize|share|pool_nest|confront|tinker|hunt|migrate|rest|vigil|leave_offering|bury_cairn", '
+            '"intent": "forage|warm_up|socialize|share|barter|plant_seed|pool_nest|confront|tinker|hunt|migrate|rest|vigil|leave_offering|bury_cairn", '
             '"utterance": "1 or 2 invented syllables like ka-ru or lu-ma", '
             '"referent": "food|cold|warmth|kin|stranger|hive|beast|craft|death|wonder", '
             '"wonder": true or false if questioning stars, death, nature, or existence itself}'

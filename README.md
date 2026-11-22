@@ -8,7 +8,7 @@
 [![APA 7th Monograph #1](https://img.shields.io/badge/%F0%9F%93%84_APA_7th_MONOGRAPH_%231-18p_Locked_PDF-fbbf24?style=for-the-badge&labelColor=0f172a)](chronicles/papers/Universe_XXV_Monograph_01_Dr_Sergio_Buedo_Martinez.pdf)
 [![Daily Field Chronicles](https://img.shields.io/badge/%F0%9D%95%8F_DAILY_CHRONICLE-%40UniverseXXVLab-34d399?style=for-the-badge&labelColor=0f172a)](https://x.com/UniverseXXVLab)
 
-[![Epistemic Veil Suite](https://img.shields.io/badge/Epistemic_Purity-7%2F7_Passed-10b981?style=flat-square)](tests/test_scientific_purity.py)
+[![Epistemic Veil Suite](https://img.shields.io/badge/Scientific_Integrity-8%2F8_Passed-10b981?style=flat-square)](tests/test_scientific_purity.py)
 [![Verified DOIs](https://img.shields.io/badge/Crossref_DOIs-100%25_Live_Verified-38bdf8?style=flat-square)](backend/academia/doi_verifier.py)
 [![Scale](https://img.shields.io/badge/Planet_Surface-5.10B_km%C2%B2_(10x_Earth)-c084fc?style=flat-square)](backend/world/physics.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-f59e0b?style=flat-square)](LICENSE)
@@ -63,7 +63,10 @@ Each lineage awakens in a distant continental corner of the round `5.10 × 10⁹
 - **Megafauna & Herd Ungulates (`6`):** `Titanotusk` (tusker megafauna), `Thunderhorn` (steppe grazer), `Lumigrazer` (antlered herd), `Windstrider` (wild courser, emergently domesticable), `Craghorn` (alpine climber), and `Rootboar` (forest tusker).
 - **Dangerous Predators, River Ambushers & Venomous Beasts (`7`):** `Shadowstalker` (nocturnal sabre-predator), `Sunmane` (savanna pride hunter), `Frostmaw` (colossal boreal bear), `Packhound` (social wolf-canid, emergently domesticable), `Mirejaw` (armored river ambush-reptile), `Venomcoil` (fang-serpent), and `Stingshell` (venomous arachnid).
 - **Small Mammals, Marine Giants & Avian/Pollinator Guilds (`11`):** `Burrowhare`, `Damweaver`, `Canopykin`, `Silverfin` shoals, `Abyssalfin` water predators, `Leviathansong` sea giants, `Tidecrawler` crabs, `Pearlclam` nacre bivalves, `Skyglider` raptors, `Reedwing` waterfowl, and keystone `Pollenwing` pollinators.
-- **No Magical Respawn:** Wild species reproduce strictly from surviving wild parents (`N ≥ 2`). Overhunting drives a species **permanently extinct** (`extinct_fauna`), while wiping out pollinators degrades flora regeneration (`12` plant guilds including cereal `Golden Stalk`, medicinal `Sootheleaf`, and toxic `Shadowberry`).
+- **No Magical Respawn & Darwinian Speciation (`v8.0`):** Wild carnivores hunt wild herbivores, herbivores graze wild flora, and species reproduce strictly from surviving parents (`N ≥ 2`). Overhunting drives species **permanently extinct**, while isolated populations adapting across generations undergo **allopatric speciation** into brand-new daughter species (and cross-continent sentient lineages can hybridize into new sentient races).
+- **Hominid Evolutionary Parity & Open-Ended 3D Creation Engine (`v8.0`):**
+  - **Wrangham Fire-Cooking (`+45%` caloric yield)**, **Proto-Agriculture (`crop_plot` cereal sowing)**, **Wheeled Transport Carts**, **River/Sea Watercraft (`water_crossing`)**, **Bilateral Barter Trade**, and **Elder-to-Juvenile Cumulative Cultural Mentorship** (*Henrich's Collective Brain*).
+  - **Unbounded Procedural 3D Inventions (`blueprint_3d`):** Beyond Paleolithic/Bronze foundations, any physically valid material synthesis invented by inhabitants generates a **real 3D parametric structure rendered live on the planet surface** without human intervention.
 - **Precious Minerals (Zero Value Hints):** Native gold (`Au`), native silver (`Ag`), octahedral diamond (`C`), fossil amber (`C10H16O`), nephrite jade, and pearlescent nacre shells—perceived strictly by physical weight, hardness, and optical luster.
 - **Thanatology & Unscripted Funerary Rites:** Fallen beings remain physically on the ground for 3 days. Without any instruction, the observatory records whether survivors react with **silent mourning vigils**, **grave offerings**, **permanent stone burial cairns**, **fearful avoidance**, or **indifference**.
 

@@ -1156,7 +1156,8 @@
 
     function createWildAnimalRig(an) {
       const g = new THREE.Group();
-      const sp = an.species || 'lumigrazer';
+      const rawSp = an.species || 'lumigrazer';
+      const sp = rawSp.replace(/^(frost|sun|emerald)_/, '');
       const isWater = ['silverfin_shoal', 'abyssalfin', 'leviathansong'].includes(sp);
       const isAir = ['pollenwing', 'skyglider', 'reedwing'].includes(sp);
 
@@ -1207,9 +1208,10 @@
           titanotusk: 1.72, frostmaw: 1.42, thunderhorn: 1.32, sunmane: 1.15,
           windstrider: 1.12, burrowhare: 0.60, damweaver: 0.68, canopykin: 0.72, packhound: 0.84
         };
-        const sc = scaleMap[sp] || 1.0;
+        const sc = (scaleMap[sp] || 1.0) * (an.scale || 1.0);
         const isPred = ['shadowstalker', 'sunmane', 'frostmaw'].includes(sp);
-        const mat = new THREE.MeshStandardMaterial({ color: colorMap[sp] || 0xfef3c7, roughness: isPred ? 0.45 : 0.7 });
+        const customCol = an.color ? new THREE.Color(an.color) : new THREE.Color(colorMap[sp] || 0xfef3c7);
+        const mat = new THREE.MeshStandardMaterial({ color: customCol, roughness: isPred ? 0.45 : 0.7 });
         const body = new THREE.Mesh(new THREE.CapsuleGeometry((isPred ? 0.20 : 0.22) * sc, 0.48 * sc, 6, 10), mat);
         body.rotation.x = Math.PI / 2; body.position.y = 0.36 * sc; body.castShadow = true;
         const head = new THREE.Mesh(new THREE.SphereGeometry(0.16 * sc, 10, 10), mat);
@@ -1272,6 +1274,30 @@
 
     function createStructureMesh(st) {
       const g = new THREE.Group();
+      // Open-Ended Procedural 3D Blueprint Engine (renders watercraft, crop plots & any novel AI-invented apparatus!)
+      if (st.blueprint_3d && st.blueprint_3d.length > 0) {
+        for (const part of st.blueprint_3d) {
+          let geo;
+          const sx = part.sx || 0.4, sy = part.sy || 0.4, sz = part.sz || 0.4;
+          if (part.shape === 'cylinder') geo = new THREE.CylinderGeometry(sx * 0.5, sz * 0.5, sy, 12);
+          else if (part.shape === 'cone') geo = new THREE.ConeGeometry(sx * 0.5, sy, 10);
+          else if (part.shape === 'torus') geo = new THREE.TorusGeometry(sx, sy, 8, 16);
+          else if (part.shape === 'sphere') geo = new THREE.SphereGeometry(sx * 0.5, 12, 10);
+          else geo = new THREE.BoxGeometry(sx, sy, sz);
+          const m = new THREE.Mesh(
+            geo,
+            new THREE.MeshStandardMaterial({ color: part.color || '#38bdf8', roughness: 0.65, metalness: 0.25 })
+          );
+          if (part.shape === 'torus') m.rotation.x = Math.PI / 2;
+          m.position.set(part.px || 0, part.py || 0, part.pz || 0);
+          m.castShadow = true;
+          g.add(m);
+        }
+        const ySurf = st.kind === 'watercraft' ? -0.02 : terrainHeight(st.x, st.y);
+        g.position.set(st.x, ySurf, st.y);
+        surfaceWorld.add(g);
+        return g;
+      }
       if (st.kind === 'hearth') {
         const stones = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.12, 8, 12), new THREE.MeshStandardMaterial({ color: 0x64748b }));
         stones.rotation.x = Math.PI / 2; stones.position.y = 0.08;

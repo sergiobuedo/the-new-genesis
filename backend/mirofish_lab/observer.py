@@ -61,6 +61,8 @@ class PopulationSimulation:
         self.hunts_count: int = 0
         self.fishing_count: int = 0
         self.domesticated_count: int = 0
+        self.trade_count: int = 0
+        self.crops_planted: int = 0
         self.predator_attacks: int = 0
         self.philosophical_count: int = 0
         self.mourning_vigils: int = 0
@@ -188,14 +190,29 @@ class PopulationSimulation:
         if self.world.tick_count % 16 == 0:
             self._process_predator_ecology(living)
 
-        # Log any wild animal species newly driven to permanent extinction!
+        # Log any wild animal species newly driven to permanent extinction OR newly evolved via speciation!
         for ext_sp, ext_day in self.world.extinct_fauna.items():
             m_ext = f"extinct_{ext_sp}"
             if m_ext not in self.discoveries and self.enable_culture:
                 self.discoveries[m_ext] = ext_day
+                label = (self.world.evolved_fauna.get(ext_sp) or FAUNA_CATALOG.get(ext_sp, {"label": ext_sp}))["label"]
                 self._record_event(
                     "conflict",
-                    f"ECOLOGICAL EXTINCTION! Wild species {FAUNA_CATALOG[ext_sp]['label']} has been driven permanently extinct!",
+                    f"ECOLOGICAL EXTINCTION! Wild species {label} has been driven permanently extinct!",
+                    [],
+                    4.0,
+                    4.0,
+                    importance=5,
+                )
+        for ev_sp, ev_spec in self.world.evolved_fauna.items():
+            m_ev = f"speciated_{ev_sp}"
+            if m_ev not in self.discoveries and self.enable_culture:
+                self.discoveries[m_ev] = ev_spec.get("born_day", self.world.day)
+                if "first_fauna_speciation" not in self.discoveries:
+                    self.discoveries["first_fauna_speciation"] = self.world.day
+                self._record_event(
+                    "invention",
+                    f"DARWINIAN SPECIATION! Wild {ev_spec['ancestor']} evolved into new species: {ev_spec['label']}!",
                     [],
                     4.0,
                     4.0,
@@ -524,9 +541,22 @@ class PopulationSimulation:
                     if agent.integrity <= 0:
                         agent.cause_of_death = "toxic plant poisoning"
                 else:
-                    agent.energy = min(100.0, agent.energy + mat.nutrition)
-                    agent.action_label = f"Eating {mat.observer_label}"
-                    agent.add_memory(f"Ate {mat.sensory_name}.", self.world.day)
+                    # Wrangham Cooking Hypothesis: eating near an active Hearth roasts food (+45% caloric bioavailability!)
+                    near_fire = self.enable_culture and any(
+                        st.kind == "hearth" and st.fuel > 0 and math.hypot(st.x - agent.x, st.y - agent.y) <= 4.5
+                        for st in nearby_structs
+                    )
+                    cal_mul = 1.45 if near_fire else 1.0
+                    agent.energy = min(100.0, agent.energy + mat.nutrition * cal_mul)
+                    if near_fire:
+                        agent.stress = max(2.0, agent.stress - 6.0)
+                        agent.action_label = f"Roasting & eating {mat.observer_label} by the fire"
+                        agent.add_memory(f"Cooked {mat.sensory_name} over warm embers—richer nourishment!", self.world.day)
+                        if "first_cooked_meal" not in self.discoveries:
+                            self.discoveries["first_cooked_meal"] = self.world.day
+                    else:
+                        agent.action_label = f"Eating {mat.observer_label}"
+                        agent.add_memory(f"Ate {mat.sensory_name}.", self.world.day)
                 agent.pause_ticks = 4
                 return
 
@@ -678,6 +708,52 @@ class PopulationSimulation:
                         agent.current_intent = "forage"
                         agent.pause_ticks = 4
                         return
+
+        # 3B. Proto-Agriculture (`plant_seed` — sowing cereal grain on fertile soil!)
+        if (
+            self.enable_culture
+            and "grain_seed" in agent.inventory
+            and agent.energy > 68.0
+            and (agent.current_intent == "plant_seed" or (agent.inventory.count("grain_seed") >= 2 and self.world.rng.random() < 0.04))
+        ):
+            if len(nearby_structs) < 4:
+                agent.inventory.remove("grain_seed")
+                self.world._struct_seq += 1
+                sx, sy = self.world.find_nearest_dry_spot(agent.x, agent.y)
+                bp = [
+                    {"shape": "box", "sx": 1.35, "sy": 0.06, "sz": 1.35, "px": 0, "py": 0.03, "pz": 0, "color": "#713f12"},
+                    {"shape": "cylinder", "sx": 0.05, "sy": 0.45, "sz": 0.05, "px": -0.35, "py": 0.25, "pz": -0.3, "color": "#eab308"},
+                    {"shape": "cylinder", "sx": 0.05, "sy": 0.48, "sz": 0.05, "px": 0.0, "py": 0.26, "pz": 0.0, "color": "#84cc16"},
+                    {"shape": "cylinder", "sx": 0.05, "sy": 0.45, "sz": 0.05, "px": 0.35, "py": 0.25, "pz": 0.3, "color": "#eab308"},
+                ]
+                crop = WorldStructure(
+                    id=f"S-{self.world._struct_seq}",
+                    kind="crop_plot",
+                    sensory_name="tilled golden seed-plot",
+                    x=sx,
+                    y=sy,
+                    creator_id=agent.id,
+                    creator_lineage=agent.lineage,
+                    created_day=self.world.day,
+                    durability=480.0,
+                    blueprint_3d=bp,
+                )
+                self.world.structures[crop.id] = crop
+                self.crops_planted += 1
+                agent.current_intent = "forage"
+                agent.pause_ticks = 5
+                agent.action_label = "Sowing Golden Stalk seeds into fertile soil"
+                if "first_agriculture" not in self.discoveries:
+                    self.discoveries["first_agriculture"] = self.world.day
+                self._record_event(
+                    "invention",
+                    f"AGRICULTURE BORN! {agent.lineage} {agent.id} sowed cereal seeds into a cultivated farm plot!",
+                    [agent.id],
+                    sx,
+                    sy,
+                    importance=5,
+                )
+                return
 
         # 4A. Emergent Shoreline Fishing & Shellfish Gathering
         if self.enable_culture and (agent.current_intent == "hunt" or agent.energy < 60.0) and nearby_animals:
@@ -886,7 +962,49 @@ class PopulationSimulation:
                 )
                 return
 
-            # C. Acoustic Communication & Cultural Teaching
+            # B2. Bilateral Barter Trade (Exchanging two distinct items!)
+            if (
+                agent.inventory
+                and partner.inventory
+                and bond >= -0.1
+                and (
+                    agent.current_intent == "barter"
+                    or (agent.genome.sociability > 0.68 and self.world.rng.random() < 0.035)
+                )
+            ):
+                give_item = agent.inventory[-1]
+                take_item = next((c for c in partner.inventory if c != give_item), None)
+                if take_item is not None:
+                    agent.inventory.remove(give_item)
+                    partner.inventory.remove(take_item)
+                    agent.inventory.append(take_item)
+                    partner.inventory.append(give_item)
+                    agent.trust_bonds[partner.id] = min(2.0, bond + 0.35)
+                    partner.trust_bonds[agent.id] = min(2.0, partner.trust_bonds.get(agent.id, 0.0) + 0.35)
+                    self.trade_count += 1
+                    agent.current_intent = "socialize"
+                    agent.pause_ticks = 4
+                    agent.action_label = f"Trading {BLIND_MATERIALS[give_item].observer_label} with {partner.id}"
+                    if "first_barter_trade" not in self.discoveries:
+                        self.discoveries["first_barter_trade"] = self.world.day
+                    self._record_event(
+                        "altruism",
+                        f"{'Inter-species trade! ' if cross_species else 'Barter trade: '}{agent.lineage} {agent.id} exchanged {BLIND_MATERIALS[give_item].observer_label} with {partner.lineage} {partner.id} for {BLIND_MATERIALS[take_item].observer_label}.",
+                        [agent.id, partner.id],
+                        agent.x,
+                        agent.y,
+                        importance=5 if cross_species else 3,
+                    )
+                    return
+
+            # C. Acoustic Communication & Elder Cumulative Cultural Mentorship (Henrich Collective Brain!)
+            if agent.age_days >= 50.0 and partner.age_days < 20.0 and agent.insight_map and bond >= 0.15:
+                for k_lore, lvl in agent.insight_map.items():
+                    if partner.insight_map.get(k_lore, 0) < lvl:
+                        partner.insight_map[k_lore] = lvl
+                for ref_k, w_val in agent.personal_lexicon.items():
+                    partner.personal_lexicon.setdefault(ref_k, w_val)
+
             if bond > -0.4 and self.world.rng.random() < 0.055 * agent.genome.sociability:
                 ref = "cold" if agent.warmth < 55 else ("food" if agent.energy < 64 else "kin")
                 word = agent.personal_lexicon.get(ref)
@@ -977,8 +1095,8 @@ class PopulationSimulation:
                     )
                 return
 
-        # 7. Gather & Stockpile Ground Materials (`max_carry` up to 8 so beings can accumulate supplies!)
-        max_carry = 8 if (self.enable_culture and (agent.has_tool or agent.has_cloak)) else 6
+        # 7. Gather & Stockpile Ground Materials (`max_carry` up to 12 with Wheeled Cart!)
+        max_carry = 12 if (self.enable_culture and agent.has_cart) else (8 if (self.enable_culture and (agent.has_tool or agent.has_cloak)) else 6)
         if tile_items:
             edibles = [c for c in tile_items if BLIND_MATERIALS[c].nutrition > 0]
             # Smart swap: if hungry and hands full of non-food, drop 1 non-edible item to grab food!
@@ -1128,21 +1246,29 @@ class PopulationSimulation:
             if a.id in used:
                 continue
             for b in eligible:
-                if b.id == a.id or b.id in used or b.lineage != a.lineage:
+                if b.id == a.id or b.id in used:
+                    continue
+                cross_lin = b.lineage != a.lineage
+                if cross_lin and not self.enable_culture:
                     continue
                 if math.hypot(a.x - b.x, a.y - b.y) <= 3.8:
                     bond = a.trust_bonds.get(b.id, 0.0)
-                    if self.enable_culture and bond < 0.18:
+                    # Same-species requires mild trust (>=0.18); cross-species hybridization requires deep mutual bond (>=0.65)!
+                    min_bond = 0.65 if cross_lin else 0.18
+                    if self.enable_culture and bond < min_bond:
                         continue
-                    if self.world.rng.random() < 0.22:
+                    chance = 0.12 if cross_lin else 0.22
+                    if self.world.rng.random() < chance:
                         used.add(a.id)
                         used.add(b.id)
                         a.energy -= 24.0
                         b.energy -= 24.0
                         self._agent_seq += 1
                         self.births_today += 1
-                        prefix = LINEAGE_SPECS[a.lineage]["prefix"]
-                        mode_name = LINEAGE_SPECS[a.lineage]["reproduction_mode"]
+                        child_genome = KobGenome.crossover(a.genome, b.genome, self.world.rng)
+                        c_lin = child_genome.lineage
+                        prefix = LINEAGE_SPECS[c_lin]["prefix"]
+                        mode_name = LINEAGE_SPECS[c_lin]["reproduction_mode"]
                         cid = f"{prefix}-{self._agent_seq:03d}"
                         gen = max(a.generation, b.generation) + 1
                         self.max_generation = max(self.max_generation, gen)
@@ -1153,7 +1279,7 @@ class PopulationSimulation:
                             born_day=self.world.day,
                             x=cx,
                             y=cy,
-                            genome=KobGenome.crossover(a.genome, b.genome, self.world.rng),
+                            genome=child_genome,
                             parents=(a.id, b.id),
                             energy=78.0,
                             warmth=86.0,
@@ -1164,16 +1290,27 @@ class PopulationSimulation:
                         a.trust_bonds[cid] = 0.90
                         b.trust_bonds[cid] = 0.90
                         self.agents[cid] = child
-                        if gen == 2 and "gen_2_born" not in self.discoveries:
-                            self.discoveries["gen_2_born"] = self.world.day
-                        self._record_event(
-                            "birth",
-                            f"{mode_name}: {a.lineage}s {a.id} & {b.id} welcomed hatchling {cid} (Gen {gen}).",
-                            [a.id, b.id, cid],
-                            cx,
-                            cy,
-                            importance=3 if gen >= 2 else 2,
-                        )
+                        if cross_lin and "first_sentient_speciation" not in self.discoveries:
+                            self.discoveries["first_sentient_speciation"] = self.world.day
+                            self._record_event(
+                                "birth",
+                                f"NEW SENTIENT SPECIES BORN! {a.lineage} {a.id} & {b.lineage} {b.id} gave rise to hybrid lineage {c_lin} ({cid})!",
+                                [a.id, b.id, cid],
+                                cx,
+                                cy,
+                                importance=5,
+                            )
+                        else:
+                            if gen == 2 and "gen_2_born" not in self.discoveries:
+                                self.discoveries["gen_2_born"] = self.world.day
+                            self._record_event(
+                                "birth",
+                                f"{mode_name}: {a.lineage} {a.id} & {b.lineage} {b.id} welcomed hatchling {cid} (Gen {gen}).",
+                                [a.id, b.id, cid],
+                                cx,
+                                cy,
+                                importance=3 if gen >= 2 else 2,
+                            )
                         break
 
 
@@ -1598,6 +1735,14 @@ class MiroFishObservatory:
             "first_burial_rite": "Built permanent stone burial cairns for the dead",
             "first_herbal_medicine": "Discovered natural wound-healing with medicinal herbs",
             "struct_palisade": "Built fortified timber palisade walls against predators",
+            "first_cooked_meal": "Roasted food over fire for higher nutrition",
+            "first_agriculture": "Planted cereal seeds into cultivated farm plots",
+            "first_barter_trade": "Established bilateral barter trade of goods",
+            "struct_watercraft": "Built buoyant watercraft to cross rivers and seas",
+            "craft_wheeled_cart": "Invented the axle-mounted wheeled transport cart",
+            "struct_open_creation": "Synthesized a brand-new unscripted 3D apparatus",
+            "first_fauna_speciation": "Wild fauna evolved into a brand-new daughter species",
+            "first_sentient_speciation": "Cross-continent lineages birthed a new hybrid sentient race",
         }
         MILESTONE_LABELS_ES = {
             "first_shared_word": "Inventaron su primera palabra hablada común",
@@ -1625,6 +1770,14 @@ class MiroFishObservatory:
             "first_burial_rite": "Primer rito funerario: túmulos de piedra sobre los difuntos",
             "first_herbal_medicine": "Descubrimiento de hierbas medicinales curativas",
             "struct_palisade": "Murallas/empalizadas de madera frente a grandes depredadores",
+            "first_cooked_meal": "Cocinado de alimentos al fuego (+nutrición)",
+            "first_agriculture": "Nacimiento de la agricultura sembrando cereal",
+            "first_barter_trade": "Primer comercio por trueque de bienes entre individuos",
+            "struct_watercraft": "Construcción de balsas/embarcaciones para cruzar aguas",
+            "craft_wheeled_cart": "Invención de la rueda y carros de transporte",
+            "struct_open_creation": "Invención libre de un artefacto 3D inédito",
+            "first_fauna_speciation": "Especiación darwiniana: nace una nueva especie animal salvaje",
+            "first_sentient_speciation": "Hibridación fértil: nace una nueva raza inteligente",
         }
 
         milestone_list_en = [
@@ -1655,18 +1808,21 @@ class MiroFishObservatory:
             extinct_note_en = f" Natural selection: {', '.join(missing)} went extinct in earlier resource winters, leaving {surviving_names} as the surviving lineage (Gen {self.live.max_generation})."
             extinct_note_es = f" Selección natural: {', '.join(missing)} se extinguieron en inviernos y disputas previas, quedando {surviving_names} como linaje superviviente (Gen {self.live.max_generation})."
 
-        total_wild_species = len(FAUNA_CATALOG)
+        evolved_wild_count = len(self.live.world.evolved_fauna)
+        total_wild_species = len(FAUNA_CATALOG) + evolved_wild_count
         extinct_wild_list = list(self.live.world.extinct_fauna.keys())
         alive_wild_species = total_wild_species - len(extinct_wild_list)
+        ev_note_en = f" (+{evolved_wild_count} newly evolved species!)" if evolved_wild_count else ""
+        ev_note_es = f" (+{evolved_wild_count} nuevas especies evolucionadas)" if evolved_wild_count else ""
         bio_en = (
-            f"All {total_wild_species}/{total_wild_species} wild animal species still survive."
+            f"All {total_wild_species}/{total_wild_species} wild animal species thrive{ev_note_en}."
             if not extinct_wild_list
-            else f"{alive_wild_species}/{total_wild_species} wild species survive ({len(extinct_wild_list)} driven extinct: {', '.join(extinct_wild_list[:4])})."
+            else f"{alive_wild_species}/{total_wild_species} wild species survive{ev_note_en} ({len(extinct_wild_list)} extinct: {', '.join(extinct_wild_list[:4])})."
         )
         bio_es = (
-            f"Conviven las {total_wild_species}/{total_wild_species} especies animales salvajes sin extinciones aún."
+            f"Conviven las {total_wild_species}/{total_wild_species} especies salvajes{ev_note_es}."
             if not extinct_wild_list
-            else f"Sobreviven {alive_wild_species}/{total_wild_species} especies salvajes ({len(extinct_wild_list)} extinguidas: {', '.join(extinct_wild_list[:4])})."
+            else f"Sobreviven {alive_wild_species}/{total_wild_species} especies salvajes{ev_note_es} ({len(extinct_wild_list)} extinguidas: {', '.join(extinct_wild_list[:4])})."
         )
 
         disciplines = {
@@ -1690,9 +1846,9 @@ class MiroFishObservatory:
                 f"and have performed {self.live.experiment_trials} hands-on material trials ({cloaks_held} wearing woven cloaks, {tools_held} carrying stone tools)."
             ),
             "economics": (
-                f"BIOSPHERE, HUNTING, STOCKPILES & PRECIOUS MATTER: {bio_en} "
-                f"Recorded {self.live.hunts_count} land hunts, {self.live.fishing_count} shoreline catches, {stored_surplus} stored rations, "
-                f"and {rare_held} precious minerals (gold/silver/diamond/amber/jade) accumulated."
+                f"BIOSPHERE, TRADE, FARMING & MATTER: {bio_en} "
+                f"Recorded {self.live.hunts_count} hunts, {self.live.fishing_count} fish catches, {self.live.crops_planted} farm plots, "
+                f"{self.live.trade_count} barter trades, and {rare_held} precious minerals accumulated."
             ),
             "philosophy": (
                 f"DEATH, RITUALS & INNER WONDER: {self.live.philosophical_count} reflections about stars, life, and mortality. "
@@ -1722,9 +1878,9 @@ class MiroFishObservatory:
                 f"y han probado {self.live.experiment_trials} combinaciones de materiales ({cloaks_held} llevan abrigos tejidos, {tools_held} portan herramientas)."
             ),
             "economics": (
-                f"BIOSFERA, EXTINCIONES, ACUMULACIÓN Y METALES PRECIOSOS: {bio_es} "
-                f"Acumulan {self.live.hunts_count} cacerías, {self.live.fishing_count} capturas de pesca, {stored_surplus} raciones guardadas "
-                f"y {rare_held} minerales preciosos (oro, plata, diamante, ámbar o jade) recolectados libremente."
+                f"BIOSFERA, TRUEQUE, AGRICULTURA Y METALES: {bio_es} "
+                f"Registradas {self.live.hunts_count} cacerías, {self.live.fishing_count} pescas, {self.live.crops_planted} cultivos sembrados, "
+                f"{self.live.trade_count} intercambios por trueque y {rare_held} minerales preciosos recolectados."
             ),
             "philosophy": (
                 f"MUERTE, DUELO, RITOS Y PENSAMIENTO: {self.live.philosophical_count} reflexiones espontáneas sobre el cielo y la existencia. "
@@ -1883,7 +2039,15 @@ class MiroFishObservatory:
                 for c in self.live.world.corpses.values()
             ],
             "animals": [
-                {"id": an.id, "species": an.species, "x": an.x, "y": an.y, "tamed": bool(an.tamed_by)}
+                {
+                    "id": an.id,
+                    "species": an.species,
+                    "x": an.x,
+                    "y": an.y,
+                    "tamed": bool(an.tamed_by),
+                    "scale": an.size_gene,
+                    "color": an.coat_color,
+                }
                 for an in self.live.world.animals.values()
                 if an.alive
             ],
@@ -1897,6 +2061,7 @@ class MiroFishObservatory:
                     "fuel": round(s.fuel, 1),
                     "stored_food": s.stored_food,
                     "inscription": s.inscription,
+                    "blueprint_3d": s.blueprint_3d,
                 }
                 for s in self.live.world.structures.values()
             ],
