@@ -1025,6 +1025,10 @@ class CosmosWorld:
                 dead_ids.append(sid)
         for sid in dead_ids:
             del self.structures[sid]
+        if len(self.structures) > 28:
+            recyclable = [sid for sid, st in self.structures.items() if st.kind not in ("monolith", "cairn")]
+            for sid in recyclable[: len(self.structures) - 28]:
+                del self.structures[sid]
 
         expired_corpses = [cid for cid, c in self.corpses.items() if c.ttl_ticks <= 1]
         for cid, c in self.corpses.items():

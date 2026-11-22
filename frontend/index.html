@@ -1035,6 +1035,36 @@
     const corpseRigs = new Map();
     const structMeshes = new Map();
 
+    function disposeObject3D(root) {
+      if (!root) return;
+      if (root.userData?.tag) root.userData.tag.remove();
+      root.traverse((obj) => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          for (const m of mats) {
+            if (m.map) m.map.dispose();
+            m.dispose();
+          }
+        }
+      });
+    }
+
+    function pickNaturalWaypoint(ax, az, span, domain = 'land') {
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const ang = Math.random() * Math.PI * 2;
+        const dist = 2.2 + Math.random() * span;
+        const nx = Math.max(-68, Math.min(72, ax + Math.cos(ang) * dist));
+        const nz = Math.max(-68, Math.min(72, az + Math.sin(ang) * dist));
+        const h = terrainHeight(nx, nz);
+        if (domain === 'water' && h < -0.05) return { x: nx, z: nz, y: -0.06 };
+        if (domain === 'air') return { x: nx, z: nz, y: Math.max(0, h) };
+        if (domain === 'land' && h > 0.08 && h < 3.2) return { x: nx, z: nz, y: h };
+      }
+      const h0 = terrainHeight(ax, az);
+      return { x: ax, z: az, y: domain === 'water' ? -0.06 : Math.max(0.02, h0) };
+    }
+
     function createSentientRig(ag) {
       const group = new THREE.Group();
       const bodyMat = new THREE.MeshStandardMaterial({ color: ag.body_color, roughness: 0.34 });
@@ -1139,8 +1169,11 @@
 
       group.userData = {
         id: ag.id,
+        entityType: 'agent',
+        serverAnchor: { x: ag.x, z: ag.y },
         targetPos: new THREE.Vector3(ag.x, y0, ag.y),
         targetHeading: ag.heading || 0,
+        pauseUntil: 0,
         lastMood: ag.mood || 'curious',
         faceCtx, faceTex,
         nextBlink: Math.random() * 4 + 2,
@@ -1242,10 +1275,34 @@
         }
         g.add(body, head);
       }
+      const halo = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.68, 24), new THREE.MeshBasicMaterial({ color: 0x34d399, side: THREE.DoubleSide }));
+      halo.rotation.x = Math.PI / 2; halo.position.y = 0.05; halo.visible = false;
+      g.add(halo);
+      const tag = document.createElement('div');
+      tag.className = 'floating-tag';
+      tag.style.display = 'none';
+      labelsLayer.appendChild(tag);
+
       const baseAlt = sp === 'skyglider' ? 4.4 : (sp === 'reedwing' ? 2.4 : (sp === 'pollenwing' ? 1.35 : 0.0));
       const y0 = (isWater ? -0.06 : Math.max(-0.02, terrainHeight(an.x, an.y))) + baseAlt;
       g.position.set(an.x, y0, an.y);
-      g.userData = Object.assign(g.userData || {}, { species: sp, isWater, baseAlt, targetPos: new THREE.Vector3(an.x, y0, an.y), heading: 0 });
+      const dom = isWater ? 'water' : (isAir ? 'air' : 'land');
+      g.userData = Object.assign(g.userData || {}, {
+        id: an.id,
+        entityType: 'animal',
+        data: an,
+        species: sp,
+        domain: dom,
+        isWater,
+        baseAlt,
+        serverAnchor: { x: an.x, z: an.y },
+        targetPos: new THREE.Vector3(an.x, y0, an.y),
+        heading: Math.random() * Math.PI * 2,
+        pauseUntil: 0,
+        phase: Math.random() * Math.PI * 2,
+        halo,
+        tag
+      });
       surfaceWorld.add(g);
       return g;
     }
@@ -1274,7 +1331,55 @@
 
     function createStructureMesh(st) {
       const g = new THREE.Group();
-      // Open-Ended Procedural 3D Blueprint Engine (renders watercraft, crop plots & any novel AI-invented apparatus!)
+      const halo = new THREE.Mesh(new THREE.RingGeometry(0.75, 0.90, 28), new THREE.MeshBasicMaterial({ color: 0xfbbf24, side: THREE.DoubleSide }));
+      halo.rotation.x = Math.PI / 2; halo.position.y = 0.05; halo.visible = false;
+      g.add(halo);
+      const tag = document.createElement('div');
+      tag.className = 'floating-tag';
+      tag.style.display = 'none';
+      labelsLayer.appendChild(tag);
+      g.userData = { id: st.id, entityType: 'structure', data: st, halo, tag, stalks: [] };
+
+      // 1. Dedicated Lush 3D Cultivated Cereal Garden (replaces ugly flat brown squares!)
+      if (st.kind === 'crop_plot') {
+        const soilBed = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.62, 0.68, 0.07, 10),
+          new THREE.MeshStandardMaterial({ color: 0x365314, roughness: 0.92 })
+        );
+        soilBed.position.y = 0.035;
+        g.add(soilBed);
+        const railMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.88 });
+        for (let a = 0; a < 4; a++) {
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 0.24, 6), railMat);
+          const ang = a * (Math.PI / 2) + Math.PI / 4;
+          post.position.set(Math.cos(ang) * 0.58, 0.12, Math.sin(ang) * 0.58);
+          g.add(post);
+        }
+        const stemMat = new THREE.MeshStandardMaterial({ color: 0x65a30d, roughness: 0.7 });
+        const earMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xca8a04, emissiveIntensity: 0.22, roughness: 0.5 });
+        const coords = [
+          [-0.28, -0.24], [0, -0.26], [0.28, -0.22],
+          [-0.26, 0.02], [0.02, 0.0], [0.26, 0.04],
+          [-0.22, 0.26], [0.04, 0.28], [0.24, 0.24]
+        ];
+        for (const [cx, cz] of coords) {
+          const stalkGrp = new THREE.Group();
+          const h = 0.44 + ((Math.abs(cx * 13 + cz * 7) % 1) * 0.16);
+          const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.028, h, 5), stemMat);
+          stem.position.y = h * 0.5;
+          const ear = new THREE.Mesh(new THREE.CapsuleGeometry(0.042, 0.12, 4, 6), earMat);
+          ear.position.y = h + 0.04;
+          stalkGrp.add(stem, ear);
+          stalkGrp.position.set(cx, 0.05, cz);
+          g.add(stalkGrp);
+          g.userData.stalks.push(stalkGrp);
+        }
+        g.position.set(st.x, terrainHeight(st.x, st.y), st.y);
+        surfaceWorld.add(g);
+        return g;
+      }
+
+      // 2. Open-Ended Procedural 3D Blueprint Engine (watercraft & novel AI-invented apparatuses!)
       if (st.blueprint_3d && st.blueprint_3d.length > 0) {
         for (const part of st.blueprint_3d) {
           let geo;
@@ -1304,7 +1409,8 @@
         const flame = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.72, 8), new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xf97316, emissiveIntensity: 2.2 }));
         flame.position.y = 0.42;
         const light = new THREE.PointLight(0xf97316, 4.2, 11.0); light.position.y = 1.0;
-        g.add(stones, flame, light); g.userData = { flame, light };
+        g.add(stones, flame, light);
+        g.userData.flame = flame; g.userData.light = light;
       } else if (st.kind === 'shelter') {
         const hut = new THREE.Mesh(new THREE.SphereGeometry(0.95, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.85 }));
         hut.castShadow = true; g.add(hut);
@@ -1333,6 +1439,8 @@
 
     let latestState = null;
     let selectedSubjectId = null;
+    let selectedEntity = { type: 'agent', id: null };
+    let lastCloudTick = -1;
     let camMode = params.get('closeup') === '1' ? 'closeup' : 'topdown';
     let timelineFilter = 'all';
     let activeDisc = 'psychology';
@@ -1402,8 +1510,10 @@
       let tx, tz;
       if (members.length > 0) {
         selectedSubjectId = members[0].id;
-        tx = members.reduce((s, a) => s + a.x, 0) / members.length;
-        tz = members.reduce((s, a) => s + a.y, 0) / members.length;
+        selectedEntity = { type: 'agent', id: selectedSubjectId };
+        renderSelectedInspector();
+        tx = members.reduce((s, a) => s + (agentRigs.get(a.id)?.position.x ?? a.x), 0) / members.length;
+        tz = members.reduce((s, a) => s + (agentRigs.get(a.id)?.position.z ?? a.y), 0) / members.length;
         showLeftTab('focus');
       } else {
         const enc = (latestState?.enclaves && latestState.enclaves[lin]) || DEFAULT_ENCLAVES[lin] || [4, 10];
@@ -1493,9 +1603,215 @@
       });
     });
 
+    function describeStructure(st) {
+      const es = currentLang === 'es';
+      const creator = st.creator || 'Ancestro del Clan';
+      const lin = st.lineage || 'Sylphid';
+      const day = st.day || 1;
+      let nearest = null, bestD = 9999;
+      for (const a of (latestState?.agents || [])) {
+        const d = Math.hypot(a.x - st.x, a.y - st.y);
+        if (d < bestD) { bestD = d; nearest = a; }
+      }
+      const caretakerEs = nearest ? `${nearest.id} (${nearest.lineage}, a ${bestD.toFixed(1)}m)` : 'Clan en expedición';
+      const caretakerEn = nearest ? `${nearest.id} (${nearest.lineage}, ${bestD.toFixed(1)}m away)` : 'Clan out foraging';
+
+      const catalog = {
+        crop_plot: {
+          tagEs: `🌾 Huerto (${st.id}) · ${nearest ? nearest.id : creator}`,
+          tagEn: `🌾 Cereal Garden (${st.id}) · ${nearest ? nearest.id : creator}`,
+          bioEs: `🌾 Huerto de Cereal Cultivado (${st.id}) — Sembrado por ${creator} (${lin}) en el Día ${day}. Cuidador más cercano: ${caretakerEs}.`,
+          bioEn: `🌾 Cultivated Cereal Garden (${st.id}) — Planted by ${creator} (${lin}) on Day ${day}. Nearest caretaker: ${caretakerEn}.`,
+          funcEs: 'Produce grano nutritivo periódicamente sin agotar los bosques salvajes. Los miembros del clan acuden aquí a recolectar cereal.',
+          funcEn: 'Yields recurring golden cereal grain harvests so the clan can eat sustainably without stripping wild forests.'
+        },
+        hearth: {
+          tagEs: `🔥 Hoguera (${st.id}) · ${lin}`,
+          tagEn: `🔥 Fire Hearth (${st.id}) · ${lin}`,
+          bioEs: `🔥 Hoguera Controlada (${st.id}) — Encendida por ${creator} (${lin}) en el Día ${day}. Junto al fuego: ${caretakerEs}.`,
+          bioEn: `🔥 Controlled Fire Hearth (${st.id}) — Ignited by ${creator} (${lin}) on Day ${day}. Tended near: ${caretakerEn}.`,
+          funcEs: `Da calor en invierno, ahuyenta depredadores nocturnos y permite cocinar alimentos (+45% nutrición). Combustible: ${Math.round(st.fuel || 0)}%.`,
+          funcEn: `Provides winter warmth, wards off nocturnal predators, and roasts food (+45% nutrition). Fuel: ${Math.round(st.fuel || 0)}%.`
+        },
+        shelter: {
+          tagEs: `🛖 Cabaña (${st.id}) · ${lin}`,
+          tagEn: `🛖 Shelter Hut (${st.id}) · ${lin}`,
+          bioEs: `🛖 Cabaña de Piedra y Madera (${st.id}) — Construida por ${creator} (${lin}) en el Día ${day}. Habitante cercano: ${caretakerEs}.`,
+          bioEn: `🛖 Stone & Timber Hut (${st.id}) — Built by ${creator} (${lin}) on Day ${day}. Nearest resident: ${caretakerEn}.`,
+          funcEs: 'Refugio permanente contra el frío invernal, lluvias y estrés ambiental donde descansan los miembros del clan.',
+          funcEn: 'Permanent weatherproof shelter protecting clan members from winter cold and environmental stress.'
+        },
+        granary: {
+          tagEs: `🏺 Granero (${st.id}) · ${st.stored_food || 0} uds`,
+          tagEn: `🏺 Clay Granary (${st.id}) · ${st.stored_food || 0} stored`,
+          bioEs: `🏺 Granero Cerámico Comunal (${st.id}) — Modelado por ${creator} (${lin}) en el Día ${day}. Custodio cercano: ${caretakerEs}.`,
+          bioEn: `🏺 Communal Clay Granary (${st.id}) — Fired by ${creator} (${lin}) on Day ${day}. Nearest keeper: ${caretakerEn}.`,
+          funcEs: `Almacena excedentes de comida (${st.stored_food || 0} raciones guardadas) para compartir en épocas de escasez.`,
+          funcEn: `Stores communal food reserves (${st.stored_food || 0} rations) for hungry clanmates and harsh winters.`
+        },
+        watercraft: {
+          tagEs: `🛶 Embarcación (${st.id}) · ${lin}`,
+          tagEn: `🛶 Watercraft (${st.id}) · ${lin}`,
+          bioEs: `🛶 Balsa Navegable (${st.id}) — Ensamblada por ${creator} (${lin}) en el Día ${day}. Navegante cercano: ${caretakerEs}.`,
+          bioEn: `🛶 Buoyant Watercraft (${st.id}) — Built by ${creator} (${lin}) on Day ${day}. Nearest navigator: ${caretakerEn}.`,
+          funcEs: 'Permite cruzar ríos, estrechos y mares hacia otros continentes.',
+          funcEn: 'Allows beings to cross rivers, straits, and ocean channels between continents.'
+        },
+        palisade: {
+          tagEs: `🪵 Empalizada (${st.id}) · ${lin}`,
+          tagEn: `🪵 Palisade Wall (${st.id}) · ${lin}`,
+          bioEs: `🪵 Empalizada Defensiva (${st.id}) — Erigida por ${creator} (${lin}) en el Día ${day}.`,
+          bioEn: `🪵 Timber Palisade (${st.id}) — Erected by ${creator} (${lin}) on Day ${day}.`,
+          funcEs: 'Barrera defensiva de troncos frente a grandes depredadores salvajes.',
+          funcEn: 'Fortified timber wall protecting the settlement against wild apex predators.'
+        },
+        cairn: {
+          tagEs: `🪨 Túmulo Funerario (${st.id})`,
+          tagEn: `🪨 Burial Cairn (${st.id})`,
+          bioEs: `🪨 Túmulo Funerario de Piedra (${st.id}) — Levantado por ${creator} (${lin}) en el Día ${day}.`,
+          bioEn: `🪨 Stone Burial Cairn (${st.id}) — Raised by ${creator} (${lin}) on Day ${day}.`,
+          funcEs: 'Monumento funerario espontáneo en memoria de un compañero fallecido.',
+          funcEn: 'Spontaneous funerary stone memorial honoring a fallen peer.'
+        }
+      };
+      const spec = catalog[st.kind] || {
+        tagEs: `⚙️ ${st.name || st.kind} (${st.id})`,
+        tagEn: `⚙️ ${st.name || st.kind} (${st.id})`,
+        bioEs: `⚙️ Creación Libre (${st.id}: ${st.name || st.kind}) — Inventada por ${creator} (${lin}) en el Día ${day}. Cerca: ${caretakerEs}.`,
+        bioEn: `⚙️ Autonomous Creation (${st.id}: ${st.name || st.kind}) — Built by ${creator} (${lin}) on Day ${day}. Nearby: ${caretakerEn}.`,
+        funcEs: st.inscription ? `Inscripción grabada: «${st.inscription}». Estructura emergente creada sin guion previo.` : 'Artefacto 3D emergente sintetizado libremente combinando materias primas.',
+        funcEn: st.inscription ? `Carved inscription: «${st.inscription}». Unscripted emergent landmark.` : 'Emergent 3D apparatus synthesized freely from raw planetary materials.'
+      };
+      return {
+        tag: es ? spec.tagEs : spec.tagEn,
+        bio: es ? spec.bioEs : spec.bioEn,
+        thought: es ? spec.funcEs : spec.funcEn,
+        notes: es
+          ? [`Creador original: ${creator} (${lin})`, `Construido en: Día ${day}`, `Actividad cercana: ${caretakerEs}`]
+          : [`Original builder: ${creator} (${lin})`, `Built on: Day ${day}`, `Nearest activity: ${caretakerEn}`]
+      };
+    }
+
+    function describeAnimal(an) {
+      const es = currentLang === 'es';
+      const label = an.label || an.species;
+      const rawSp = (an.species || '').replace(/^(frost|sun|emerald)_/, '');
+      const isEvolved = /^(frost|sun|emerald)_/.test(an.species || '');
+      const isPred = ['shadowstalker', 'sunmane', 'frostmaw', 'mirejaw', 'venomcoil', 'abyssalfin'].includes(rawSp);
+      const isWater = ['silverfin_shoal', 'abyssalfin', 'leviathansong', 'tidecrawler', 'pearlclam', 'stingshell'].includes(rawSp);
+      const isAir = ['pollenwing', 'skyglider', 'reedwing'].includes(rawSp);
+      const statusEs = an.tamed ? `Domesticado (Compañero de ${an.tamed_by})` : (isEvolved ? 'Especie Evolucionada por Especiación Darwiniana' : 'Fauna Salvaje Libre');
+      const statusEn = an.tamed ? `Domesticated (Companion of ${an.tamed_by})` : (isEvolved ? 'Evolved Daughter Species (Darwinian Speciation)' : 'Free Wild Fauna');
+      const roleEs = isPred
+        ? 'Depredador activo de la red trófica: caza presas para sobrevivir y supone un peligro si los seres van desarmados.'
+        : isWater
+        ? 'Fauna acuática/marina: mantiene el ecosistema fluvial y oceánico; recurso de pesca costera.'
+        : isAir
+        ? 'Fauna aérea/polinizadora: dispersa semillas y fertiliza la flora salvaje del planeta.'
+        : 'Herbívoro terrestre: pasta en praderas y bosques; puede convivir, ser cazado o domesticado según la especie.';
+      const roleEn = isPred
+        ? 'Active trophic predator: hunts wild prey and poses danger to unarmed beings.'
+        : isWater
+        ? 'Aquatic/marine fauna sustaining river and ocean ecosystems and coastal fishing.'
+        : isAir
+        ? 'Aerial/pollinator fauna dispersing seeds and fertilizing planetary flora.'
+        : 'Terrestrial herbivore grazing across biomes; coexists, or may be hunted or tamed.';
+      return {
+        tag: `🐾 ${label} (Gen ${an.gen || 1})${an.tamed ? ' · 🤝' : ''}`,
+        bio: es ? `🐾 ${label} (${an.id}) · Generación ${an.gen || 1} — ${statusEs}.` : `🐾 ${label} (${an.id}) · Generation ${an.gen || 1} — ${statusEn}.`,
+        thought: es ? roleEs : roleEn,
+        notes: es
+          ? [`Especie: ${label}`, `Estado: ${statusEs}`, `Escala genética: ${(an.scale || 1.0).toFixed(2)}x`]
+          : [`Species: ${label}`, `Status: ${statusEn}`, `Genetic size: ${(an.scale || 1.0).toFixed(2)}x`]
+      };
+    }
+
+    function renderSelectedInspector() {
+      if (!latestState) return;
+      for (const [id, rig] of agentRigs.entries()) rig.userData.halo.visible = (selectedEntity.type === 'agent' && id === selectedEntity.id);
+      for (const [sid, sm] of structMeshes.entries()) {
+        const sel = (selectedEntity.type === 'structure' && sid === selectedEntity.id);
+        if (sm.userData.halo) sm.userData.halo.visible = sel;
+        if (!sel && sm.userData.tag) sm.userData.tag.style.display = 'none';
+      }
+      for (const [aid, ar] of animalRigs.entries()) {
+        const sel = (selectedEntity.type === 'animal' && aid === selectedEntity.id);
+        if (ar.userData.halo) ar.userData.halo.visible = sel;
+        if (!sel && ar.userData.tag) ar.userData.tag.style.display = 'none';
+      }
+
+      if (selectedEntity.type === 'structure') {
+        const st = (latestState.structures || []).find(s => s.id === selectedEntity.id);
+        if (st) {
+          const info = describeStructure(st);
+          document.getElementById('subj-bio').textContent = info.bio;
+          document.getElementById('val-energy').textContent = st.kind === 'crop_plot' ? '🌾 100%' : `${Math.round(st.fuel || 100)}%`;
+          document.getElementById('bar-energy').style.width = st.kind === 'crop_plot' ? '100%' : `${Math.min(100, st.fuel || 100)}%`;
+          document.getElementById('val-warmth').textContent = st.kind === 'hearth' ? '🔥 100%' : '—';
+          document.getElementById('bar-warmth').style.width = st.kind === 'hearth' ? '100%' : '0%';
+          document.getElementById('val-rest').textContent = st.kind === 'shelter' ? '🛖 100%' : '—';
+          document.getElementById('bar-rest').style.width = st.kind === 'shelter' ? '100%' : '0%';
+          document.getElementById('val-stress').textContent = '0%';
+          document.getElementById('bar-stress').style.width = '0%';
+          document.getElementById('subj-thought').textContent = info.thought;
+          document.getElementById('subj-memories').innerHTML = info.notes.map(n => `<div>• ${n}</div>`).join('');
+          const sm = structMeshes.get(st.id);
+          if (sm?.userData?.tag) sm.userData.tag.innerHTML = `<strong>${info.tag}</strong>`;
+          return;
+        }
+      }
+
+      if (selectedEntity.type === 'animal') {
+        const an = (latestState.animals || []).find(a => a.id === selectedEntity.id);
+        if (an) {
+          const info = describeAnimal(an);
+          document.getElementById('subj-bio').textContent = info.bio;
+          document.getElementById('val-energy').textContent = '100%';
+          document.getElementById('bar-energy').style.width = '100%';
+          document.getElementById('val-warmth').textContent = '90%';
+          document.getElementById('bar-warmth').style.width = '90%';
+          document.getElementById('val-rest').textContent = '85%';
+          document.getElementById('bar-rest').style.width = '85%';
+          document.getElementById('val-stress').textContent = an.tamed ? '5%' : '18%';
+          document.getElementById('bar-stress').style.width = an.tamed ? '5%' : '18%';
+          document.getElementById('subj-thought').textContent = info.thought;
+          document.getElementById('subj-memories').innerHTML = info.notes.map(n => `<div>• ${n}</div>`).join('');
+          const ar = animalRigs.get(an.id);
+          if (ar?.userData?.tag) ar.userData.tag.innerHTML = `<strong>${info.tag}</strong>`;
+          return;
+        }
+      }
+
+      const subj = latestState.agents.find(a => a.id === selectedSubjectId) || latestState.agents[0];
+      if (subj) {
+        selectedSubjectId = subj.id;
+        selectedEntity = { type: 'agent', id: subj.id };
+        for (const [id, rig] of agentRigs.entries()) rig.userData.halo.visible = (id === subj.id);
+        document.getElementById('subj-bio').textContent = subj.bio;
+        document.getElementById('val-energy').textContent = `${Math.round(subj.energy)}%`;
+        document.getElementById('bar-energy').style.width = `${subj.energy}%`;
+        document.getElementById('val-warmth').textContent = `${Math.round(subj.warmth)}%`;
+        document.getElementById('bar-warmth').style.width = `${subj.warmth}%`;
+        const restVal = subj.rest !== undefined ? subj.rest : 85;
+        document.getElementById('val-rest').textContent = `${Math.round(restVal)}%`;
+        document.getElementById('bar-rest').style.width = `${restVal}%`;
+        document.getElementById('val-stress').textContent = `${Math.round(subj.stress)}%`;
+        document.getElementById('bar-stress').style.width = `${subj.stress}%`;
+        document.getElementById('subj-thought').textContent = `«${subj.thought}»`;
+        document.getElementById('subj-memories').innerHTML = (subj.memories || []).slice().reverse().map(
+          mem => `<div>• ${mem}</div>`
+        ).join('');
+      }
+    }
+
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
+    let pointerDownPt = { x: 0, y: 0 };
     renderer.domElement.addEventListener('pointerdown', (ev) => {
+      pointerDownPt = { x: ev.clientX, y: ev.clientY };
+    });
+    renderer.domElement.addEventListener('pointerup', (ev) => {
+      if (Math.hypot(ev.clientX - pointerDownPt.x, ev.clientY - pointerDownPt.y) > 9) return; // Ignore camera drags!
       pointer.x = (ev.clientX / window.innerWidth) * 2 - 1;
       pointer.y = -(ev.clientY / window.innerHeight) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
@@ -1506,15 +1822,24 @@
           return;
         }
       }
-      const hits = raycaster.intersectObjects(Array.from(agentRigs.values()), true);
+      const interactiveRoots = [
+        ...Array.from(agentRigs.values()),
+        ...Array.from(structMeshes.values()),
+        ...Array.from(animalRigs.values())
+      ];
+      const hits = raycaster.intersectObjects(interactiveRoots, true);
       if (hits.length > 0) {
         let obj = hits[0].object;
-        while (obj && !obj.userData?.id) obj = obj.parent;
+        while (obj && !obj.userData?.entityType) obj = obj.parent;
         if (obj?.userData?.id) {
-          selectedSubjectId = obj.userData.id;
+          selectedEntity = { type: obj.userData.entityType, id: obj.userData.id };
+          if (obj.userData.entityType === 'agent') {
+            selectedSubjectId = obj.userData.id;
+            if (ev.detail === 2) setCamMode('closeup');
+          }
+          renderSelectedInspector();
           showLeftTab('focus');
           if (window.innerWidth <= 940) document.body.classList.add('mob-left');
-          if (ev.detail === 2) setCamMode('closeup');
         }
       } else if (window.innerWidth <= 940) {
         document.body.classList.remove('mob-left', 'mob-right');
@@ -1570,6 +1895,9 @@
       latestState = state;
       const w = state.world;
       const m = state.metrics;
+      const isCloudMode = Boolean(cloudPollTimer);
+      const isNewServerTick = (w.tick !== lastCloudTick);
+      lastCloudTick = w.tick;
 
       document.getElementById('ui-time').textContent = `Y${w.year} · Day ${w.day}`;
       document.getElementById('ui-season').textContent = w.season;
@@ -1597,17 +1925,20 @@
         lastWinterState = isWinter;
         buildContinuousTerrain(isWinter);
       }
-      if (w.is_night) {
-        scene.background.setHex(0x1e293b); scene.fog.color.setHex(0x1e293b);
-        sunLight.intensity = 0.65; hemiLight.intensity = 0.85;
-      } else {
-        scene.background.setHex(isWinter ? 0xcbd5e1 : 0x7dd3fc);
-        scene.fog.color.setHex(isWinter ? 0xe2e8f0 : 0xbae6fd);
-        sunLight.intensity = 1.75; hemiLight.intensity = 1.35;
+      if (!globeGroup.visible) {
+        if (w.is_night) {
+          scene.background.setHex(0x1e293b); scene.fog.color.setHex(0x1e293b);
+          sunLight.intensity = 0.65; hemiLight.intensity = 0.85;
+        } else {
+          scene.background.setHex(isWinter ? 0xcbd5e1 : 0x7dd3fc);
+          scene.fog.color.setHex(isWinter ? 0xe2e8f0 : 0xbae6fd);
+          sunLight.intensity = 1.75; hemiLight.intensity = 1.35;
+        }
       }
 
       if (!selectedSubjectId || !state.agents.some(a => a.id === selectedSubjectId)) {
         selectedSubjectId = state.spotlight_id;
+        if (selectedEntity.type === 'agent') selectedEntity.id = selectedSubjectId;
       }
 
       const activeIds = new Set();
@@ -1619,8 +1950,11 @@
           agentRigs.set(ag.id, rig);
         }
         rig.scale.setScalar(ag.scale || 1.0);
-        rig.userData.targetPos.set(ag.x, terrainHeight(ag.x, ag.y), ag.y);
-        rig.userData.targetHeading = ag.heading || 0;
+        if (!isCloudMode || isNewServerTick) {
+          rig.userData.serverAnchor = { x: ag.x, z: ag.y };
+          rig.userData.targetPos.set(ag.x, terrainHeight(ag.x, ag.y), ag.y);
+          rig.userData.targetHeading = ag.heading || 0;
+        }
         rig.userData.cloak.visible = ag.has_cloak;
         rig.userData.spearMesh.visible = ag.has_tool;
 
@@ -1639,7 +1973,8 @@
           rig.userData.heldMesh.visible = false;
         }
 
-        if (ag.id === selectedSubjectId) {
+        const isSelAgent = (selectedEntity.type === 'agent' && ag.id === selectedEntity.id);
+        if (isSelAgent) {
           rig.userData.tagPriority = 3;
           rig.userData.tag.className = ag.utterance ? 'floating-tag speech' : 'floating-tag';
           rig.userData.tag.innerHTML = ag.utterance
@@ -1660,7 +1995,7 @@
       }
       for (const [id, rig] of agentRigs.entries()) {
         if (!activeIds.has(id)) {
-          rig.userData.tag.remove(); surfaceWorld.remove(rig); agentRigs.delete(id);
+          surfaceWorld.remove(rig); disposeObject3D(rig); agentRigs.delete(id);
         }
       }
 
@@ -1669,12 +2004,16 @@
         animIds.add(an.id);
         let ar = animalRigs.get(an.id);
         if (!ar) { ar = createWildAnimalRig(an); animalRigs.set(an.id, ar); }
-        const ay = (ar.userData.isWater ? -0.06 : Math.max(-0.02, terrainHeight(an.x, an.y))) + (ar.userData.baseAlt || 0);
-        ar.userData.targetPos.set(an.x, ay, an.y);
+        ar.userData.data = an;
+        if (!isCloudMode || isNewServerTick) {
+          ar.userData.serverAnchor = { x: an.x, z: an.y };
+          const ay = (ar.userData.isWater ? -0.06 : Math.max(-0.02, terrainHeight(an.x, an.y))) + (ar.userData.baseAlt || 0);
+          ar.userData.targetPos.set(an.x, ay, an.y);
+        }
         if (ar.userData.collar) ar.userData.collar.visible = !!an.tamed;
       }
       for (const [id, ar] of animalRigs.entries()) {
-        if (!animIds.has(id)) { surfaceWorld.remove(ar); animalRigs.delete(id); }
+        if (!animIds.has(id)) { surfaceWorld.remove(ar); disposeObject3D(ar); animalRigs.delete(id); }
       }
 
       const cpIds = new Set();
@@ -1685,7 +2024,7 @@
         if (cm.userData.offeringDot) cm.userData.offeringDot.visible = (cp.offerings || 0) > 0;
       }
       for (const [cid, cm] of corpseRigs.entries()) {
-        if (!cpIds.has(cid)) { surfaceWorld.remove(cm); corpseRigs.delete(cid); }
+        if (!cpIds.has(cid)) { surfaceWorld.remove(cm); disposeObject3D(cm); corpseRigs.delete(cid); }
       }
 
       const sIds = new Set();
@@ -1693,13 +2032,14 @@
         sIds.add(st.id);
         let sm = structMeshes.get(st.id);
         if (!sm) { sm = createStructureMesh(st); structMeshes.set(st.id, sm); }
+        sm.userData.data = st;
         if (st.kind === 'hearth' && sm.userData.flame) {
           const on = st.fuel > 0;
           sm.userData.flame.visible = on; sm.userData.light.intensity = on ? 4.2 : 0.0;
         }
       }
       for (const [sid, sm] of structMeshes.entries()) {
-        if (!sIds.has(sid)) { surfaceWorld.remove(sm); structMeshes.delete(sid); }
+        if (!sIds.has(sid)) { surfaceWorld.remove(sm); disposeObject3D(sm); structMeshes.delete(sid); }
       }
 
       const rList = state.resources || [];
@@ -1716,39 +2056,48 @@
       resInstanced.instanceMatrix.needsUpdate = true;
       if (resInstanced.instanceColor) resInstanced.instanceColor.needsUpdate = true;
 
+      const structIcon = { crop_plot: '🌾', hearth: '🔥', shelter: '🛖', granary: '🏺', watercraft: '🛶', palisade: '🪵', cairn: '🪨' };
+      const structsHtml = (state.structures || []).length > 0
+        ? `<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--border);font-size:10px;color:var(--amber);font-weight:700">${currentLang === 'es' ? '🌾 CULTIVOS Y CONSTRUCCIONES (Toca para ver)' : '🌾 GARDENS & STRUCTURES (Tap to inspect)'}</div>` +
+          state.structures.map(st =>
+            `<div class="roster-row" data-sid="${st.id}">
+              <span>${structIcon[st.kind] || '⚙️'} <strong>${st.id}</strong> · ${st.kind === 'crop_plot' ? (currentLang === 'es' ? 'Huerto Cereal' : 'Cereal Garden') : (st.name || st.kind)}</span>
+              <span style="color:var(--muted)">${st.creator || st.lineage || ''}</span>
+            </div>`
+          ).join('')
+        : '';
+
       rosterBox.innerHTML = state.agents.map(a =>
         `<div class="roster-row" data-aid="${a.id}">
           <span><span class="swatch" style="background:${a.body_color}"></span><strong>${a.id}</strong> · ${a.lineage} (${a.stage})</span>
           <span style="color:var(--muted)">${a.mood}</span>
         </div>`
-      ).join('');
-      rosterBox.querySelectorAll('.roster-row').forEach(r => {
+      ).join('') + structsHtml;
+
+      rosterBox.querySelectorAll('.roster-row[data-aid]').forEach(r => {
         r.addEventListener('click', () => {
           selectedSubjectId = r.dataset.aid;
+          selectedEntity = { type: 'agent', id: r.dataset.aid };
+          renderSelectedInspector();
           showLeftTab('focus');
           setCamMode('closeup');
         });
       });
+      rosterBox.querySelectorAll('.roster-row[data-sid]').forEach(r => {
+        r.addEventListener('click', () => {
+          const st = (latestState?.structures || []).find(s => s.id === r.dataset.sid);
+          if (!st) return;
+          selectedEntity = { type: 'structure', id: st.id };
+          renderSelectedInspector();
+          showLeftTab('focus');
+          setCamMode('topdown');
+          const ty = terrainHeight(st.x, st.y);
+          controls.target.set(st.x, ty + 0.4, st.y);
+          camera.position.set(st.x + 2.5, ty + 11.0, st.y + 13.0);
+        });
+      });
 
-      const subj = state.agents.find(a => a.id === selectedSubjectId) || state.agents[0];
-      if (subj) {
-        selectedSubjectId = subj.id;
-        for (const [id, rig] of agentRigs.entries()) rig.userData.halo.visible = (id === subj.id);
-        document.getElementById('subj-bio').textContent = subj.bio;
-        document.getElementById('val-energy').textContent = `${Math.round(subj.energy)}%`;
-        document.getElementById('bar-energy').style.width = `${subj.energy}%`;
-        document.getElementById('val-warmth').textContent = `${Math.round(subj.warmth)}%`;
-        document.getElementById('bar-warmth').style.width = `${subj.warmth}%`;
-        const restVal = subj.rest !== undefined ? subj.rest : 85;
-        document.getElementById('val-rest').textContent = `${Math.round(restVal)}%`;
-        document.getElementById('bar-rest').style.width = `${restVal}%`;
-        document.getElementById('val-stress').textContent = `${Math.round(subj.stress)}%`;
-        document.getElementById('bar-stress').style.width = `${subj.stress}%`;
-        document.getElementById('subj-thought').textContent = `«${subj.thought}»`;
-        document.getElementById('subj-memories').innerHTML = (subj.memories || []).slice().reverse().map(
-          mem => `<div>• ${mem}</div>`
-        ).join('');
-      }
+      renderSelectedInspector();
 
       const discSource = (currentLang === 'es' && m.disciplines_es) ? m.disciplines_es : (m.disciplines || {});
       document.getElementById('disc-text').textContent = discSource[activeDisc] || '';
@@ -1787,10 +2136,23 @@
       }
     }
 
+    const CLOUD_API_URL = 'https://api.github.com/repos/sergiobuedo/the-new-genesis/contents/chronicles/latest_public_state.json?ref=live-telemetry';
     const CLOUD_TELEMETRY_URL = 'https://raw.githubusercontent.com/sergiobuedo/the-new-genesis/live-telemetry/chronicles/latest_public_state.json';
     let cloudPollTimer = null;
+    let cloudPollCount = 0;
 
     async function pollCloudState() {
+      cloudPollCount++;
+      // Use uncached GitHub Contents API on initial open & every ~90s (stays safely below 60 req/hr unauth limit!)
+      if (cloudPollCount === 1 || cloudPollCount % 9 === 0) {
+        try {
+          const rApi = await fetch(CLOUD_API_URL, {
+            headers: { 'Accept': 'application/vnd.github.raw' },
+            cache: 'no-store'
+          });
+          if (rApi.ok) { applyState(await rApi.json()); return; }
+        } catch (_) {}
+      }
       try {
         const r = await fetch(`${CLOUD_TELEMETRY_URL}?t=${Date.now()}`, { cache: 'no-store' });
         if (r.ok) { applyState(await r.json()); return; }
@@ -1803,8 +2165,8 @@
 
     function startCloudPolling() {
       if (cloudPollTimer) return;
+      cloudPollTimer = setInterval(pollCloudState, 10000);
       pollCloudState();
-      cloudPollTimer = setInterval(pollCloudState, 4000);
     }
 
     function connectStream() {
@@ -1826,13 +2188,17 @@
     connectStream();
 
     const clock = new THREE.Clock();
+    let elapsedSimTime = 0;
     const projVec = new THREE.Vector3();
     const desiredCam = new THREE.Vector3();
     const topbarEl = document.getElementById('topbar-el');
 
     function animate() {
       requestAnimationFrame(animate);
-      const t = clock.getElapsedTime();
+      const dt = Math.min(0.06, clock.getDelta());
+      elapsedSimTime += dt;
+      const t = elapsedSimTime;
+      const isCloudMode = Boolean(cloudPollTimer);
       waterMesh.position.y = -0.04 + Math.sin(t * 1.6) * 0.02;
 
       // Smooth keyboard Arrow / WASD planetary panning
@@ -1847,13 +2213,22 @@
         controls.target.x += dx; controls.target.z += dz;
       }
 
-      // Seamless zoom-out transition to Round 3D Planet (> 175m) and zoom-in back to Continent (< 52m in Globe)
+      // Seamless zoom-out transition to Round 3D Planet (> 175m) and zoom-in back to Continent (< 42m in Globe)
       const camDist = camera.position.distanceTo(controls.target);
       if (camMode === 'topdown' && camDist > 175) {
         setCamMode('globe');
       } else if (camMode === 'globe') {
         globeGroup.rotation.y += 0.0018;
         if (camDist < 42) setCamMode('topdown');
+      }
+
+      // Gentle wind sway on cultivated cereal gardens!
+      for (const sm of structMeshes.values()) {
+        if (sm.userData.stalks && sm.userData.stalks.length > 0) {
+          for (let i = 0; i < sm.userData.stalks.length; i++) {
+            sm.userData.stalks[i].rotation.z = Math.sin(t * 2.2 + i * 0.8 + sm.position.x) * 0.085;
+          }
+        }
       }
 
       const labelCandidates = [];
@@ -1864,27 +2239,59 @@
       const safeTop = cleanMode ? 16 : (topbarEl.offsetHeight + 22);
       const safeBottom = isMobile ? window.innerHeight - 76 : window.innerHeight - 24;
 
+      const walkSpeedCloud = 0.72 + viewSpeed * 0.16;
+      const strideRate = 6.8 + viewSpeed * 0.25;
+
       for (const rig of agentRigs.values()) {
         const ud = rig.userData;
         const target = ud.targetPos;
-        const dx = target.x - rig.position.x;
-        const dz = target.z - rig.position.z;
-        const distSq = dx * dx + dz * dz;
+        let dx = target.x - rig.position.x;
+        let dz = target.z - rig.position.z;
+        let distSq = dx * dx + dz * dz;
+
+        // Continuous 60 FPS Autonomous Life Kinematics between Cloud Telemetry Snapshots!
+        if (isCloudMode && !ud.isSleeping && distSq <= 0.06 && t >= (ud.pauseUntil || 0)) {
+          const anchor = ud.serverAnchor || { x: rig.position.x, z: rig.position.z };
+          let wp = null;
+          if (Math.random() < 0.28 && latestState?.structures?.length) {
+            const nearbyFarm = latestState.structures.find(s => s.kind === 'crop_plot' && Math.hypot(s.x - anchor.x, s.y - anchor.z) < 12.0);
+            if (nearbyFarm) {
+              const ang = Math.random() * Math.PI * 2;
+              wp = { x: nearbyFarm.x + Math.cos(ang) * 0.95, z: nearbyFarm.y + Math.sin(ang) * 0.95 };
+              wp.y = terrainHeight(wp.x, wp.z);
+            }
+          }
+          if (!wp) wp = pickNaturalWaypoint(anchor.x, anchor.z, 6.8, 'land');
+          ud.targetPos.set(wp.x, wp.y, wp.z);
+          ud.targetHeading = Math.atan2(wp.x - rig.position.x, wp.z - rig.position.z);
+          ud.pauseUntil = t + 0.7 + Math.random() * 1.8;
+          dx = ud.targetPos.x - rig.position.x;
+          dz = ud.targetPos.z - rig.position.z;
+          distSq = dx * dx + dz * dz;
+        }
 
         rig.rotation.y = shortestAngleLerp(rig.rotation.y, ud.targetHeading, 0.12);
 
         const targetTilt = ud.isSleeping ? -Math.PI * 0.42 : 0.0;
         rig.rotation.x += (targetTilt - rig.rotation.x) * 0.14;
 
-        if (!ud.isSleeping && distSq > 0.0008) {
-          rig.position.x += dx * 0.11;
-          rig.position.z += dz * 0.11;
-          const sw = Math.sin(t * 8.5 + ud.phase) * 0.36;
+        if (!ud.isSleeping && distSq > 0.0012) {
+          if (isCloudMode) {
+            const dist = Math.sqrt(distSq);
+            const step = Math.min(dist, dt * walkSpeedCloud);
+            rig.position.x += (dx / dist) * step;
+            rig.position.z += (dz / dist) * step;
+            ud.targetHeading = Math.atan2(dx, dz);
+          } else {
+            rig.position.x += dx * 0.11;
+            rig.position.z += dz * 0.11;
+          }
+          const sw = Math.sin(t * strideRate + ud.phase) * 0.36;
           ud.leftLeg.rotation.x = sw;
           ud.rightLeg.rotation.x = -sw;
           ud.leftArm.rotation.x = -sw * 0.75;
           ud.rightArm.rotation.x = sw * 0.75;
-          rig.position.y = terrainHeight(rig.position.x, rig.position.z) + Math.abs(Math.sin(t * 8.5 + ud.phase)) * 0.035;
+          rig.position.y = terrainHeight(rig.position.x, rig.position.z) + Math.abs(Math.sin(t * strideRate + ud.phase)) * 0.035;
         } else {
           rig.position.y = terrainHeight(rig.position.x, rig.position.z) + (ud.isSleeping ? 0.12 : 0.0);
           ud.leftLeg.rotation.x *= 0.85;
@@ -1927,6 +2334,25 @@
         }
       }
 
+      // Project floating 3D badge for any clicked Structure or Wild Animal!
+      if (selectedEntity.type === 'structure' && structMeshes.has(selectedEntity.id)) {
+        const sm = structMeshes.get(selectedEntity.id);
+        projVec.copy(sm.position); projVec.y += 1.25; projVec.project(camera);
+        if (projVec.z < 1 && sm.userData.tag) {
+          const sx = (projVec.x * 0.5 + 0.5) * window.innerWidth;
+          const sy = (-projVec.y * 0.5 + 0.5) * window.innerHeight;
+          labelCandidates.push({ tag: sm.userData.tag, sx, sy, prio: 5 });
+        }
+      } else if (selectedEntity.type === 'animal' && animalRigs.has(selectedEntity.id)) {
+        const ar = animalRigs.get(selectedEntity.id);
+        projVec.copy(ar.position); projVec.y += 1.35; projVec.project(camera);
+        if (projVec.z < 1 && ar.userData.tag) {
+          const sx = (projVec.x * 0.5 + 0.5) * window.innerWidth;
+          const sy = (-projVec.y * 0.5 + 0.5) * window.innerHeight;
+          labelCandidates.push({ tag: ar.userData.tag, sx, sy, prio: 5 });
+        }
+      }
+
       labelCandidates.sort((a, b) => b.prio - a.prio);
       const placed = [];
       for (const cand of labelCandidates) {
@@ -1942,19 +2368,40 @@
         }
       }
 
+      const animalSpeedCloud = 0.58 + viewSpeed * 0.14;
       for (const ar of animalRigs.values()) {
-        const tp = ar.userData.targetPos;
-        const dx = tp.x - ar.position.x;
-        const dz = tp.z - ar.position.z;
-        if (dx * dx + dz * dz > 0.0015) {
-          ar.position.x += dx * 0.09;
-          ar.position.z += dz * 0.09;
-          ar.userData.heading = shortestAngleLerp(ar.userData.heading, Math.atan2(dx, dz), 0.10);
-          ar.rotation.y = ar.userData.heading;
+        const aud = ar.userData;
+        const tp = aud.targetPos;
+        let dx = tp.x - ar.position.x;
+        let dz = tp.z - ar.position.z;
+        let distSq = dx * dx + dz * dz;
+        if (isCloudMode && distSq <= 0.08 && t >= (aud.pauseUntil || 0)) {
+          const anchor = aud.serverAnchor || { x: ar.position.x, z: ar.position.z };
+          const span = aud.domain === 'air' ? 11.5 : 7.2;
+          const wp = pickNaturalWaypoint(anchor.x, anchor.z, span, aud.domain || 'land');
+          tp.set(wp.x, wp.y + (aud.baseAlt || 0), wp.z);
+          aud.pauseUntil = t + (aud.domain === 'air' ? 0.1 : 0.6 + Math.random() * 1.5);
+          dx = tp.x - ar.position.x;
+          dz = tp.z - ar.position.z;
+          distSq = dx * dx + dz * dz;
         }
-        const baseAlt = ar.userData.baseAlt || 0;
-        const groundY = ar.userData.isWater ? -0.06 : Math.max(-0.02, terrainHeight(ar.position.x, ar.position.z));
-        ar.position.y = groundY + baseAlt + (baseAlt > 0 ? Math.sin(t * 3.5 + ar.position.x) * 0.18 : 0);
+        if (distSq > 0.0015) {
+          if (isCloudMode) {
+            const dist = Math.sqrt(distSq);
+            const step = Math.min(dist, dt * (aud.domain === 'air' ? animalSpeedCloud * 1.45 : animalSpeedCloud));
+            ar.position.x += (dx / dist) * step;
+            ar.position.z += (dz / dist) * step;
+          } else {
+            ar.position.x += dx * 0.09;
+            ar.position.z += dz * 0.09;
+          }
+          aud.heading = shortestAngleLerp(aud.heading, Math.atan2(dx, dz), 0.10);
+          ar.rotation.y = aud.heading;
+        }
+        const baseAlt = aud.baseAlt || 0;
+        const groundY = aud.isWater ? -0.06 : Math.max(-0.02, terrainHeight(ar.position.x, ar.position.z));
+        const gaitBob = (baseAlt === 0 && !aud.isWater && distSq > 0.004) ? Math.abs(Math.sin(t * 7.0 + aud.phase)) * 0.03 : 0;
+        ar.position.y = groundY + baseAlt + gaitBob + (baseAlt > 0 ? Math.sin(t * 3.5 + aud.phase) * 0.18 : 0);
       }
 
       let skipOrbitUpdate = false;

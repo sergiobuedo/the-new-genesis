@@ -302,7 +302,7 @@ class PopulationSimulation:
                     agent.last_cortex_tick = self.world.tick_count
                     cortex_requests.append((agent, prompt))
 
-        if self.world.tick_count % 36 == 0 and len(self.living_agents) < 120:
+        if self.world.tick_count % 36 == 0 and len(self.living_agents) < 88:
             self._check_species_reproduction()
 
         # Distant Continental Refugia: if an entire continent's native lineage vanished, isolated far-continent survivors can re-emerge after long eras
@@ -709,50 +709,57 @@ class PopulationSimulation:
                         agent.pause_ticks = 4
                         return
 
-        # 3B. Proto-Agriculture (`plant_seed` — sowing cereal grain on fertile soil!)
+        # 3B. Proto-Agriculture (`plant_seed` — sowing cereal grain into spaced, recognizable garden beds!)
         if (
             self.enable_culture
             and "grain_seed" in agent.inventory
             and agent.energy > 68.0
-            and (agent.current_intent == "plant_seed" or (agent.inventory.count("grain_seed") >= 2 and self.world.rng.random() < 0.04))
+            and len(self.world.structures) < 26
+            and (agent.current_intent == "plant_seed" or (agent.inventory.count("grain_seed") >= 3 and self.world.rng.random() < 0.025))
         ):
-            if len(nearby_structs) < 4:
+            too_close_crop = any(
+                st.kind == "crop_plot" and math.hypot(st.x - agent.x, st.y - agent.y) < 10.5
+                for st in self.world.structures.values()
+            )
+            if not too_close_crop and len(nearby_structs) < 2:
                 agent.inventory.remove("grain_seed")
                 self.world._struct_seq += 1
                 sx, sy = self.world.find_nearest_dry_spot(agent.x, agent.y)
                 bp = [
-                    {"shape": "box", "sx": 1.35, "sy": 0.06, "sz": 1.35, "px": 0, "py": 0.03, "pz": 0, "color": "#713f12"},
-                    {"shape": "cylinder", "sx": 0.05, "sy": 0.45, "sz": 0.05, "px": -0.35, "py": 0.25, "pz": -0.3, "color": "#eab308"},
-                    {"shape": "cylinder", "sx": 0.05, "sy": 0.48, "sz": 0.05, "px": 0.0, "py": 0.26, "pz": 0.0, "color": "#84cc16"},
-                    {"shape": "cylinder", "sx": 0.05, "sy": 0.45, "sz": 0.05, "px": 0.35, "py": 0.25, "pz": 0.3, "color": "#eab308"},
+                    {"shape": "box", "sx": 0.92, "sy": 0.05, "sz": 0.92, "px": 0, "py": 0.025, "pz": 0, "color": "#3f6212"},
+                    {"shape": "cylinder", "sx": 0.06, "sy": 0.52, "sz": 0.06, "px": -0.26, "py": 0.28, "pz": -0.24, "color": "#facc15"},
+                    {"shape": "cylinder", "sx": 0.06, "sy": 0.56, "sz": 0.06, "px": 0.0, "py": 0.30, "pz": -0.24, "color": "#84cc16"},
+                    {"shape": "cylinder", "sx": 0.06, "sy": 0.52, "sz": 0.06, "px": 0.26, "py": 0.28, "pz": -0.24, "color": "#facc15"},
+                    {"shape": "cylinder", "sx": 0.06, "sy": 0.54, "sz": 0.06, "px": -0.22, "py": 0.29, "pz": 0.22, "color": "#84cc16"},
+                    {"shape": "cylinder", "sx": 0.06, "sy": 0.58, "sz": 0.06, "px": 0.18, "py": 0.31, "pz": 0.22, "color": "#facc15"},
                 ]
                 crop = WorldStructure(
                     id=f"S-{self.world._struct_seq}",
                     kind="crop_plot",
-                    sensory_name="tilled golden seed-plot",
+                    sensory_name="cultivated cereal garden",
                     x=sx,
                     y=sy,
                     creator_id=agent.id,
                     creator_lineage=agent.lineage,
                     created_day=self.world.day,
-                    durability=480.0,
+                    durability=420.0,
                     blueprint_3d=bp,
                 )
                 self.world.structures[crop.id] = crop
                 self.crops_planted += 1
                 agent.current_intent = "forage"
                 agent.pause_ticks = 5
-                agent.action_label = "Sowing Golden Stalk seeds into fertile soil"
+                agent.action_label = "Tending cultivated cereal garden"
                 if "first_agriculture" not in self.discoveries:
                     self.discoveries["first_agriculture"] = self.world.day
-                self._record_event(
-                    "invention",
-                    f"AGRICULTURE BORN! {agent.lineage} {agent.id} sowed cereal seeds into a cultivated farm plot!",
-                    [agent.id],
-                    sx,
-                    sy,
-                    importance=5,
-                )
+                    self._record_event(
+                        "invention",
+                        f"AGRICULTURE BORN! {agent.lineage} {agent.id} planted a cultivated cereal garden!",
+                        [agent.id],
+                        sx,
+                        sy,
+                        importance=5,
+                    )
                 return
 
         # 4A. Emergent Shoreline Fishing & Shellfish Gathering
@@ -1370,7 +1377,7 @@ class MiroFishObservatory:
         if not state_path.exists():
             return
         try:
-            saved = json.loads(state_path.read_text(encoding="utf-8"))
+            saved = json.loads(state_path.read_text(encoding="utf-8-sig"))
             w = saved.get("world", {})
             m = saved.get("metrics", {})
             saved_agents = saved.get("agents", [])
@@ -1387,6 +1394,17 @@ class MiroFishObservatory:
                 for lin in sw.get("lineages", ["Vespera"]):
                     lex_by_lineage[lin][sw["referent"]] = sw["word"]
 
+            if len(saved_agents) > 88:
+                by_lin: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+                for item in saved_agents:
+                    by_lin[item.get("lineage", "Sylphid")].append(item)
+                balanced: List[Dict[str, Any]] = []
+                while len(balanced) < 88 and any(by_lin.values()):
+                    for k in list(by_lin.keys()):
+                        if by_lin[k] and len(balanced) < 88:
+                            balanced.append(by_lin[k].pop(0))
+                saved_agents = balanced
+
             for ad in saved_agents:
                 aid = ad["id"]
                 try:
@@ -1395,6 +1413,7 @@ class MiroFishObservatory:
                 except Exception:
                     pass
                 lin = ad.get("lineage", "Vespera")
+                lin = {"Lith-Lith": "Lithokin", "Sylp-Sylp": "Sylphid", "Vesp-Vesp": "Vespera"}.get(lin, lin)
                 gen_num = int(ad.get("gen", 1))
                 age_d = float(ad.get("age", 10.0))
                 born_d = max(1, int(round(self.live.world.day - age_d)))
@@ -1455,10 +1474,14 @@ class MiroFishObservatory:
             self.live.philosophical_count = int(m.get("philosophical_count", 0))
             self.live.hunts_count = int(m.get("hunts_count", 11))
             self.live.fishing_count = int(m.get("fishing_count", 0))
+            self.live.domesticated_count = int(m.get("domesticated_count", 0))
+            self.live.crops_planted = int(m.get("crops_planted", 0))
+            self.live.trade_count = int(m.get("trade_count", 0))
             self.live.mourning_vigils = int(m.get("mourning_vigils", 0))
             self.live.grave_offerings = int(m.get("grave_offerings", 0))
             self.live.stone_burials = int(m.get("stone_burials", 0))
             self.live.corpse_avoidance = int(m.get("corpse_avoidance", 0))
+            self.live.world.extinct_fauna = dict(m.get("extinct_fauna", {}))
             self.cortex.total_calls = int(m.get("llm_deliberations", 0))
             self.live.timeline = list(saved.get("timeline", []))
             self.daily_logs = self.warehouse.recent_daily_summaries(limit=40)
@@ -1466,6 +1489,62 @@ class MiroFishObservatory:
                 self.history_series.append(
                     {"day": h["day"], "live_population": h["live"], "control_population": h["ctrl"]}
                 )
+
+            # Restore structures cleanly with minimum spacing & upgrade legacy brown crop slabs to lush cereal gardens!
+            garden_bp = [
+                {"shape": "box", "sx": 0.92, "sy": 0.05, "sz": 0.92, "px": 0, "py": 0.025, "pz": 0, "color": "#3f6212"},
+                {"shape": "cylinder", "sx": 0.06, "sy": 0.52, "sz": 0.06, "px": -0.26, "py": 0.28, "pz": -0.24, "color": "#facc15"},
+                {"shape": "cylinder", "sx": 0.06, "sy": 0.56, "sz": 0.06, "px": 0.0, "py": 0.30, "pz": -0.24, "color": "#84cc16"},
+                {"shape": "cylinder", "sx": 0.06, "sy": 0.52, "sz": 0.06, "px": 0.26, "py": 0.28, "pz": -0.24, "color": "#facc15"},
+                {"shape": "cylinder", "sx": 0.06, "sy": 0.54, "sz": 0.06, "px": -0.22, "py": 0.29, "pz": 0.22, "color": "#84cc16"},
+                {"shape": "cylinder", "sx": 0.06, "sy": 0.58, "sz": 0.06, "px": 0.18, "py": 0.31, "pz": 0.22, "color": "#facc15"},
+            ]
+            self.live.world.structures.clear()
+            max_st_seq = 0
+            # Prioritize non-crop landmarks first, then spaced cereal gardens
+            saved_structs = sorted(
+                saved.get("structures", []),
+                key=lambda d: 1 if d.get("kind") == "crop_plot" else 0,
+            )
+            for sd in saved_structs:
+                if len(self.live.world.structures) >= 26:
+                    break
+                skind = sd.get("kind", "shelter")
+                sx = float(sd.get("x", 0.0))
+                sy = float(sd.get("y", 0.0))
+                min_gap = 10.5 if skind == "crop_plot" else 3.8
+                if any(
+                    math.hypot(ex.x - sx, ex.y - sy) < (min_gap if (skind == "crop_plot" and ex.kind == "crop_plot") else 3.2)
+                    for ex in self.live.world.structures.values()
+                ):
+                    continue
+                sid = sd.get("id", f"S-{len(self.live.world.structures) + 1}")
+                try:
+                    max_st_seq = max(max_st_seq, int(str(sid).split("-")[1]))
+                except Exception:
+                    max_st_seq += 1
+                creator_id = sd.get("creator") or (ids[len(self.live.world.structures) % len(ids)] if ids else "S-001")
+                creator_lin = sd.get("lineage") or (
+                    self.live.agents[creator_id].lineage if creator_id in self.live.agents else "Sylphid"
+                )
+                bp = garden_bp if skind == "crop_plot" else list(sd.get("blueprint_3d") or [])
+                sname = "cultivated cereal garden" if skind == "crop_plot" else sd.get("name", skind)
+                self.live.world.structures[sid] = WorldStructure(
+                    id=sid,
+                    kind=skind,
+                    sensory_name=sname,
+                    x=sx,
+                    y=sy,
+                    creator_id=creator_id,
+                    creator_lineage=creator_lin,
+                    created_day=int(sd.get("day") or max(1, self.live.world.day - 5)),
+                    fuel=float(sd.get("fuel", 100.0)),
+                    stored_food=int(sd.get("stored_food", 0)),
+                    inscription=sd.get("inscription", ""),
+                    water_crossing=(skind == "watercraft"),
+                    blueprint_3d=bp,
+                )
+            self.live.world._struct_seq = max(max_st_seq, len(self.live.world.structures))
 
             # Ensure all 3 continental enclaves are populated when upgrading from single-valley saves!
             present_lins = Counter(a.lineage for a in self.live.living_agents)
@@ -1920,6 +1999,8 @@ class MiroFishObservatory:
             "hunts_count": self.live.hunts_count,
             "fishing_count": self.live.fishing_count,
             "domesticated_count": self.live.domesticated_count,
+            "crops_planted": self.live.crops_planted,
+            "trade_count": self.live.trade_count,
             "wild_species_alive": alive_wild_species,
             "wild_species_total": total_wild_species,
             "extinct_fauna": dict(self.live.world.extinct_fauna),
@@ -2042,11 +2123,14 @@ class MiroFishObservatory:
                 {
                     "id": an.id,
                     "species": an.species,
+                    "label": (self.live.world.evolved_fauna.get(an.species) or FAUNA_CATALOG.get(an.species, {"label": an.species}))["label"],
                     "x": an.x,
                     "y": an.y,
                     "tamed": bool(an.tamed_by),
+                    "tamed_by": an.tamed_by,
                     "scale": an.size_gene,
                     "color": an.coat_color,
+                    "gen": an.generation,
                 }
                 for an in self.live.world.animals.values()
                 if an.alive
@@ -2056,6 +2140,9 @@ class MiroFishObservatory:
                     "id": s.id,
                     "kind": s.kind,
                     "name": s.sensory_name,
+                    "creator": s.creator_id,
+                    "lineage": s.creator_lineage,
+                    "day": s.created_day,
                     "x": s.x,
                     "y": s.y,
                     "fuel": round(s.fuel, 1),

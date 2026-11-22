@@ -83,6 +83,14 @@ class KobGenome:
     @classmethod
     def random_founder(cls, rng: random.Random, lineage: str = "Sylphid") -> "KobGenome":
         """100% symmetric uniform [0.05..0.95] trait initialization — zero moral bias!"""
+        if lineage not in LINEAGE_SPECS:
+            LINEAGE_SPECS[lineage] = {
+                "prefix": "H",
+                "reproduction_mode": "Symbiotic Hybrid Genesis",
+                "palettes": [("#34d399", "#fef3c7"), ("#38bdf8", "#f3e8ff")],
+                "ColdBias": 1.2,
+                "SpeedMul": 1.02,
+            }
         spec = LINEAGE_SPECS[lineage]
         body_c, acc_c = rng.choice(spec["palettes"])
         return cls(
@@ -107,7 +115,10 @@ class KobGenome:
 
         if p1.lineage != p2.lineage:
             pair = sorted([p1.lineage[:4], p2.lineage[:4]])
-            lineage = f"{pair[0]}-{pair[1]}"
+            if pair[0] == pair[1]:
+                lineage = p1.lineage if "-" in p1.lineage else p2.lineage
+            else:
+                lineage = f"{pair[0]}-{pair[1]}"
             if lineage not in LINEAGE_SPECS:
                 s1 = LINEAGE_SPECS.get(p1.lineage, LINEAGE_SPECS["Sylphid"])
                 s2 = LINEAGE_SPECS.get(p2.lineage, LINEAGE_SPECS["Vespera"])
