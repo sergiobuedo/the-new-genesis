@@ -816,30 +816,30 @@
     scene.add(globeGroup);
 
     function buildSphericalPlanet() {
-      const gGeo = new THREE.SphereGeometry(28, 72, 54);
+      const gGeo = new THREE.SphereGeometry(24, 128, 96);
       const gPos = gGeo.attributes.position;
       const gCols = new Float32Array(gPos.count * 3);
       const c = new THREE.Color();
       for (let i = 0; i < gPos.count; i++) {
         const vx = gPos.getX(i), vy = gPos.getY(i), vz = gPos.getZ(i);
-        const lat = vy / 28.0;
-        const n = Math.sin(vx * 0.14 + 1.2) * Math.cos(vz * 0.14 - 0.8) + 0.45 * Math.sin(vy * 0.22 + vx * 0.19);
+        const lat = vy / 24.0;
+        const n = Math.sin(vx * 0.16 + 1.2) * Math.cos(vz * 0.16 - 0.8) + 0.45 * Math.sin(vy * 0.24 + vx * 0.21);
         let rMul = 1.0;
         if (Math.abs(lat) > 0.82) { c.setHex(0xf8fafc); rMul = 1.012; }
         else if (n < -0.05) { c.setHex(0x0284c7); }
         else if (n < 0.08) { c.setHex(0xfde68a); rMul = 1.005; }
         else if (Math.abs(lat) < 0.25 && n > 0.25) { c.setHex(0x65a30d); rMul = 1.022; }
-        else if (n > 0.65) { c.setHex(0x94a3b8); rMul = 1.045; }
+        else if (n > 0.65) { c.setHex(0x94a3b8); rMul = 1.042; }
         else { c.setHex(0x16a34a); rMul = 1.018; }
         gPos.setXYZ(i, vx * rMul, vy * rMul, vz * rMul);
         gCols[i * 3] = c.r; gCols[i * 3 + 1] = c.g; gCols[i * 3 + 2] = c.b;
       }
       gGeo.setAttribute('color', new THREE.BufferAttribute(gCols, 3));
       gGeo.computeVertexNormals();
-      const planetMesh = new THREE.Mesh(gGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.08 }));
+      const planetMesh = new THREE.Mesh(gGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.68, metalness: 0.08 }));
       const atmoMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(29.8, 48, 36),
-        new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.16, side: THREE.BackSide })
+        new THREE.SphereGeometry(25.6, 64, 48),
+        new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.18, side: THREE.BackSide })
       );
       globeGroup.add(planetMesh, atmoMesh);
 
@@ -863,13 +863,13 @@
       ];
       globeGroup.userData.beacons = [];
       for (const b of beacons) {
-        const r = 28.9;
+        const r = 24.9;
         const bx = r * Math.cos(b.lat) * Math.sin(b.lon);
         const by = r * Math.sin(b.lat);
         const bz = r * Math.cos(b.lat) * Math.cos(b.lon);
         const pin = new THREE.Mesh(
-          new THREE.SphereGeometry(1.15, 16, 16),
-          new THREE.MeshStandardMaterial({ color: b.col, emissive: b.col, emissiveIntensity: 1.4 })
+          new THREE.SphereGeometry(0.95, 16, 16),
+          new THREE.MeshStandardMaterial({ color: b.col, emissive: b.col, emissiveIntensity: 1.5 })
         );
         pin.position.set(bx, by, bz);
         pin.userData = { jumpLineage: b.lin };
@@ -1289,7 +1289,7 @@
         scene.fog.density = 0.0;
         controls.maxPolarAngle = Math.PI * 0.92;
         controls.target.set(0, 0, 0);
-        camera.position.set(0, 18, 78);
+        camera.position.set(0, 22, 92);
       } else {
         surfaceWorld.visible = true;
         globeGroup.visible = false;

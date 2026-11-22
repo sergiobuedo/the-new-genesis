@@ -33,6 +33,11 @@
 
 ## 🖼️ Live Visual Showcase (*God's Window* Desktop & Mobile)
 
+| **3D Spherical Super-Earth (`🌍 Globe`)** | **NE Boreal Volcanic Highlands (`📍 Lithokin`)** |
+| :---: | :---: |
+| <img src="docs/assets/globe_planet.png" width="100%" alt="3D Spherical Super-Earth"/> | <img src="docs/assets/lithokin_highlands.png" width="100%" alt="Lithokin Boreal Volcanic Highlands"/> |
+| *Zoom out to space to see all 3 continental civilizations on the rotating globe* | *Click any lineage pill (`📍 Sylphids`, `📍 Lithokin`, `📍 Vespera`) to fly straight to their climate* |
+
 | **Continental Surface & Plain-Language HUD (`EN`)** | **Collapsible Menus & Bilingual Explanations (`ES`)** |
 | :---: | :---: |
 | <img src="docs/assets/observatory_en.png" width="100%" alt="God's Window English HUD"/> | <img src="docs/assets/observatory_es.png" width="100%" alt="God's Window Spanish HUD & Collapsible Menus"/> |
@@ -66,18 +71,18 @@ Each lineage awakens in a distant continental corner of the round `5.10 × 10⁹
 
 ```mermaid
 flowchart LR
-    subgraph Cloud247["☁️ 24/7 Autonomous Cloud Engine"]
-        W["CosmosWorld v6.0\n10× Round Super-Earth\n4 Climates · Real Chemistry"]
-        S1["System 1 Instincts\n60 Hz Homeostasis\nEat · Warmth · Sleep · Steer"]
-        S2["System 2 Cortex (Ollama LLM)\nPhenomenological Stream\nEpistemic Veil Firewall"]
-        CTRL["Synchronized Null-Control Twin\n(Instinct Only · Same Seed)"]
-        DB[("SQLite-WAL Warehouse\n+ SHA-256 Event Chain")]
-        APA["Weekly APA 7th Compiler\nLive Crossref DOI Verifier\n15–20p Locked A4 PDF"]
+    subgraph Cloud247["24/7 Autonomous Cloud Engine"]
+        W["CosmosWorld v6.0 (10x Super-Earth)"]
+        S1["System 1 Homeostasis (Eat, Warmth, Sleep)"]
+        S2["System 2 Cortex (Ollama LLM + Epistemic Veil)"]
+        CTRL["Synchronized Null-Control Twin"]
+        DB[("SQLite-WAL + SHA-256 Ledger")]
+        APA["Weekly APA 7th PDF Compiler (Crossref DOIs)"]
     end
 
-    subgraph PublicGlass["👁️ God's Window (Read-Only WebGL)"]
-        GLOBE["🌍 3D Round Planet <-> Surface\nArrows · Pinch · Long-Press Pan\nClick Lineage to Fly"]
-        HUD["Plain-Language EN / ES Panels\nCollapsible Cards · APA Viewer"]
+    subgraph PublicGlass["God's Window (Read-Only WebGL)"]
+        GLOBE["3D Round Planet and Continental Surface"]
+        HUD["Plain-Language EN/ES Collapsible HUD"]
     end
 
     W <--> S1

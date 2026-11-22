@@ -48,7 +48,7 @@ jobs:
           ollama pull qwen2.5:1.5b
 
       - name: Verify Epistemic Veil & Scientific Integrity Suite
-        run: pytest tests/ -v
+        run: python -m pytest tests/ -v
 
       - name: Run continuous 24/7 planetary evolution burst
         env:
