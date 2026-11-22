@@ -93,6 +93,8 @@ class BlindMaterial:
     metallic: float = 0.0
     magnetic: float = 0.0
     luster: float = 0.0  # Physical optical reflectance/rarity (never labeled 'precious' to agents)
+    healing: float = 0.0  # Natural phytochemical analgesia/tissue repair
+    toxicity: float = 0.0  # Alkaloid/venomous hazard learned strictly by experience
 
 
 BLIND_MATERIALS: Dict[str, BlindMaterial] = {
@@ -128,6 +130,42 @@ BLIND_MATERIALS: Dict[str, BlindMaterial] = {
         observer_label="Fresh River Fish (Protein)",
         color_hex="#38bdf8",
         nutrition=54.0,
+    ),
+    "grain_seed": BlindMaterial(
+        code="grain_seed",
+        formula="Amylose + Aleurone Cereal Grain",
+        sensory_name="dry golden seed-panicle",
+        observer_label="Golden Stalk Grain (Cereal)",
+        color_hex="#eab308",
+        nutrition=32.0,
+    ),
+    "medicinal_herb": BlindMaterial(
+        code="medicinal_herb",
+        formula="Salicin + Terpenoid Phytochemicals",
+        sensory_name="fragrant silver-veined leaf",
+        observer_label="Sootheleaf (Medicinal Herb)",
+        color_hex="#2dd4bf",
+        nutrition=10.0,
+        healing=28.0,
+    ),
+    "toxic_nightshade": BlindMaterial(
+        code="toxic_nightshade",
+        formula="Tropane Alkaloid Berry",
+        sensory_name="glossy dark-violet bitter berry",
+        observer_label="Shadowberry (Toxic Flora!)",
+        color_hex="#7e22ce",
+        nutrition=4.0,
+        toxicity=24.0,
+    ),
+    "ivory_horn": BlindMaterial(
+        code="ivory_horn",
+        formula="Hydroxyapatite Dentine Tusk",
+        sensory_name="curved dense pale tusk-bone",
+        observer_label="Megafauna Tusk-Bone",
+        color_hex="#fef9c3",
+        hardness=0.78,
+        sharpness=0.74,
+        luster=0.84,
     ),
     "fiber_dry": BlindMaterial(
         code="fiber_dry",
@@ -342,15 +380,52 @@ class NaturalProp:
     radius: float
 
 
+FLORA_SPECIES = {
+    "ironbark_tree": "Hardwood Canopy Tree",
+    "boreal_conifer": "Sub-Polar Conifer Pine",
+    "monsoon_palm": "Equatorial Broadleaf Palm",
+    "amber_pine": "Resin-Bearing Amber Pine",
+    "hollow_cane": "Riverbank Reed-Bamboo",
+    "amberberry_shrub": "Fruiting Berry Shrub",
+    "golden_stalk": "Wild Cereal Grass",
+    "sootheleaf": "Medicinal Silver-Herb",
+    "shadowberry": "Alkaloid Toxic Nightshade",
+    "weaver_reed": "Fibrous Bast-Flax",
+    "frost_lichen": "Tundra Cushion-Lichen",
+    "starch_bulb": "Root-Tuber Patch",
+}
+
+# 24 Distinct Earth-Analogue Wild Fauna Species (Original non-Earth names, real trophic roles & dangers!)
 FAUNA_CATALOG = {
-    "silverfin_shoal": {"domain": "water", "speed": 0.16, "hp": 35.0, "label": "Silverfin Fish Shoal"},
-    "tidecrawler": {"domain": "shore", "speed": 0.10, "hp": 30.0, "label": "Tidecrawler Crab"},
-    "lumigrazer": {"domain": "land", "speed": 0.20, "hp": 100.0, "label": "Lumigrazer Herd"},
-    "burrowhare": {"domain": "land", "speed": 0.30, "hp": 40.0, "label": "Meadow Burrowhare"},
-    "pollenwing": {"domain": "air", "speed": 0.26, "hp": 20.0, "label": "Pollenwing Flock"},
-    "skyglider": {"domain": "air", "speed": 0.32, "hp": 45.0, "label": "Coastal Skyglider"},
-    "packhound": {"domain": "land", "speed": 0.25, "hp": 80.0, "label": "Wild Packhound"},
-    "shadowstalker": {"domain": "land", "speed": 0.30, "hp": 115.0, "label": "Nocturnal Shadowstalker"},
+    # Megaherbivores & Herd Ungulates (6)
+    "titanotusk": {"domain": "land", "speed": 0.14, "hp": 260.0, "danger": 26.0, "hostile": "defensive", "cap": 5, "meat": 3, "label": "Titanotusk (Megafauna Tusker)"},
+    "thunderhorn": {"domain": "land", "speed": 0.21, "hp": 165.0, "danger": 18.0, "hostile": "defensive", "cap": 7, "meat": 2, "label": "Thunderhorn (Armored Steppe Grazer)"},
+    "lumigrazer": {"domain": "land", "speed": 0.22, "hp": 95.0, "danger": 0.0, "hostile": "none", "cap": 10, "meat": 1, "label": "Lumigrazer (Antlered Meadow Herd)"},
+    "windstrider": {"domain": "land", "speed": 0.34, "hp": 110.0, "danger": 0.0, "hostile": "none", "cap": 7, "meat": 1, "tameable": True, "label": "Windstrider (Swift Plains Courser)"},
+    "craghorn": {"domain": "land", "speed": 0.24, "hp": 85.0, "danger": 8.0, "hostile": "defensive", "cap": 6, "meat": 1, "label": "Craghorn (Alpine Cliff Climber)"},
+    "rootboar": {"domain": "land", "speed": 0.23, "hp": 90.0, "danger": 15.0, "hostile": "defensive", "cap": 7, "meat": 1, "label": "Rootboar (Bristled Forest Tusker)"},
+    # Small Mammals & Arboreal Omnivores (3)
+    "burrowhare": {"domain": "land", "speed": 0.31, "hp": 35.0, "danger": 0.0, "hostile": "none", "cap": 9, "meat": 1, "label": "Burrowhare (Meadow Sprinter)"},
+    "damweaver": {"domain": "shore", "speed": 0.16, "hp": 50.0, "danger": 0.0, "hostile": "none", "cap": 6, "meat": 1, "label": "Damweaver (Riverbank Gnawer)"},
+    "canopykin": {"domain": "land", "speed": 0.27, "hp": 55.0, "danger": 0.0, "hostile": "none", "cap": 6, "meat": 1, "label": "Canopykin (Arboreal Climber)"},
+    # Dangerous Apex Predators, Pack Carnivores & Venomous Fauna (7)
+    "shadowstalker": {"domain": "land", "speed": 0.30, "hp": 125.0, "danger": 22.0, "hostile": "night", "cap": 5, "meat": 1, "label": "Shadowstalker (Nocturnal Sabre-Predator)"},
+    "sunmane": {"domain": "land", "speed": 0.29, "hp": 140.0, "danger": 24.0, "hostile": "day", "cap": 5, "meat": 1, "label": "Sunmane (Savanna Pride Predator)"},
+    "frostmaw": {"domain": "land", "speed": 0.24, "hp": 195.0, "danger": 28.0, "hostile": "always", "cap": 4, "meat": 2, "label": "Frostmaw (Colossal Boreal Predator)"},
+    "packhound": {"domain": "land", "speed": 0.26, "hp": 80.0, "danger": 14.0, "hostile": "pack", "cap": 8, "meat": 1, "tameable": True, "label": "Packhound (Social Clan-Canid)"},
+    "mirejaw": {"domain": "shore", "speed": 0.18, "hp": 150.0, "danger": 26.0, "hostile": "ambush", "cap": 5, "meat": 2, "label": "Mirejaw (Armored River Ambush-Reptile)"},
+    "venomcoil": {"domain": "land", "speed": 0.19, "hp": 28.0, "danger": 22.0, "hostile": "venom", "cap": 6, "meat": 1, "label": "Venomcoil (Banded Fang-Serpent)"},
+    "stingshell": {"domain": "land", "speed": 0.15, "hp": 24.0, "danger": 16.0, "hostile": "venom", "cap": 6, "meat": 0, "label": "Stingshell (Venomous Tail-Arachnid)"},
+    # Marine & Freshwater Aquatic Life (5)
+    "silverfin_shoal": {"domain": "water", "speed": 0.18, "hp": 35.0, "danger": 0.0, "hostile": "none", "cap": 10, "meat": 1, "label": "Silverfin (Migrating Fish Shoal)"},
+    "abyssalfin": {"domain": "water", "speed": 0.28, "hp": 120.0, "danger": 21.0, "hostile": "ambush", "cap": 4, "meat": 2, "label": "Abyssalfin (Razor-Finned Water Predator)"},
+    "leviathansong": {"domain": "water", "speed": 0.14, "hp": 320.0, "danger": 0.0, "hostile": "none", "cap": 4, "meat": 3, "label": "Leviathansong (Gentle Sea Giant)"},
+    "tidecrawler": {"domain": "shore", "speed": 0.10, "hp": 30.0, "danger": 0.0, "hostile": "none", "cap": 8, "meat": 1, "label": "Tidecrawler (Armored Shore Crustacean)"},
+    "pearlclam": {"domain": "shore", "speed": 0.02, "hp": 20.0, "danger": 0.0, "hostile": "none", "cap": 7, "meat": 1, "label": "Pearlclam (Nacre Shoreline Bivalve)"},
+    # Avian & Keystone Pollinator Guilds (3)
+    "skyglider": {"domain": "air", "speed": 0.33, "hp": 45.0, "danger": 0.0, "hostile": "none", "cap": 6, "meat": 1, "label": "Skyglider (Soaring Cliff Raptor)"},
+    "reedwing": {"domain": "air", "speed": 0.25, "hp": 32.0, "danger": 0.0, "hostile": "none", "cap": 7, "meat": 1, "label": "Reedwing (Coastal Waterfowl)"},
+    "pollenwing": {"domain": "air", "speed": 0.26, "hp": 20.0, "danger": 0.0, "hostile": "none", "cap": 8, "meat": 0, "label": "Pollenwing (Keystone Pollinator Swarm)"},
 }
 
 
@@ -427,6 +502,7 @@ class CosmosWorld:
         self.corpses: Dict[str, MortalRemains] = {}
         self.animals: Dict[str, WildAnimal] = {}
         self._animal_seq: int = 0
+        self.extinct_fauna: Dict[str, int] = {}  # Permanent extinction ledger (species -> day extinct)!
         self.thermal_vents: List[Tuple[float, float]] = []
 
         # Generate the Central Crossroads + all 3 distant Continental Homelands!
@@ -562,20 +638,35 @@ class CosmosWorld:
                 if self.elevation_at(px, py) < 0.04:
                     continue
 
-                if biome == "forest" and trng.random() < 0.40:
-                    if len(self.props) < 1800:
-                        self._add_prop("tree", px, py, scale=round(trng.uniform(0.85, 1.45), 2), radius=0.65)
+                zone = classify_climate_zone(tx, ty)
+                if biome == "forest" and trng.random() < 0.42:
+                    if len(self.props) < 1900:
+                        t_kind = (
+                            "boreal_conifer" if zone == "boreal_highland"
+                            else "monsoon_palm" if zone == "equatorial_savanna"
+                            else "amber_pine" if trng.random() < 0.3
+                            else "tree"
+                        )
+                        self._add_prop(t_kind, px, py, scale=round(trng.uniform(0.85, 1.45), 2), radius=0.65)
                     self._seed_tile_resources(tx, ty, biome, trng, initial=True)
-                elif biome in ("meadow", "savanna") and trng.random() < 0.24:
-                    if len(self.props) < 1800:
-                        self._add_prop("bush", px, py, scale=round(trng.uniform(0.75, 1.15), 2), radius=0.0)
+                elif biome in ("meadow", "savanna") and trng.random() < 0.28:
+                    if len(self.props) < 1900:
+                        b_kind = (
+                            "golden_stalk" if trng.random() < 0.32
+                            else "sootheleaf" if trng.random() < 0.14
+                            else "shadowberry" if trng.random() < 0.08
+                            else "bush"
+                        )
+                        self._add_prop(b_kind, px, py, scale=round(trng.uniform(0.75, 1.15), 2), radius=0.0)
                     self._seed_tile_resources(tx, ty, biome, trng, initial=True)
                 elif biome in ("ridge", "tundra") and trng.random() < 0.34:
-                    if len(self.props) < 1800:
-                        kind = "crystal" if trng.random() < 0.28 else "boulder"
-                        self._add_prop(kind, px, py, scale=round(trng.uniform(0.8, 1.4), 2), radius=0.62)
+                    if len(self.props) < 1900:
+                        kind = "crystal" if trng.random() < 0.28 else ("frost_lichen" if biome == "tundra" and trng.random() < 0.35 else "boulder")
+                        self._add_prop(kind, px, py, scale=round(trng.uniform(0.8, 1.4), 2), radius=0.62 if kind != "frost_lichen" else 0.0)
                     self._seed_tile_resources(tx, ty, biome, trng, initial=True)
-                elif biome == "riverbank" and trng.random() < 0.30:
+                elif biome == "riverbank" and trng.random() < 0.34:
+                    if len(self.props) < 1900 and trng.random() < 0.45:
+                        self._add_prop("hollow_cane", px, py, scale=round(trng.uniform(0.8, 1.25), 2), radius=0.0)
                     self._seed_tile_resources(tx, ty, biome, trng, initial=True)
 
         crng = self._tile_rng(cx * 31, cy * 37)
@@ -606,28 +697,30 @@ class CosmosWorld:
         return -5.0, 8.0
 
     def _spawn_initial_fauna(self) -> None:
-        anchors = list(ENCLAVE_HOMELANDS.values()) + [(4.0, 4.0)]
-        for cx, cy in anchors:
-            for sp in ("silverfin_shoal", "silverfin_shoal", "tidecrawler", "lumigrazer", "lumigrazer", "burrowhare", "pollenwing", "skyglider", "packhound"):
+        """Populates all 24 wild animal species in their authentic terrestrial/aquatic/avian biomes!"""
+        regional_guilds = [
+            # NW Temperate Emerald River Basin (Sylphid region)
+            ((-38.0, -34.0), ["lumigrazer", "lumigrazer", "rootboar", "burrowhare", "damweaver", "damweaver", "packhound", "packhound", "silverfin_shoal", "silverfin_shoal", "pearlclam", "reedwing", "pollenwing", "pollenwing", "shadowstalker"]),
+            # NE Boreal Volcanic Highlands (Lithokin region)
+            ((42.0, -34.0), ["titanotusk", "thunderhorn", "craghorn", "craghorn", "craghorn", "frostmaw", "frostmaw", "packhound", "packhound", "burrowhare", "silverfin_shoal", "skyglider", "skyglider", "pollenwing"]),
+            # South Equatorial Monsoon Savanna & Coast (Vespera region)
+            ((4.0, 38.0), ["titanotusk", "thunderhorn", "windstrider", "windstrider", "canopykin", "canopykin", "sunmane", "sunmane", "mirejaw", "mirejaw", "venomcoil", "venomcoil", "stingshell", "tidecrawler", "tidecrawler", "pearlclam", "pollenwing", "pollenwing"]),
+            # Central Mediterranean Crossroads & Deep Sea
+            ((4.0, 4.0), ["titanotusk", "thunderhorn", "lumigrazer", "lumigrazer", "windstrider", "rootboar", "burrowhare", "canopykin", "damweaver", "sunmane", "frostmaw", "shadowstalker", "shadowstalker", "mirejaw", "venomcoil", "stingshell", "stingshell", "silverfin_shoal", "silverfin_shoal", "abyssalfin", "abyssalfin", "abyssalfin", "leviathansong", "leviathansong", "leviathansong", "tidecrawler", "pearlclam", "skyglider", "reedwing", "reedwing", "pollenwing"]),
+        ]
+        for (cx, cy), sp_list in regional_guilds:
+            for sp in sp_list:
                 self._animal_seq += 1
                 dom = FAUNA_CATALOG[sp]["domain"]
                 if dom == "water":
-                    ax, ay = self.find_nearest_water_spot(cx + self.rng.uniform(-12.0, 12.0), cy + self.rng.uniform(-12.0, 12.0))
+                    ax, ay = self.find_nearest_water_spot(cx + self.rng.uniform(-16.0, 16.0), cy + self.rng.uniform(-16.0, 16.0))
                 elif dom == "air":
-                    ax, ay = round(cx + self.rng.uniform(-14.0, 14.0), 2), round(cy + self.rng.uniform(-14.0, 14.0), 2)
+                    ax, ay = round(cx + self.rng.uniform(-18.0, 18.0), 2), round(cy + self.rng.uniform(-18.0, 18.0), 2)
                 else:
-                    ax, ay = self.find_nearest_dry_spot(cx + self.rng.uniform(-12.0, 12.0), cy + self.rng.uniform(-12.0, 12.0))
-                self.animals[f"W-{self._animal_seq:02d}"] = WildAnimal(
-                    id=f"W-{self._animal_seq:02d}", species=sp, x=ax, y=ay, health=FAUNA_CATALOG[sp]["hp"]
+                    ax, ay = self.find_nearest_dry_spot(cx + self.rng.uniform(-16.0, 16.0), cy + self.rng.uniform(-16.0, 16.0))
+                self.animals[f"W-{self._animal_seq:03d}"] = WildAnimal(
+                    id=f"W-{self._animal_seq:03d}", species=sp, x=ax, y=ay, health=FAUNA_CATALOG[sp]["hp"]
                 )
-        for ang in (0.6, 2.7, 4.8):
-            self._animal_seq += 1
-            ax, ay = self.find_nearest_dry_spot(
-                4.0 + math.cos(ang) * 26.0, 4.0 + math.sin(ang) * 26.0
-            )
-            self.animals[f"W-{self._animal_seq:02d}"] = WildAnimal(
-                id=f"W-{self._animal_seq:02d}", species="shadowstalker", x=ax, y=ay, health=115.0
-            )
 
     def _seed_tile_resources(
         self, tx: int, ty: int, biome: str, rng: random.Random, initial: bool = False
@@ -639,10 +732,16 @@ class CosmosWorld:
             return
         p = 1.0 if initial else 0.25
         if biome in ("meadow", "savanna"):
-            if rng.random() < 0.52 * p:
+            if rng.random() < 0.44 * p:
                 self._add_resource_at(tx, ty, "orb_sweet")
             if rng.random() < 0.24 * p:
+                self._add_resource_at(tx, ty, "grain_seed")
+            if rng.random() < 0.22 * p:
                 self._add_resource_at(tx, ty, "fiber_dry")
+            if rng.random() < 0.09 * p:
+                self._add_resource_at(tx, ty, "medicinal_herb")
+            if rng.random() < 0.045 * p:
+                self._add_resource_at(tx, ty, "toxic_nightshade")
             if biome == "savanna" and rng.random() < 0.04 * p:
                 self._add_resource_at(tx, ty, "fossil_amber")
         elif biome == "forest":
@@ -724,9 +823,13 @@ class CosmosWorld:
 
     def step_environment(self) -> None:
         self.tick_count += 1
+        pollinator_pop = sum(1 for a in self.animals.values() if a.alive and a.species == "pollenwing")
+        pollinator_factor = max(0.35, min(1.25, pollinator_pop / 5.0))
+
         if self.tick_count % 22 == 0 and self.chunks:
             chunk_keys = list(self.chunks.keys())
-            trials = 18 if self.season_index != 3 else 7
+            base_trials = 22 if self.season_index != 3 else 9
+            trials = max(4, int(round(base_trials * pollinator_factor)))
             for _ in range(trials):
                 cx, cy = self.rng.choice(chunk_keys)
                 tx = cx * CHUNK_SIZE + self.rng.randrange(0, CHUNK_SIZE)
@@ -735,40 +838,34 @@ class CosmosWorld:
                 if biome != "water":
                     self._seed_tile_resources(tx, ty, biome, self.rng, initial=False)
 
-        # Replenish multi-niche biodiversity slowly so aquatic, land, and avian webs persist
-        if self.tick_count % 320 == 0:
-            counts: Dict[str, int] = {}
+        # TRUE LOTKA-VOLTERRA ECOLOGY: Species reproduce ONLY if >=2 wild parents survive!
+        # If overhunted to 0, that species goes PERMANENTLY EXTINCT (no magic respawn)!
+        if self.tick_count % 260 == 0:
+            by_species: Dict[str, List[WildAnimal]] = {}
             for a in self.animals.values():
                 if a.alive:
-                    counts[a.species] = counts.get(a.species, 0) + 1
-            quotas = {
-                "silverfin_shoal": 6,
-                "tidecrawler": 4,
-                "lumigrazer": 7,
-                "burrowhare": 4,
-                "pollenwing": 3,
-                "skyglider": 2,
-                "packhound": 3,
-            }
-            for sp, min_q in quotas.items():
-                if counts.get(sp, 0) < min_q:
+                    by_species.setdefault(a.species, []).append(a)
+            for sp, spec in FAUNA_CATALOG.items():
+                living_sp = by_species.get(sp, [])
+                if len(living_sp) == 0 and sp not in self.extinct_fauna:
+                    self.extinct_fauna[sp] = self.day
+                elif 2 <= len(living_sp) < spec["cap"] and self.rng.random() < 0.42:
+                    parent = self.rng.choice(living_sp)
                     self._animal_seq += 1
-                    dom = FAUNA_CATALOG[sp]["domain"]
-                    anchor = self.rng.choice(list(ENCLAVE_HOMELANDS.values()) + [(4.0, 4.0)])
+                    dom = spec["domain"]
                     if dom == "water":
-                        ax, ay = self.find_nearest_water_spot(anchor[0] + self.rng.uniform(-14.0, 14.0), anchor[1] + self.rng.uniform(-14.0, 14.0))
+                        ax, ay = self.find_nearest_water_spot(parent.x + self.rng.uniform(-4.0, 4.0), parent.y + self.rng.uniform(-4.0, 4.0))
                     elif dom == "air":
-                        ax, ay = round(anchor[0] + self.rng.uniform(-16.0, 16.0), 2), round(anchor[1] + self.rng.uniform(-16.0, 16.0), 2)
+                        ax, ay = round(parent.x + self.rng.uniform(-5.0, 5.0), 2), round(parent.y + self.rng.uniform(-5.0, 5.0), 2)
                     else:
-                        ax, ay = self.find_nearest_dry_spot(anchor[0] + self.rng.uniform(-14.0, 14.0), anchor[1] + self.rng.uniform(-14.0, 14.0))
-                    self.animals[f"W-{self._animal_seq:02d}"] = WildAnimal(
-                        id=f"W-{self._animal_seq:02d}",
+                        ax, ay = self.find_nearest_dry_spot(parent.x + self.rng.uniform(-4.0, 4.0), parent.y + self.rng.uniform(-4.0, 4.0))
+                    self.animals[f"W-{self._animal_seq:03d}"] = WildAnimal(
+                        id=f"W-{self._animal_seq:03d}",
                         species=sp,
                         x=ax,
                         y=ay,
-                        health=FAUNA_CATALOG[sp]["hp"],
+                        health=spec["hp"],
                     )
-                    break
 
         for animal in list(self.animals.values()):
             if not animal.alive:
@@ -1084,6 +1181,38 @@ class CosmosWorld:
                 None,
                 "breakthrough",
                 "Shaped and strung a rare gleaming mineral into a wearable symbolic ornament!",
+            )
+
+        # 9B. Defensive Timber Palisade Wall (Timber + Timber/Fiber — protects camp from predators!)
+        if code_a == "rod_porous" and code_b in ("rod_porous", "fiber_dry", "resin_gold"):
+            lvl = insight_map.get("palisade_lore", 0) + 1
+            insight_map["palisade_lore"] = lvl
+            if lvl < 2:
+                return (
+                    None,
+                    None,
+                    "partial_insight",
+                    "Lashed upright hardwood stakes together into a sturdy defensive barrier test.",
+                )
+            self._struct_seq += 1
+            sx, sy = self.find_nearest_dry_spot(x, y)
+            st = WorldStructure(
+                id=f"S-{self._struct_seq}",
+                kind="palisade",
+                sensory_name="fortified timber palisade wall",
+                x=sx,
+                y=sy,
+                creator_id=actor_id,
+                creator_lineage=actor_lineage,
+                created_day=self.day,
+                durability=320.0,
+            )
+            self.structures[st.id] = st
+            return (
+                None,
+                st,
+                "breakthrough",
+                "Erected a fortified timber palisade wall protecting the settlement from dangerous beasts!",
             )
 
         return None, None, "inert", "Examined both terrestrial materials without reaction."

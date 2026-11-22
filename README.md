@@ -59,9 +59,11 @@ Each lineage awakens in a distant continental corner of the round `5.10 × 10⁹
 | **🟡 Lithokin** | **NE Boreal Volcanic & Basalt Highlands** (`+9°C` + geothermal vents) | *Geothermal Spore-Clutch* | Sub-polar ridges rich in flint (`SiO2`), pyrite (`FeS2`), copper (`Cu`), tin (`SnO2`), silver (`Ag`), jade & rough diamond (`C`) |
 | **🟣 Vespera** | **South Equatorial Monsoon Savanna & Oasis** (`+25°C` base) | *Kinship Fission-Bloom* | Warm tropical nights, `Lumigrazer` herds, `Burrowhare` prey, `Tidecrawler` crabs, `Pollenwing` flocks & fossil amber |
 
-### 🦌 8-Species Wild Food Web & Precious Earth Matter
-- **Aquatic & Coastal:** `Silverfin` river/sea shoals & `Tidecrawler` crabs *(enabling unscripted shoreline fishing)*.
-- **Terrestrial & Avian:** `Lumigrazer` herds, `Burrowhare` runners, `Pollenwing` pollinators *(which naturally fertilize berry flora)*, soaring `Skyglider` birds, opportunistic `Packhound` canids *(rival hunters OR emergently domesticable if fed by empathetic beings)*, and nocturnal `Shadowstalker` apex predators.
+### 🦌 24-Species Wild Fauna Web & 12-Species Flora Biosphere (True Extinction vs Coexistence)
+- **Megafauna & Herd Ungulates (`6`):** `Titanotusk` (tusker megafauna), `Thunderhorn` (steppe grazer), `Lumigrazer` (antlered herd), `Windstrider` (wild courser, emergently domesticable), `Craghorn` (alpine climber), and `Rootboar` (forest tusker).
+- **Dangerous Predators, River Ambushers & Venomous Beasts (`7`):** `Shadowstalker` (nocturnal sabre-predator), `Sunmane` (savanna pride hunter), `Frostmaw` (colossal boreal bear), `Packhound` (social wolf-canid, emergently domesticable), `Mirejaw` (armored river ambush-reptile), `Venomcoil` (fang-serpent), and `Stingshell` (venomous arachnid).
+- **Small Mammals, Marine Giants & Avian/Pollinator Guilds (`11`):** `Burrowhare`, `Damweaver`, `Canopykin`, `Silverfin` shoals, `Abyssalfin` water predators, `Leviathansong` sea giants, `Tidecrawler` crabs, `Pearlclam` nacre bivalves, `Skyglider` raptors, `Reedwing` waterfowl, and keystone `Pollenwing` pollinators.
+- **No Magical Respawn:** Wild species reproduce strictly from surviving wild parents (`N ≥ 2`). Overhunting drives a species **permanently extinct** (`extinct_fauna`), while wiping out pollinators degrades flora regeneration (`12` plant guilds including cereal `Golden Stalk`, medicinal `Sootheleaf`, and toxic `Shadowberry`).
 - **Precious Minerals (Zero Value Hints):** Native gold (`Au`), native silver (`Ag`), octahedral diamond (`C`), fossil amber (`C10H16O`), nephrite jade, and pearlescent nacre shells—perceived strictly by physical weight, hardness, and optical luster.
 - **Thanatology & Unscripted Funerary Rites:** Fallen beings remain physically on the ground for 3 days. Without any instruction, the observatory records whether survivors react with **silent mourning vigils**, **grave offerings**, **permanent stone burial cairns**, **fearful avoidance**, or **indifference**.
 

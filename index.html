@@ -359,7 +359,8 @@
         <div class="stat-pill"><strong id="ui-time">Y1 · Day 1</strong></div>
         <div class="stat-pill"><strong id="ui-season">Spring</strong> (<span id="ui-temp">19.0°C</span>)</div>
         <div class="stat-pill">Live: <strong id="ui-pop">21</strong> · Null: <strong id="ui-ctrl">21</strong></div>
-        <div class="stat-pill hide-sm" title="10x Earth Super-Earth Surface (5.10B km²)">Planet: <strong id="ui-km2">225 km²</strong> / 5.1B km²</div>
+        <div class="stat-pill hide-sm" title="Living Wild Animal Species out of 24 Total">Fauna: <strong id="ui-fauna">24/24</strong></div>
+        <div class="stat-pill hide-sm" title="10x Earth Super-Earth Surface (5.10B km²)">Planet: <strong id="ui-km2">825 km²</strong> / 5.1B km²</div>
         <div class="stat-pill hide-sm">Cortex: <strong id="ui-llm">GPU</strong></div>
       </div>
 
@@ -959,19 +960,44 @@
           const y = terrainHeight(p.x, p.y);
           if (y < 0.02) continue;
           const g = new THREE.Group();
-          if (p.kind === 'tree') {
+          if (p.kind === 'tree' || p.kind === 'boreal_conifer' || p.kind === 'amber_pine') {
+            const leafC = p.kind === 'boreal_conifer' ? 0x065f46 : (p.kind === 'amber_pine' ? 0x3f6212 : 0x166534);
+            const lMat = new THREE.MeshStandardMaterial({ color: leafC, roughness: 0.75 });
             const tr = new THREE.Mesh(trunkGeo, trunkMat); tr.position.y = 0.36; tr.castShadow = true;
-            const f1 = new THREE.Mesh(foliageGeo1, leafMat); f1.position.y = 1.15; f1.castShadow = true;
-            const f2 = new THREE.Mesh(foliageGeo2, leafMat); f2.position.y = 1.82; f2.castShadow = true;
+            const f1 = new THREE.Mesh(foliageGeo1, lMat); f1.position.y = 1.15; f1.castShadow = true;
+            const f2 = new THREE.Mesh(foliageGeo2, lMat); f2.position.y = 1.82; f2.castShadow = true;
             g.add(tr, f1, f2);
-          } else if (p.kind === 'bush') {
-            const bu = new THREE.Mesh(bushGeo, bushMat); bu.position.y = 0.28; bu.castShadow = true;
-            const b1 = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), berryDotMat); b1.position.set(0.22, 0.42, 0.18);
+          } else if (p.kind === 'monsoon_palm') {
+            const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 1.55, 7), trunkMat); tr.position.y = 0.75; tr.castShadow = true;
+            const crown = new THREE.Mesh(new THREE.DodecahedronGeometry(0.68, 1), new THREE.MeshStandardMaterial({ color: 0x4d7c0f }));
+            crown.scale.set(1.35, 0.45, 1.35); crown.position.y = 1.58; g.add(tr, crown);
+          } else if (p.kind === 'hollow_cane') {
+            const caneMat = new THREE.MeshStandardMaterial({ color: 0x65a30d });
+            for (const [cx, cz] of [[-0.12, 0], [0.12, 0.08], [0, -0.14]]) {
+              const st = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 1.25, 6), caneMat);
+              st.position.set(cx, 0.60, cz); g.add(st);
+            }
+          } else if (p.kind === 'golden_stalk') {
+            const wheatMat = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.6 });
+            for (const [wx, wz] of [[-0.14, -0.1], [0.14, 0.1], [0, 0.15], [-0.08, 0.08]]) {
+              const w = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.02, 0.62, 5), wheatMat);
+              w.position.set(wx, 0.30, wz); g.add(w);
+            }
+          } else if (p.kind === 'bush' || p.kind === 'sootheleaf' || p.kind === 'shadowberry') {
+            const bCol = p.kind === 'sootheleaf' ? 0x2dd4bf : (p.kind === 'shadowberry' ? 0x581c87 : 0x22c55e);
+            const bu = new THREE.Mesh(bushGeo, new THREE.MeshStandardMaterial({ color: bCol, roughness: 0.7 })); bu.position.y = 0.28; bu.castShadow = true;
+            const dotMat = p.kind === 'shadowberry'
+              ? new THREE.MeshStandardMaterial({ color: 0x9333ea, emissive: 0x6b21a8, emissiveIntensity: 0.4 })
+              : berryDotMat;
+            const b1 = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), dotMat); b1.position.set(0.22, 0.42, 0.18);
             const b2 = b1.clone(); b2.position.set(-0.18, 0.38, 0.24);
             g.add(bu, b1, b2);
           } else if (p.kind === 'crystal') {
             const cr = new THREE.Mesh(crystalGeo, oreVeinMat); cr.position.y = 0.35; cr.rotation.y = p.scale * 3; cr.castShadow = true;
             g.add(cr);
+          } else if (p.kind === 'frost_lichen') {
+            const li = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 6), new THREE.MeshStandardMaterial({ color: 0x99f6e4, roughness: 0.9 }));
+            li.scale.set(1.2, 0.3, 1.2); li.position.y = 0.08; g.add(li);
           } else {
             const bo = new THREE.Mesh(boulderGeo, boulderMat); bo.position.y = 0.28; bo.scale.set(1.2, 0.85, 1.0); bo.castShadow = true;
             g.add(bo);
@@ -1131,45 +1157,78 @@
     function createWildAnimalRig(an) {
       const g = new THREE.Group();
       const sp = an.species || 'lumigrazer';
+      const isWater = ['silverfin_shoal', 'abyssalfin', 'leviathansong'].includes(sp);
+      const isAir = ['pollenwing', 'skyglider', 'reedwing'].includes(sp);
+
       if (sp === 'silverfin_shoal') {
         const fishMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.55, roughness: 0.25 });
         for (const [fx, fz] of [[0, 0], [0.24, -0.18], [-0.22, -0.22]]) {
           const f = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.34, 7), fishMat);
           f.rotation.x = Math.PI / 2; f.position.set(fx, 0.04, fz); g.add(f);
         }
-      } else if (sp === 'tidecrawler') {
-        const crabMat = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.6 });
-        const shell = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), crabMat);
-        shell.scale.set(1.2, 0.55, 1.0); shell.position.y = 0.10; g.add(shell);
-      } else if (sp === 'pollenwing' || sp === 'skyglider') {
+      } else if (sp === 'abyssalfin' || sp === 'leviathansong') {
+        const isWhale = sp === 'leviathansong';
+        const mMat = new THREE.MeshStandardMaterial({ color: isWhale ? 0x1d4ed8 : 0x334155, roughness: 0.35 });
+        const hull = new THREE.Mesh(new THREE.CapsuleGeometry(isWhale ? 0.36 : 0.16, isWhale ? 1.15 : 0.62, 6, 12), mMat);
+        hull.rotation.x = Math.PI / 2; hull.position.y = 0.10;
+        const fin = new THREE.Mesh(new THREE.ConeGeometry(0.10, 0.32, 4), mMat);
+        fin.position.set(0, isWhale ? 0.36 : 0.28, 0);
+        g.add(hull, fin);
+      } else if (sp === 'tidecrawler' || sp === 'pearlclam' || sp === 'stingshell') {
+        const cCol = sp === 'pearlclam' ? 0xfbcfe8 : (sp === 'stingshell' ? 0x451a03 : 0xf97316);
+        const shell = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), new THREE.MeshStandardMaterial({ color: cCol, roughness: 0.5 }));
+        shell.scale.set(1.2, 0.52, 1.0); shell.position.y = 0.10; g.add(shell);
+      } else if (sp === 'venomcoil') {
+        const sMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, emissive: 0x14532d, emissiveIntensity: 0.25 });
+        const coil = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.055, 8, 16), sMat);
+        coil.rotation.x = Math.PI / 2; coil.position.y = 0.06;
+        const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.28, 6), sMat);
+        neck.position.set(0, 0.18, 0.14); g.add(coil, neck);
+      } else if (sp === 'mirejaw') {
+        const crocMat = new THREE.MeshStandardMaterial({ color: 0x365314, roughness: 0.75 });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.16, 1.05), crocMat);
+        body.position.y = 0.12; g.add(body);
+      } else if (isAir) {
         const isBig = sp === 'skyglider';
-        const bMat = new THREE.MeshStandardMaterial({ color: isBig ? 0xf8fafc : 0xfacc15, emissive: isBig ? 0x000000 : 0xca8a04, emissiveIntensity: 0.3 });
-        const core = new THREE.Mesh(new THREE.CapsuleGeometry(isBig ? 0.10 : 0.05, isBig ? 0.30 : 0.12, 5, 8), bMat);
+        const col = sp === 'skyglider' ? 0xf8fafc : (sp === 'reedwing' ? 0x93c5fd : 0xfacc15);
+        const bMat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.5 });
+        const core = new THREE.Mesh(new THREE.CapsuleGeometry(isBig ? 0.10 : 0.06, isBig ? 0.30 : 0.15, 5, 8), bMat);
         core.rotation.x = Math.PI / 2;
-        const wing = new THREE.Mesh(new THREE.BoxGeometry(isBig ? 0.95 : 0.34, 0.02, isBig ? 0.22 : 0.12), bMat);
+        const wing = new THREE.Mesh(new THREE.BoxGeometry(isBig ? 0.98 : 0.44, 0.02, isBig ? 0.22 : 0.14), bMat);
         g.add(core, wing);
       } else {
         const colorMap = {
-          shadowstalker: 0x1e1b4b,
-          packhound: 0xb45309,
-          burrowhare: 0xd6d3d1,
-          lumigrazer: 0xfef3c7
+          titanotusk: 0x78716c, thunderhorn: 0x451a03, lumigrazer: 0xfef3c7,
+          windstrider: 0xd97706, craghorn: 0xe2e8f0, rootboar: 0x57534e,
+          burrowhare: 0xd6d3d1, damweaver: 0x78350f, canopykin: 0xa16207,
+          shadowstalker: 0x1e1b4b, sunmane: 0xfbbf24, frostmaw: 0xf1f5f9, packhound: 0xb45309
         };
-        const sc = sp === 'burrowhare' ? 0.62 : (sp === 'packhound' ? 0.82 : 1.0);
-        const isPred = sp === 'shadowstalker';
-        const mat = new THREE.MeshStandardMaterial({ color: colorMap[sp] || 0xfef3c7, roughness: isPred ? 0.4 : 0.7 });
-        const body = new THREE.Mesh(new THREE.CapsuleGeometry((isPred ? 0.18 : 0.22) * sc, 0.46 * sc, 6, 10), mat);
+        const scaleMap = {
+          titanotusk: 1.72, frostmaw: 1.42, thunderhorn: 1.32, sunmane: 1.15,
+          windstrider: 1.12, burrowhare: 0.60, damweaver: 0.68, canopykin: 0.72, packhound: 0.84
+        };
+        const sc = scaleMap[sp] || 1.0;
+        const isPred = ['shadowstalker', 'sunmane', 'frostmaw'].includes(sp);
+        const mat = new THREE.MeshStandardMaterial({ color: colorMap[sp] || 0xfef3c7, roughness: isPred ? 0.45 : 0.7 });
+        const body = new THREE.Mesh(new THREE.CapsuleGeometry((isPred ? 0.20 : 0.22) * sc, 0.48 * sc, 6, 10), mat);
         body.rotation.x = Math.PI / 2; body.position.y = 0.36 * sc; body.castShadow = true;
         const head = new THREE.Mesh(new THREE.SphereGeometry(0.16 * sc, 10, 10), mat);
         head.position.set(0, 0.50 * sc, 0.38 * sc);
+        if (sp === 'titanotusk' || sp === 'thunderhorn' || sp === 'craghorn') {
+          const tuskMat = new THREE.MeshStandardMaterial({ color: 0xfef9c3 });
+          const t1 = new THREE.Mesh(new THREE.ConeGeometry(0.04 * sc, 0.36 * sc, 6), tuskMat);
+          t1.rotation.x = Math.PI * 0.35; t1.position.set(-0.11 * sc, 0.48 * sc, 0.56 * sc);
+          const t2 = t1.clone(); t2.position.x = 0.11 * sc;
+          g.add(t1, t2);
+        }
         if (isPred) {
           const eyeMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
-          const e1 = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), eyeMat); e1.position.set(-0.07, 0.53, 0.51);
-          const e2 = e1.clone(); e2.position.x = 0.07;
+          const e1 = new THREE.Mesh(new THREE.SphereGeometry(0.035 * sc, 6, 6), eyeMat); e1.position.set(-0.07 * sc, 0.53 * sc, 0.51 * sc);
+          const e2 = e1.clone(); e2.position.x = 0.07 * sc;
           g.add(e1, e2);
         }
-        if (sp === 'packhound') {
-          const collar = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.025, 6, 14), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+        if (sp === 'packhound' || sp === 'windstrider') {
+          const collar = new THREE.Mesh(new THREE.TorusGeometry(0.13 * sc, 0.025, 6, 14), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
           collar.position.set(0, 0.44 * sc, 0.28 * sc);
           collar.visible = !!an.tamed;
           g.add(collar);
@@ -1181,10 +1240,10 @@
         }
         g.add(body, head);
       }
-      const baseAlt = sp === 'skyglider' ? 4.2 : (sp === 'pollenwing' ? 1.35 : 0.0);
-      const y0 = (sp === 'silverfin_shoal' ? -0.06 : Math.max(-0.02, terrainHeight(an.x, an.y))) + baseAlt;
+      const baseAlt = sp === 'skyglider' ? 4.4 : (sp === 'reedwing' ? 2.4 : (sp === 'pollenwing' ? 1.35 : 0.0));
+      const y0 = (isWater ? -0.06 : Math.max(-0.02, terrainHeight(an.x, an.y))) + baseAlt;
       g.position.set(an.x, y0, an.y);
-      g.userData = Object.assign(g.userData || {}, { species: sp, baseAlt, targetPos: new THREE.Vector3(an.x, y0, an.y), heading: 0 });
+      g.userData = Object.assign(g.userData || {}, { species: sp, isWater, baseAlt, targetPos: new THREE.Vector3(an.x, y0, an.y), heading: 0 });
       surfaceWorld.add(g);
       return g;
     }
@@ -1226,6 +1285,12 @@
       } else if (st.kind === 'granary') {
         const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.30, 0.65, 14), new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.6 }));
         pot.position.y = 0.32; g.add(pot);
+      } else if (st.kind === 'palisade') {
+        const logMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 });
+        for (let lx = -0.7; lx <= 0.71; lx += 0.28) {
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 1.35, 6), logMat);
+          post.position.set(lx, 0.65, 0); post.castShadow = true; g.add(post);
+        }
       } else if (st.kind === 'cairn') {
         for (const [sy, sr] of [[0.14, 0.42], [0.38, 0.30], [0.58, 0.18]]) {
           const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(sr, 0), new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.85 }));
@@ -1485,6 +1550,9 @@
       document.getElementById('ui-temp').textContent = `${w.ambient_temp}°C`;
       document.getElementById('ui-pop').textContent = m.live_population;
       document.getElementById('ui-ctrl').textContent = m.control_population;
+      if (m.wild_species_alive !== undefined) {
+        document.getElementById('ui-fauna').textContent = `${m.wild_species_alive}/${m.wild_species_total || 24}`;
+      }
       document.getElementById('ui-km2').textContent = `${m.explored_area_km2 || 225} km²`;
       document.getElementById('ui-llm').textContent = `${m.llm_deliberations}`;
       document.getElementById('ui-hash').textContent = `#${m.ledger_head_hash.slice(0, 10)}`;
@@ -1575,7 +1643,7 @@
         animIds.add(an.id);
         let ar = animalRigs.get(an.id);
         if (!ar) { ar = createWildAnimalRig(an); animalRigs.set(an.id, ar); }
-        const ay = (an.species === 'silverfin_shoal' ? -0.06 : Math.max(-0.02, terrainHeight(an.x, an.y))) + (ar.userData.baseAlt || 0);
+        const ay = (ar.userData.isWater ? -0.06 : Math.max(-0.02, terrainHeight(an.x, an.y))) + (ar.userData.baseAlt || 0);
         ar.userData.targetPos.set(an.x, ay, an.y);
         if (ar.userData.collar) ar.userData.collar.visible = !!an.tamed;
       }
@@ -1859,7 +1927,7 @@
           ar.rotation.y = ar.userData.heading;
         }
         const baseAlt = ar.userData.baseAlt || 0;
-        const groundY = ar.userData.species === 'silverfin_shoal' ? -0.06 : Math.max(-0.02, terrainHeight(ar.position.x, ar.position.z));
+        const groundY = ar.userData.isWater ? -0.06 : Math.max(-0.02, terrainHeight(ar.position.x, ar.position.z));
         ar.position.y = groundY + baseAlt + (baseAlt > 0 ? Math.sin(t * 3.5 + ar.position.x) * 0.18 : 0);
       }
 

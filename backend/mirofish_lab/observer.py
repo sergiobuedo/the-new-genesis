@@ -21,6 +21,7 @@ from backend.mirofish_lab.storage import LongitudinalWarehouse
 from backend.world.physics import (
     BLIND_MATERIALS,
     ENCLAVE_HOMELANDS,
+    FAUNA_CATALOG,
     CosmosWorld,
     MortalRemains,
     TICKS_PER_DAY,
@@ -184,8 +185,22 @@ class PopulationSimulation:
         for a in living:
             agent_grid[(int(a.x) // 6, int(a.y) // 6)].append(a)
 
-        if self.world.is_night and self.world.tick_count % 14 == 0:
+        if self.world.tick_count % 16 == 0:
             self._process_predator_ecology(living)
+
+        # Log any wild animal species newly driven to permanent extinction!
+        for ext_sp, ext_day in self.world.extinct_fauna.items():
+            m_ext = f"extinct_{ext_sp}"
+            if m_ext not in self.discoveries and self.enable_culture:
+                self.discoveries[m_ext] = ext_day
+                self._record_event(
+                    "conflict",
+                    f"ECOLOGICAL EXTINCTION! Wild species {FAUNA_CATALOG[ext_sp]['label']} has been driven permanently extinct!",
+                    [],
+                    4.0,
+                    4.0,
+                    importance=5,
+                )
 
         for agent in living:
             if not agent.alive:
@@ -292,31 +307,45 @@ class PopulationSimulation:
         return cortex_requests
 
     def _process_predator_ecology(self, living: List[KobAgent]) -> None:
+        """Simulates all dangerous Earth-analogue predators, river ambushers & venomous creatures!"""
         for pred in self.world.animals.values():
-            if not pred.alive or pred.species != "shadowstalker":
+            if not pred.alive:
                 continue
+            spec = FAUNA_CATALOG.get(pred.species, {})
+            hostility = spec.get("hostile", "none")
+            if hostility in ("none", "defensive") or pred.tamed_by:
+                continue
+            if hostility == "night" and not self.world.is_night:
+                continue
+            if hostility == "day" and self.world.is_night:
+                continue
+
             repelled = any(
                 (st.kind == "hearth" and st.fuel > 0 and math.hypot(st.x - pred.x, st.y - pred.y) < 7.5)
-                or (st.kind == "shelter" and math.hypot(st.x - pred.x, st.y - pred.y) < 5.0)
+                or (st.kind in ("shelter", "palisade") and math.hypot(st.x - pred.x, st.y - pred.y) < 6.5)
                 for st in self.world.structures.values()
             ) or any(
-                an.alive and an.species == "packhound" and an.tamed_by and math.hypot(an.x - pred.x, an.y - pred.y) < 6.0
+                an.alive and an.tamed_by and math.hypot(an.x - pred.x, an.y - pred.y) < 6.5
                 for an in self.world.animals.values()
             )
             if repelled:
                 continue
-            prey = [a for a in living if math.hypot(a.x - pred.x, a.y - pred.y) <= 3.0]
+
+            strike_rad = 1.7 if hostility == "venom" else 3.0
+            prey = [a for a in living if math.hypot(a.x - pred.x, a.y - pred.y) <= strike_rad]
             if prey:
                 victim = prey[0]
                 defenders = [a for a in living if math.hypot(a.x - victim.x, a.y - victim.y) <= 4.8]
-                if len(defenders) >= 3 or any(d.has_tool for d in defenders):
-                    pred.health -= 32.0
-                    victim.action_label = "Repelled nocturnal predator with group!"
+                if hostility != "venom" and (len(defenders) >= 3 or any(d.has_tool for d in defenders)):
+                    pred.health -= 38.0
+                    victim.action_label = f"Repelled wild {pred.species} with group!"
                     if pred.health <= 0:
                         pred.alive = False
+                        for _ in range(spec.get("meat", 1)):
+                            victim.inventory.append("wild_meat")
                         self._record_event(
                             "defense",
-                            f"Collective defense! {', '.join(d.id for d in defenders[:3])} slew a nocturnal Shadowstalker!",
+                            f"Collective defense! {', '.join(d.id for d in defenders[:3])} slew dangerous {spec['label']}!",
                             [d.id for d in defenders[:3]],
                             victim.x,
                             victim.y,
@@ -324,15 +353,18 @@ class PopulationSimulation:
                         )
                 else:
                     self.predator_attacks += 1
-                    victim.integrity = max(0.0, victim.integrity - 20.0)
-                    victim.stress = min(100.0, victim.stress + 32.0)
+                    dmg = float(spec.get("danger", 20.0))
+                    victim.integrity = max(0.0, victim.integrity - dmg)
+                    victim.stress = min(100.0, victim.stress + 30.0)
+                    victim.is_sleeping = False
                     victim.mood = "tense"
-                    victim.add_memory("Mauled in darkness by a wild Shadowstalker!", self.world.day)
+                    atk_verb = "envenomed" if hostility == "venom" else "attacked"
+                    victim.add_memory(f"Was {atk_verb} by wild {pred.species}!", self.world.day)
                     if victim.integrity <= 0:
-                        victim.cause_of_death = "nocturnal predator ambush"
+                        victim.cause_of_death = f"wild {pred.species} attack"
                     self._record_event(
                         "predation",
-                        f"Predator ambush! Isolated {victim.lineage} {victim.id} was attacked at night.",
+                        f"Wild danger! {victim.lineage} {victim.id} was {atk_verb} by {spec['label']}.",
                         [victim.id],
                         victim.x,
                         victim.y,
@@ -450,18 +482,52 @@ class PopulationSimulation:
             agent.action_label = "Sleeping deeply to restore strength"
             return
 
-        # 1. Eat carried food or draw from communal hive/granary
+        # 1A. Herbal Self-Medication when injured/envenomed!
+        if self.enable_culture and agent.integrity < 76.0 and "medicinal_herb" in agent.inventory:
+            agent.inventory.remove("medicinal_herb")
+            agent.integrity = min(100.0, agent.integrity + BLIND_MATERIALS["medicinal_herb"].healing)
+            agent.action_label = "Chewing medicinal Sootheleaf to heal wounds"
+            agent.pause_ticks = 4
+            agent.add_memory("Healed pain with fragrant silver-veined leaf.", self.world.day)
+            if "first_herbal_medicine" not in self.discoveries:
+                self.discoveries["first_herbal_medicine"] = self.world.day
+                self._record_event(
+                    "invention",
+                    f"NATURAL MEDICINE! {agent.lineage} {agent.id} healed wounds using wild Sootheleaf!",
+                    [agent.id],
+                    agent.x,
+                    agent.y,
+                    importance=5,
+                )
+            return
+
+        # 1B. Eat carried food (avoiding toxic_nightshade once learned!) or draw from granary
         if agent.energy < 62.0:
+            knows_toxin = agent.insight_map.get("avoid_toxic", 0) >= 1
             edible_idx = next(
-                (i for i, code in enumerate(agent.inventory) if BLIND_MATERIALS[code].nutrition > 0),
+                (
+                    i
+                    for i, code in enumerate(agent.inventory)
+                    if BLIND_MATERIALS[code].nutrition > 0 and not (knows_toxin and code == "toxic_nightshade")
+                ),
                 None,
             )
             if edible_idx is not None:
                 code = agent.inventory.pop(edible_idx)
-                agent.energy = min(100.0, agent.energy + BLIND_MATERIALS[code].nutrition)
-                agent.action_label = f"Eating {BLIND_MATERIALS[code].observer_label}"
+                mat = BLIND_MATERIALS[code]
+                if mat.toxicity > 0:
+                    agent.integrity = max(0.0, agent.integrity - mat.toxicity)
+                    agent.insight_map["avoid_toxic"] = 1
+                    agent.mood = "tense"
+                    agent.action_label = "Sickened by toxic Shadowberry (learned to avoid!)"
+                    agent.add_memory(f"Sickened by {mat.sensory_name}—never eat again!", self.world.day)
+                    if agent.integrity <= 0:
+                        agent.cause_of_death = "toxic plant poisoning"
+                else:
+                    agent.energy = min(100.0, agent.energy + mat.nutrition)
+                    agent.action_label = f"Eating {mat.observer_label}"
+                    agent.add_memory(f"Ate {mat.sensory_name}.", self.world.day)
                 agent.pause_ticks = 4
-                agent.add_memory(f"Ate {BLIND_MATERIALS[code].sensory_name}.", self.world.day)
                 return
 
             if self.enable_culture:
@@ -613,17 +679,17 @@ class PopulationSimulation:
                         agent.pause_ticks = 4
                         return
 
-        # 4A. Emergent Shoreline Fishing & Crustacean Gathering
+        # 4A. Emergent Shoreline Fishing & Shellfish Gathering
         if self.enable_culture and (agent.current_intent == "hunt" or agent.energy < 60.0) and nearby_animals:
             aquatic = [
-                an for an in nearby_animals if an.species in ("silverfin_shoal", "tidecrawler") and an.alive
+                an for an in nearby_animals if an.species in ("silverfin_shoal", "tidecrawler", "pearlclam", "damweaver") and an.alive
             ]
             if aquatic:
                 catch = aquatic[0]
                 dist_aq = math.hypot(catch.x - agent.x, catch.y - agent.y)
                 if dist_aq <= 3.3:
                     has_gear = agent.has_tool or ("fiber_dry" in agent.inventory)
-                    chance = 0.65 if has_gear else 0.28
+                    chance = 0.65 if has_gear else 0.30
                     agent.action_label = f"Fishing along shoreline ({catch.species})"
                     agent.pause_ticks = 4
                     if self.world.rng.random() < chance:
@@ -631,13 +697,15 @@ class PopulationSimulation:
                         if catch.health <= 0:
                             catch.alive = False
                         agent.inventory.append("wild_fish")
+                        if catch.species == "pearlclam" and len(agent.inventory) < 7:
+                            agent.inventory.append("nacre_shell")
                         self.fishing_count += 1
                         agent.current_intent = "forage"
                         if "first_fishing" not in self.discoveries:
                             self.discoveries["first_fishing"] = self.world.day
                         self._record_event(
                             "hunt",
-                            f"Shoreline fishing! {agent.lineage} {agent.id} caught fresh fish ({catch.species}).",
+                            f"Shoreline fishing! {agent.lineage} {agent.id} harvested {FAUNA_CATALOG[catch.species]['label']}.",
                             [agent.id],
                             agent.x,
                             agent.y,
@@ -645,33 +713,33 @@ class PopulationSimulation:
                         )
                     return
 
-        # 4B. Hunting Wild Land Fauna (Lumigrazers & Burrowhares) + Emergent Packhound Taming
+        # 4B. Emergent Taming (Packhound Wolves & Windstrider Wild Horses!) + Hunting All Terrestrial Prey & Megafauna
         if self.enable_culture and nearby_animals:
-            wild_hounds = [
-                an for an in nearby_animals if an.species == "packhound" and an.alive and not an.tamed_by
+            tame_candidates = [
+                an for an in nearby_animals if FAUNA_CATALOG.get(an.species, {}).get("tameable") and an.alive and not an.tamed_by
             ]
-            edible_for_hound = [i for i, c in enumerate(agent.inventory) if BLIND_MATERIALS[c].nutrition > 0]
+            edible_for_beast = [i for i, c in enumerate(agent.inventory) if BLIND_MATERIALS[c].nutrition > 15]
             if (
-                wild_hounds
-                and edible_for_hound
-                and agent.energy > 72.0
-                and agent.genome.empathy > 0.68
-                and (agent.current_intent == "share" or self.world.rng.random() < 0.03)
+                tame_candidates
+                and edible_for_beast
+                and agent.energy > 70.0
+                and agent.genome.empathy > 0.65
+                and (agent.current_intent == "share" or self.world.rng.random() < 0.035)
             ):
-                hound = wild_hounds[0]
-                if math.hypot(hound.x - agent.x, hound.y - agent.y) <= 3.6:
-                    agent.inventory.pop(edible_for_hound[0])
-                    hound.tameness += 0.55
-                    agent.action_label = f"Offering food to wild Packhound {hound.id}"
+                beast = tame_candidates[0]
+                if math.hypot(beast.x - agent.x, beast.y - agent.y) <= 3.6:
+                    agent.inventory.pop(edible_for_beast[0])
+                    beast.tameness += 0.55
+                    agent.action_label = f"Offering food to wild {beast.species} {beast.id}"
                     agent.pause_ticks = 4
-                    if hound.tameness >= 1.0:
-                        hound.tamed_by = agent.id
+                    if beast.tameness >= 1.0:
+                        beast.tamed_by = agent.id
                         self.domesticated_count += 1
                         if "first_domestication" not in self.discoveries:
                             self.discoveries["first_domestication"] = self.world.day
                         self._record_event(
                             "altruism",
-                            f"Inter-species domestication! {agent.lineage} {agent.id} tamed wild Packhound {hound.id}!",
+                            f"DOMESTICATION! {agent.lineage} {agent.id} tamed wild {FAUNA_CATALOG[beast.species]['label']} ({beast.id})!",
                             [agent.id],
                             agent.x,
                             agent.y,
@@ -680,29 +748,41 @@ class PopulationSimulation:
                     return
 
         if self.enable_culture and agent.current_intent == "hunt" and nearby_animals:
-            grazers = [
-                an for an in nearby_animals if an.species in ("lumigrazer", "burrowhare") and an.alive
-            ]
+            huntable = ("lumigrazer", "burrowhare", "craghorn", "rootboar", "thunderhorn", "titanotusk", "canopykin", "reedwing")
+            grazers = [an for an in nearby_animals if an.species in huntable and an.alive]
             if grazers:
                 prey = grazers[0]
-                if math.hypot(prey.x - agent.x, prey.y - agent.y) <= 1.9:
-                    prey.health -= 55.0 if agent.has_tool else 28.0
+                pspec = FAUNA_CATALOG[prey.species]
+                if math.hypot(prey.x - agent.x, prey.y - agent.y) <= 2.1:
+                    prey.health -= 62.0 if agent.has_tool else 28.0
                     agent.action_label = f"Hunting wild {prey.species} {prey.id}"
                     agent.pause_ticks = 3
+                    # Dangerous megafauna / boars counter-charge if hunted solo without spears!
+                    if prey.health > 0 and pspec.get("danger", 0) > 0 and not agent.has_tool and len(nearby_others) < 2:
+                        counter = float(pspec["danger"]) * 0.65
+                        agent.integrity = max(0.0, agent.integrity - counter)
+                        agent.stress = min(100.0, agent.stress + 20.0)
+                        agent.add_memory(f"Gored by charging {prey.species} while hunting unarmed!", self.world.day)
+                        if agent.integrity <= 0:
+                            agent.cause_of_death = f"charging {prey.species}"
                     if prey.health <= 0:
                         prey.alive = False
-                        agent.inventory.append("wild_meat")
+                        for _ in range(pspec.get("meat", 1)):
+                            if len(agent.inventory) < 8:
+                                agent.inventory.append("wild_meat")
+                        if prey.species in ("titanotusk", "thunderhorn") and len(agent.inventory) < 8:
+                            agent.inventory.append("ivory_horn")
                         self.hunts_count += 1
                         agent.current_intent = "forage"
                         if "first_hunt" not in self.discoveries:
                             self.discoveries["first_hunt"] = self.world.day
                         self._record_event(
                             "hunt",
-                            f"{agent.lineage} {agent.id} hunted wild {prey.species} {prey.id}.",
+                            f"{agent.lineage} {agent.id} hunted wild {pspec['label']} ({prey.id}).",
                             [agent.id],
                             agent.x,
                             agent.y,
-                            importance=3,
+                            importance=4 if pspec.get("meat", 1) >= 2 else 3,
                         )
                     return
                 else:
@@ -897,8 +977,8 @@ class PopulationSimulation:
                     )
                 return
 
-        # 7. Gather Ground Materials (with Smart Drop so hungry agents NEVER get stuck spinning on berries!)
-        max_carry = 5 if (self.enable_culture and agent.has_tool) else 4
+        # 7. Gather & Stockpile Ground Materials (`max_carry` up to 8 so beings can accumulate supplies!)
+        max_carry = 8 if (self.enable_culture and (agent.has_tool or agent.has_cloak)) else 6
         if tile_items:
             edibles = [c for c in tile_items if BLIND_MATERIALS[c].nutrition > 0]
             # Smart swap: if hungry and hands full of non-food, drop 1 non-edible item to grab food!
@@ -1516,6 +1596,8 @@ class MiroFishObservatory:
             "first_mourning_vigil": "Held silent mourning vigil beside a fallen peer",
             "first_grave_offering": "Placed grave offerings beside the dead",
             "first_burial_rite": "Built permanent stone burial cairns for the dead",
+            "first_herbal_medicine": "Discovered natural wound-healing with medicinal herbs",
+            "struct_palisade": "Built fortified timber palisade walls against predators",
         }
         MILESTONE_LABELS_ES = {
             "first_shared_word": "Inventaron su primera palabra hablada común",
@@ -1526,7 +1608,7 @@ class MiroFishObservatory:
             "craft_warm_cloak": "Tejieron abrigos vegetales para resistir el invierno",
             "first_hunt": "Caza de animales terrestres salvajes",
             "first_fishing": "Pesca costera y fluvial de peces y crustáceos",
-            "first_domestication": "Domesticación espontánea de cánidos salvajes",
+            "first_domestication": "Domesticación espontánea de animales salvajes",
             "first_interspecies_peace": "Entrega pacífica de comida entre distintas especies",
             "first_altruism": "Ayuda altruista dando alimento a compañeros hambrientos",
             "first_frontier_expansion": "Migración hacia nuevos territorios del planeta",
@@ -1541,6 +1623,8 @@ class MiroFishObservatory:
             "first_mourning_vigil": "Primera vigilia silenciosa de duelo ante un fallecido",
             "first_grave_offering": "Primeras ofrendas depositadas junto a sus muertos",
             "first_burial_rite": "Primer rito funerario: túmulos de piedra sobre los difuntos",
+            "first_herbal_medicine": "Descubrimiento de hierbas medicinales curativas",
+            "struct_palisade": "Murallas/empalizadas de madera frente a grandes depredadores",
         }
 
         milestone_list_en = [
@@ -1571,15 +1655,29 @@ class MiroFishObservatory:
             extinct_note_en = f" Natural selection: {', '.join(missing)} went extinct in earlier resource winters, leaving {surviving_names} as the surviving lineage (Gen {self.live.max_generation})."
             extinct_note_es = f" Selección natural: {', '.join(missing)} se extinguieron en inviernos y disputas previas, quedando {surviving_names} como linaje superviviente (Gen {self.live.max_generation})."
 
+        total_wild_species = len(FAUNA_CATALOG)
+        extinct_wild_list = list(self.live.world.extinct_fauna.keys())
+        alive_wild_species = total_wild_species - len(extinct_wild_list)
+        bio_en = (
+            f"All {total_wild_species}/{total_wild_species} wild animal species still survive."
+            if not extinct_wild_list
+            else f"{alive_wild_species}/{total_wild_species} wild species survive ({len(extinct_wild_list)} driven extinct: {', '.join(extinct_wild_list[:4])})."
+        )
+        bio_es = (
+            f"Conviven las {total_wild_species}/{total_wild_species} especies animales salvajes sin extinciones aún."
+            if not extinct_wild_list
+            else f"Sobreviven {alive_wild_species}/{total_wild_species} especies salvajes ({len(extinct_wild_list)} extinguidas: {', '.join(extinct_wild_list[:4])})."
+        )
+
         disciplines = {
             "psychology": (
-                f"HOW THEY FEEL TODAY: {'Emotional calm and healthy routine' if mean_stress < 35 else 'Noticeable survival tension from hunger or crowding'} "
+                f"HOW THEY FEEL TODAY: {'Emotional calm and healthy routine' if mean_stress < 35 else 'Noticeable survival tension from hunger, predators, or crowding'} "
                 f"(average tension {mean_stress}%). Right now {sleeping_now} beings are curled up sleeping, "
                 f"and {hungry_now} are actively searching for food. They huddle together on cold nights to share body warmth."
             ),
             "sociology": (
                 f"HOW THEY ORGANIZE ({arch_en}): Across history they have voluntarily shared food {self.live.sharing_count} times "
-                f"versus {self.live.conflict_count} territorial fights over scarce items. "
+                f"versus {self.live.conflict_count} territorial fights over scarce items ({self.live.domesticated_count} wild beasts tamed). "
                 + (
                     "Close-knit family clans stay bonded together."
                     if clustering >= 0.3
@@ -1592,9 +1690,9 @@ class MiroFishObservatory:
                 f"and have performed {self.live.experiment_trials} hands-on material trials ({cloaks_held} wearing woven cloaks, {tools_held} carrying stone tools)."
             ),
             "economics": (
-                f"SUBSISTENCE & PRECIOUS MATTER: {'Egalitarian sharing — almost everyone holds similar food and gear' if gini < 0.25 else 'Early material inequality — some individuals accumulate more items than others'}. "
-                f"So far: {self.live.hunts_count} land hunts, {self.live.fishing_count} shoreline fish catches, {stored_surplus} stored granary rations, "
-                f"and {rare_held} rare gleaming minerals (gold/silver/jade/amber/diamond) currently picked up out of curiosity."
+                f"BIOSPHERE, HUNTING, STOCKPILES & PRECIOUS MATTER: {bio_en} "
+                f"Recorded {self.live.hunts_count} land hunts, {self.live.fishing_count} shoreline catches, {stored_surplus} stored rations, "
+                f"and {rare_held} precious minerals (gold/silver/diamond/amber/jade) accumulated."
             ),
             "philosophy": (
                 f"DEATH, RITUALS & INNER WONDER: {self.live.philosophical_count} reflections about stars, life, and mortality. "
@@ -1605,13 +1703,13 @@ class MiroFishObservatory:
 
         disciplines_es = {
             "psychology": (
-                f"CÓMO SE ENCUENTRAN HOY: {'Calma emocional y rutina saludable' if mean_stress < 35 else 'Tensión elevada por falta de comida o espacio'} "
+                f"CÓMO SE ENCUENTRAN HOY: {'Calma emocional y rutina saludable' if mean_stress < 35 else 'Tensión elevada por depredadores, hambre o espacio'} "
                 f"(estrés medio del {mean_stress}%). Ahora mismo hay {sleeping_now} individuos durmiendo para recuperar fuerzas "
                 f"y {hungry_now} buscando comida con hambre. Por las noches se agrupan para darse calor."
             ),
             "sociology": (
-                f"CONVIVENCIA Y ORGANIZACIÓN ({arch_es}): A lo largo de su historia se han regalado comida voluntariamente {self.live.sharing_count} veces, "
-                f"frente a {self.live.conflict_count} peleas territoriales cuando escasea el alimento. "
+                f"CONVIVENCIA Y ORGANIZACIÓN ({arch_es}): Se han regalado comida voluntariamente {self.live.sharing_count} veces, "
+                f"frente a {self.live.conflict_count} peleas territoriales ({self.live.domesticated_count} animales salvajes domesticados). "
                 + (
                     "Forman clanes familiares muy unidos entre sí."
                     if clustering >= 0.3
@@ -1624,9 +1722,9 @@ class MiroFishObservatory:
                 f"y han probado {self.live.experiment_trials} combinaciones de materiales ({cloaks_held} llevan abrigos tejidos, {tools_held} portan herramientas)."
             ),
             "economics": (
-                f"SUPERVIVENCIA, CAZA, PESCA Y METALES PRECIOSOS: {'Reparto muy igualitario: todos tienen recursos parecidos' if gini < 0.25 else 'Empieza a verse desigualdad: algunos acumulan más bienes que otros'}. "
-                f"Acumulan {self.live.hunts_count} cacerías terrestres, {self.live.fishing_count} capturas de pesca en orilla, {stored_surplus} raciones guardadas "
-                f"y {rare_held} minerales preciosos (oro, plata, diamante, ámbar o jade) recogidos espontáneamente."
+                f"BIOSFERA, EXTINCIONES, ACUMULACIÓN Y METALES PRECIOSOS: {bio_es} "
+                f"Acumulan {self.live.hunts_count} cacerías, {self.live.fishing_count} capturas de pesca, {stored_surplus} raciones guardadas "
+                f"y {rare_held} minerales preciosos (oro, plata, diamante, ámbar o jade) recolectados libremente."
             ),
             "philosophy": (
                 f"MUERTE, DUELO, RITOS Y PENSAMIENTO: {self.live.philosophical_count} reflexiones espontáneas sobre el cielo y la existencia. "
@@ -1666,6 +1764,9 @@ class MiroFishObservatory:
             "hunts_count": self.live.hunts_count,
             "fishing_count": self.live.fishing_count,
             "domesticated_count": self.live.domesticated_count,
+            "wild_species_alive": alive_wild_species,
+            "wild_species_total": total_wild_species,
+            "extinct_fauna": dict(self.live.world.extinct_fauna),
             "mourning_vigils": self.live.mourning_vigils,
             "grave_offerings": self.live.grave_offerings,
             "stone_burials": self.live.stone_burials,
