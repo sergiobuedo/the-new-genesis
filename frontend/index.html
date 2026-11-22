@@ -1,0 +1,1906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>THE NEW GENESIS · God's Window — Planetary Observatory (Dr. Sergio Buedo Martínez)</title>
+  <style>
+    :root {
+      --panel: rgba(10, 18, 32, 0.88);
+      --border: rgba(148, 163, 184, 0.25);
+      --accent: #38bdf8;
+      --amber: #fbbf24;
+      --emerald: #34d399;
+      --rose: #fb7185;
+      --violet: #c084fc;
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #7dd3fc;
+      color: var(--text);
+      overflow: hidden;
+      height: 100%;
+      width: 100%;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body.clean-shot #hud-shell,
+    body.clean-shot #mobile-dock { display: none !important; }
+
+    #canvas-wrap {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      touch-action: none;
+    }
+    #labels-layer { position: fixed; inset: 0; pointer-events: none; z-index: 2; overflow: hidden; }
+
+    .floating-tag {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      background: rgba(10, 18, 32, 0.90);
+      border: 1px solid rgba(56, 189, 248, 0.48);
+      border-radius: 9px;
+      padding: 3px 8px;
+      font-size: 10.5px;
+      white-space: nowrap;
+      color: #f8fafc;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.42);
+    }
+    .floating-tag.speech { border-color: var(--amber); background: rgba(15, 23, 42, 0.95); }
+    .floating-tag .phoneme { font-weight: 800; color: var(--amber); }
+
+    /* Zero-Overlap Flex Shell: Topbar + Workspace Columns NEVER collide at any width! */
+    #hud-shell {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .topbar {
+      pointer-events: auto;
+      flex-shrink: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px 12px;
+      padding: 8px 14px;
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+    }
+    .brand { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+    .live-dot {
+      width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+      background: var(--emerald); box-shadow: 0 0 12px var(--emerald);
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.45;transform:scale(0.85)} }
+    .brand h1 { font-size: 13.5px; font-weight: 800; letter-spacing: 0.4px; }
+    .brand .sub { font-size: 10px; color: var(--emerald); font-weight: 600; }
+
+    .top-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 10.8px; }
+    .stat-pill {
+      background: rgba(15, 23, 42, 0.82);
+      padding: 4px 8px; border-radius: 7px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      white-space: nowrap;
+    }
+    .stat-pill strong { color: var(--accent); }
+
+    .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+    .speed-group {
+      display: inline-flex;
+      background: rgba(15, 23, 42, 0.82);
+      padding: 2px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .speed-group button { border: none; background: transparent; padding: 3px 7px; font-size: 10.5px; border-radius: 6px; }
+    .speed-group button.active { background: rgba(56, 189, 248, 0.28); color: #e0f2fe; }
+
+    button, select {
+      background: rgba(15, 23, 42, 0.88);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 5px 8px;
+      border-radius: 8px;
+      font-size: 10.8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    button:hover, select:hover { border-color: var(--accent); }
+    button.active { background: rgba(56, 189, 248, 0.25); border-color: var(--accent); }
+    .btn-papers { border-color: rgba(251, 191, 36, 0.55); color: #fef3c7; }
+
+    .workspace-columns {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .left-col, .right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+      pointer-events: none;
+    }
+    .left-col { width: 344px; }
+    .right-col { width: 364px; }
+
+    .card {
+      pointer-events: auto;
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      padding: 11px 12px;
+      overflow: hidden;
+    }
+    .card h2 {
+      font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.8px;
+      color: var(--accent); margin-bottom: 7px;
+      display: flex; justify-content: space-between; align-items: center;
+      cursor: pointer; user-select: none;
+    }
+    .card.collapsed { flex: 0 0 auto !important; padding-bottom: 8px; }
+    .card.collapsed h2 { margin-bottom: 0; }
+    .card.collapsed .card-body { display: none !important; }
+    .collapse-btn {
+      background: rgba(56, 189, 248, 0.14);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #e0f2fe;
+      padding: 1px 6px;
+      border-radius: 5px;
+      font-size: 10px;
+      line-height: 1.2;
+      margin-left: 6px;
+    }
+    body.hide-panels .workspace-columns { display: none !important; }
+    .tab-strip { display: flex; gap: 4px; margin-bottom: 7px; }
+    .tab-strip button { flex: 1; padding: 4px 5px; font-size: 10.2px; }
+
+    .bio-box {
+      background: rgba(15, 23, 42, 0.80);
+      border: 1px solid rgba(56, 189, 248, 0.32);
+      border-radius: 8px;
+      padding: 7px 9px;
+      font-size: 11px;
+      line-height: 1.42;
+      color: #e0f2fe;
+      margin-bottom: 7px;
+      user-select: text;
+    }
+    .bars { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 8px; margin-bottom: 7px; font-size: 10px; }
+    .bar-track { height: 5px; background: rgba(255,255,255,0.12); border-radius: 4px; overflow: hidden; margin-top: 2px; }
+    .bar-fill { height: 100%; border-radius: 4px; transition: width 0.25s; }
+
+    .thought-box {
+      background: rgba(15, 23, 42, 0.85);
+      border-left: 3px solid var(--amber);
+      padding: 6px 9px; border-radius: 6px;
+      font-size: 11px; line-height: 1.38; color: #fef3c7;
+      margin-bottom: 6px; user-select: text;
+    }
+    .mem-list { max-height: 54px; overflow-y: auto; font-size: 10px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
+
+    #roster-box, #daily-box { display: none; max-height: 230px; overflow-y: auto; flex-direction: column; gap: 5px; }
+    .roster-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 5px 8px; border-radius: 7px;
+      background: rgba(15, 23, 42, 0.68);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      font-size: 10.5px; cursor: pointer;
+    }
+    .roster-row:hover { border-color: var(--accent); }
+    .daily-item {
+      background: rgba(15, 23, 42, 0.78);
+      border-left: 3px solid var(--accent);
+      border-radius: 7px;
+      padding: 6px 8px;
+      font-size: 10.6px;
+      line-height: 1.4;
+      user-select: text;
+    }
+    .swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+
+    .timeline-card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .filter-pills { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+    .filter-pills button { padding: 2px 6px; font-size: 9.6px; border-radius: 5px; }
+    #timeline-list { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 5px; font-size: 10.6px; padding-right: 3px; user-select: text; }
+    .ev-item { background: rgba(15, 23, 42, 0.68); border: 1px solid rgba(148, 163, 184, 0.14); border-radius: 7px; padding: 5px 8px; line-height: 1.35; }
+    .ev-item.breakthrough { border-left: 3px solid var(--emerald); }
+    .ev-item.conflict { border-left: 3px solid var(--rose); }
+    .ev-item.lexicon { border-left: 3px solid var(--amber); }
+    .ev-day { color: var(--accent); font-weight: 700; font-size: 9.6px; }
+
+    .species-pills { display: flex; gap: 5px; margin-bottom: 7px; font-size: 10.5px; }
+    .sp-pill { flex: 1; background: rgba(15, 23, 42, 0.72); border-radius: 7px; padding: 4px 6px; text-align: center; border: 1px solid rgba(255,255,255,0.12); cursor: pointer; transition: transform 0.14s, background 0.14s; }
+    .sp-pill:hover { transform: translateY(-1px); background: rgba(30, 41, 59, 0.92); }
+    #pan-toast {
+      display: none; position: fixed; top: 68px; left: 50%; transform: translateX(-50%);
+      z-index: 30; background: rgba(10, 18, 32, 0.92); border: 1px solid var(--accent);
+      color: #e0f2fe; padding: 5px 12px; border-radius: 999px; font-size: 11px; font-weight: 700;
+      pointer-events: none;
+    }
+
+    .disc-box {
+      background: rgba(15, 23, 42, 0.76);
+      border-radius: 8px;
+      padding: 7px 9px;
+      font-size: 10.8px;
+      line-height: 1.42;
+      color: #f1f5f9;
+      min-height: 50px;
+      user-select: text;
+    }
+    #pop-chart { width: 100%; height: 56px; background: rgba(15, 23, 42, 0.62); border-radius: 7px; margin-top: 6px; }
+
+    .lex-list { display: flex; flex-direction: column; gap: 4px; max-height: 84px; overflow-y: auto; font-size: 10.5px; }
+    .lex-row { display: flex; justify-content: space-between; background: rgba(15, 23, 42, 0.66); padding: 4px 7px; border-radius: 6px; }
+    .pidgin-badge { background: rgba(192, 132, 252, 0.25); color: #e9d5ff; padding: 0 5px; border-radius: 4px; font-size: 9.5px; margin-left: 4px; }
+    .milestone-tags { display: flex; flex-wrap: wrap; gap: 4px; font-size: 10px; }
+    .m-tag { background: rgba(52, 211, 153, 0.16); border: 1px solid rgba(52, 211, 153, 0.45); color: #a7f3d0; padding: 2px 6px; border-radius: 5px; }
+
+    /* Scientific APA 7th Papers Modal */
+    #papers-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      background: rgba(3, 7, 18, 0.78);
+      backdrop-filter: blur(10px);
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+    .modal-box {
+      background: rgba(10, 18, 32, 0.96);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: min(980px, 96vw);
+      height: min(86vh, 840px);
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      gap: 12px;
+    }
+    .paper-card {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(251, 191, 36, 0.35);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 12px;
+    }
+    #pdf-frame {
+      flex: 1;
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #ffffff;
+    }
+
+    /* Mobile Bottom Dock & Responsive Drawers (< 940px) */
+    #mobile-dock {
+      display: none;
+      position: fixed;
+      bottom: 10px; left: 10px; right: 10px;
+      z-index: 25;
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      padding: 6px;
+      justify-content: space-around;
+      gap: 4px;
+    }
+    #mobile-dock button { flex: 1; padding: 7px 4px; font-size: 10.5px; }
+
+    @media (max-width: 940px) {
+      #hud-shell { padding: 8px; padding-bottom: 64px; }
+      .top-stats .hide-sm { display: none; }
+      .workspace-columns { position: relative; }
+      .left-col, .right-col {
+        display: none;
+        width: 100%;
+        max-height: 56vh;
+        overflow-y: auto;
+        margin-top: auto;
+      }
+      body.mob-left .left-col { display: flex; }
+      body.mob-right .right-col { display: flex; }
+      #mobile-dock { display: flex; }
+    }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.162.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.162.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="canvas-wrap"></div>
+  <div id="labels-layer"></div>
+  <div id="pan-toast">🧭 Gliding across the planet…</div>
+
+  <div id="hud-shell">
+    <header class="topbar" id="topbar-el">
+      <div class="brand">
+        <div class="live-dot"></div>
+        <div>
+          <h1>THE NEW GENESIS · <span style="color:var(--accent);font-weight:700">God's Window</span></h1>
+          <div class="sub" id="ui-archetype">🔒 Primitive Foraging Bands</div>
+        </div>
+      </div>
+
+      <div class="top-stats">
+        <div class="stat-pill"><strong id="ui-time">Y1 · Day 1</strong></div>
+        <div class="stat-pill"><strong id="ui-season">Spring</strong> (<span id="ui-temp">19.0°C</span>)</div>
+        <div class="stat-pill">Live: <strong id="ui-pop">21</strong> · Null: <strong id="ui-ctrl">21</strong></div>
+        <div class="stat-pill hide-sm" title="10x Earth Super-Earth Surface (5.10B km²)">Planet: <strong id="ui-km2">225 km²</strong> / 5.1B km²</div>
+        <div class="stat-pill hide-sm">Cortex: <strong id="ui-llm">GPU</strong></div>
+      </div>
+
+      <div class="controls">
+        <div class="speed-group" title="Observation Speed (Default x5)">
+          <button data-spd="1">x1</button>
+          <button data-spd="2">x2</button>
+          <button data-spd="5" class="active">x5</button>
+          <button data-spd="10">x10</button>
+          <button data-spd="20">x20</button>
+        </div>
+        <button id="btn-globe" title="Round 3D Super-Earth Planet View">🌍 Globe</button>
+        <button id="btn-topdown" class="active" title="Continental Surface View (Use Arrows / Drag / Pinch)">🦅 Map</button>
+        <button id="btn-autodir" title="Follow Active Creature">🎥 Follow</button>
+        <button id="btn-closeup" title="Close-Up Emotional Face">🔍 Face</button>
+        <button id="btn-toggle-hud" title="Show or Hide All Side Panels">👁️ Menus</button>
+        <button id="btn-papers" class="btn-papers" title="APA 7th Scientific Monographs (Dr. Sergio Buedo Martínez)">📄 APA Papers</button>
+        <button id="btn-snap" title="Save HD Photo">📸</button>
+        <button id="btn-rec" title="Record 8s Video">🎬</button>
+        <select id="lang-select" aria-label="Language">
+          <option value="en" selected>EN</option>
+          <option value="es">ES</option>
+        </select>
+      </div>
+    </header>
+
+    <main class="workspace-columns">
+      <aside class="left-col" id="left-col-el">
+        <section class="card">
+          <h2 data-collapse-card>
+            <span data-i18n="subjCardTitle">🔬 Creature Needs & Daily Diary</span>
+            <span class="collapse-btn">▾</span>
+          </h2>
+          <div class="card-body">
+            <div class="tab-strip">
+              <button id="tab-focus" class="active" data-i18n="tFocus">🔬 Subject</button>
+              <button id="tab-roster" data-i18n="tRoster">👥 Beings (21)</button>
+              <button id="tab-daily" data-i18n="tDaily">📅 Daily Log</button>
+            </div>
+
+            <div id="focus-box">
+              <div class="bio-box" id="subj-bio">Tap or click any creature in 3D to inspect its species, sleep/hunger needs, emotional face, and inner mind.</div>
+              <div class="bars">
+                <div><span data-i18n="nourish">Food / Energy</span> <span id="val-energy">84%</span>
+                  <div class="bar-track"><div class="bar-fill" id="bar-energy" style="width:84%;background:#34d399"></div></div>
+                </div>
+                <div><span data-i18n="warmth">Body Warmth</span> <span id="val-warmth">88%</span>
+                  <div class="bar-track"><div class="bar-fill" id="bar-warmth" style="width:88%;background:#fbbf24"></div></div>
+                </div>
+                <div><span data-i18n="sleepNeed">Rest / Sleep</span> <span id="val-rest">88%</span>
+                  <div class="bar-track"><div class="bar-fill" id="bar-rest" style="width:88%;background:#38bdf8"></div></div>
+                </div>
+                <div><span data-i18n="stress">Tension</span> <span id="val-stress">10%</span>
+                  <div class="bar-track"><div class="bar-fill" id="bar-stress" style="width:10%;background:#fb7185"></div></div>
+                </div>
+              </div>
+              <div class="thought-box" id="subj-thought">«Sunlight warms my body; unfamiliar shapes move across the valley.»</div>
+              <div class="mem-list" id="subj-memories"></div>
+            </div>
+
+            <div id="roster-box"></div>
+            <div id="daily-box"><div style="color:var(--muted);font-size:10.5px;">Recording Day 1 bilingual summary…</div></div>
+          </div>
+        </section>
+
+        <section class="card timeline-card">
+          <h2 data-collapse-card>
+            <span data-i18n="timeline">📜 Live History & Actions</span>
+            <span><span id="ui-hash" style="font-size:9.5px;color:var(--muted)">#SHA256</span><span class="collapse-btn">▾</span></span>
+          </h2>
+          <div class="card-body" style="display:flex;flex-direction:column;flex:1;min-height:0;">
+            <div class="filter-pills">
+              <button data-filter="all" class="active">All</button>
+              <button data-filter="invention">Tech</button>
+              <button data-filter="lexicon">Speech</button>
+              <button data-filter="altruism">Aid</button>
+              <button data-filter="conflict">Clash</button>
+              <button data-filter="birth">Birth</button>
+            </div>
+            <div id="timeline-list"></div>
+          </div>
+        </section>
+      </aside>
+
+      <aside class="right-col" id="right-col-el">
+        <section class="card">
+          <h2 data-collapse-card>
+            <span data-i18n="lineagesTitle">🧬 How Their Society Is Doing Today</span>
+            <span class="collapse-btn">▾</span>
+          </h2>
+          <div class="card-body">
+            <div class="species-pills" title="Click any lineage to fly directly to their continent!">
+              <div class="sp-pill" data-jump-lineage="Sylphid" style="border-color:#38bdf8"><strong style="color:#38bdf8">📍 Sylphids</strong><br><span id="sp-syl">7</span></div>
+              <div class="sp-pill" data-jump-lineage="Lithokin" style="border-color:#fbbf24"><strong style="color:#fbbf24">📍 Lithokin</strong><br><span id="sp-lit">7</span></div>
+              <div class="sp-pill" data-jump-lineage="Vespera" style="border-color:#c084fc"><strong style="color:#c084fc">📍 Vespera</strong><br><span id="sp-ves">7</span></div>
+            </div>
+
+            <div class="tab-strip" id="disc-tabs">
+              <button data-disc="psychology" class="active" data-i18n="dPsych">Mood & Needs</button>
+              <button data-disc="sociology" data-i18n="dSocio">Clans</button>
+              <button data-disc="anthropology" data-i18n="dAnthro">Culture</button>
+              <button data-disc="economics" data-i18n="dEcon">Survival</button>
+              <button data-disc="philosophy" data-i18n="dPhilo">Thoughts</button>
+            </div>
+            <div class="disc-box" id="disc-text">Observing spontaneous social organization…</div>
+
+            <canvas id="pop-chart" width="336" height="56"></canvas>
+            <div style="display:flex;justify-content:space-between;font-size:9.6px;color:var(--muted);margin-top:3px;">
+              <span>🟢 Sentient Beings (Free Will)</span>
+              <span>⚪ Control Twin (Instinct Only)</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 data-collapse-card>
+            <span data-i18n="lexiconTitle">🗣️ Words Invented From Scratch</span>
+            <span><span id="lex-count">0 words</span><span class="collapse-btn">▾</span></span>
+          </h2>
+          <div class="card-body">
+            <div class="lex-list" id="lex-list">
+              <div style="color:var(--muted);font-size:10.5px;">Awaiting unscripted spoken words…</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 data-collapse-card>
+            <span data-i18n="milestonesTitle">🏛️ Milestones Achieved So Far</span>
+            <span class="collapse-btn">▾</span>
+          </h2>
+          <div class="card-body">
+            <div class="milestone-tags" id="milestones-box" style="max-height:110px;overflow-y:auto;">
+              <span style="color:var(--muted)">Observing unscripted discoveries…</span>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <!-- Mobile Bottom Navigation Bar -->
+  <nav id="mobile-dock">
+    <button data-mob="map" class="active">🌍 3D World</button>
+    <button data-mob="left">🔬 Subject / Log</button>
+    <button data-mob="right">📊 Science</button>
+    <button data-mob="papers">📄 Papers</button>
+  </nav>
+
+  <!-- APA 7th Peer-Style Monographs Modal -->
+  <div id="papers-modal">
+    <div class="modal-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <h2 style="font-size:14px;color:var(--amber);">📄 Longitudinal Scientific Compendium (APA 7th Edition · Locked A4 PDF)</h2>
+          <div style="font-size:11px;color:var(--muted);">Principal Investigator: <strong>Dr. Sergio Buedo Martínez</strong> · 100% Live Crossref-Verified DOIs</div>
+        </div>
+        <button id="btn-close-papers">✕ Close</button>
+      </div>
+      <div id="papers-list"></div>
+      <iframe id="pdf-frame" title="APA Scientific Monograph Viewer"></iframe>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const params = new URLSearchParams(location.search);
+    if (params.get('clean') === '1') document.body.classList.add('clean-shot');
+    const API_ORIGIN = params.get('api') || location.origin;
+
+    let currentLang = 'en';
+    const UI_STRINGS = {
+      en: {
+        subjCardTitle: '🔬 Creature Needs & Daily Diary',
+        tFocus: '🔬 Subject', tDaily: '📅 Daily Log',
+        nourish: 'Food / Energy', warmth: 'Body Warmth', sleepNeed: 'Rest / Sleep', stress: 'Tension',
+        timeline: '📜 Live History & Actions',
+        lineagesTitle: '🧬 How Their Society Is Doing Today',
+        dPsych: 'Mood & Needs', dSocio: 'Clans', dAnthro: 'Culture', dEcon: 'Survival', dPhilo: 'Thoughts',
+        lexiconTitle: '🗣️ Words Invented From Scratch',
+        milestonesTitle: '🏛️ Milestones Achieved So Far'
+      },
+      es: {
+        subjCardTitle: '🔬 Necesidades y Diario del Ser',
+        tFocus: '🔬 Individuo', tDaily: '📅 Resumen Diario',
+        nourish: 'Comida / Energía', warmth: 'Calor Corporal', sleepNeed: 'Sueño / Descanso', stress: 'Tensión',
+        timeline: '📜 Historia Viva y Acciones',
+        lineagesTitle: '🧬 Cómo Se Encuentran Hoy',
+        dPsych: 'Ánimo/Sueño', dSocio: 'Convivencia', dAnthro: 'Cultura', dEcon: 'Supervivencia', dPhilo: 'Mente',
+        lexiconTitle: '🗣️ Palabras Inventadas por Ellos',
+        milestonesTitle: '🏛️ Resumen de Hitos Logrados'
+      }
+    };
+
+    // Collapsible cards & 1-click clean 3D view
+    document.querySelectorAll('[data-collapse-card]').forEach(hdr => {
+      hdr.addEventListener('click', () => {
+        const card = hdr.closest('.card');
+        card.classList.toggle('collapsed');
+        const btn = hdr.querySelector('.collapse-btn');
+        if (btn) btn.textContent = card.classList.contains('collapsed') ? '▸' : '▾';
+      });
+    });
+
+    const btnToggleHud = document.getElementById('btn-toggle-hud');
+    btnToggleHud.addEventListener('click', () => {
+      const hidden = document.body.classList.toggle('hide-panels');
+      btnToggleHud.textContent = hidden ? '👁️ Show Menus' : '👁️ Menus';
+    });
+
+    // Mobile Bottom Navigation Switcher (tapping active tab again closes the drawer!)
+    document.querySelectorAll('#mobile-dock button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const m = btn.dataset.mob;
+        if (m === 'papers') { openPapersModal(); return; }
+        const alreadyOpen = (m === 'left' && document.body.classList.contains('mob-left')) ||
+                            (m === 'right' && document.body.classList.contains('mob-right'));
+        document.querySelectorAll('#mobile-dock button').forEach(b => b.classList.remove('active'));
+        document.body.classList.remove('mob-left', 'mob-right');
+        if (alreadyOpen || m === 'map') {
+          document.querySelector('#mobile-dock button[data-mob="map"]').classList.add('active');
+        } else {
+          btn.classList.add('active');
+          if (m === 'left') document.body.classList.add('mob-left');
+          if (m === 'right') document.body.classList.add('mob-right');
+        }
+      });
+    });
+
+    // APA 7th Papers Modal Logic (supports both FastAPI server and 24/7 static cloud hosting!)
+    const papersModal = document.getElementById('papers-modal');
+    async function openPapersModal() {
+      papersModal.style.display = 'flex';
+      try {
+        let papers = [];
+        try {
+          const r = await fetch(`${API_ORIGIN}/api/papers`);
+          if (r.ok) { const d = await r.json(); papers = d.papers || []; }
+        } catch (_) {}
+        if (!papers.length) {
+          const r2 = await fetch('./chronicles/papers/papers_manifest.json');
+          if (r2.ok) papers = await r2.json();
+        }
+        const box = document.getElementById('papers-list');
+        if (papers.length > 0) {
+          const resolvePdf = (u) => u.startsWith('/papers/') ? `./chronicles${u}` : u;
+          const isApi = location.port === '8000';
+          const firstUrl = isApi ? `${API_ORIGIN}${papers[0].url}` : resolvePdf(papers[0].url);
+          box.innerHTML = papers.map(item => {
+            const href = isApi ? `${API_ORIGIN}${item.url}` : resolvePdf(item.url);
+            return `
+            <div class="paper-card">
+              <div>
+                <strong>${item.title}</strong><br/>
+                <span style="color:var(--muted)">${item.author} · ${item.date} · ${item.pages} Pages (A4 Times 12pt) · ✓ ${item.verified_dois} Verified DOIs · 🔒 SHA-256 #${item.sha256}</span>
+              </div>
+              <div style="display:flex;gap:6px;">
+                <a href="${href}" target="_blank" style="color:var(--amber);text-decoration:none;font-weight:700;padding:6px 10px;border:1px solid var(--amber);border-radius:7px;">⬇ Open / Download Locked PDF</a>
+              </div>
+            </div>`;
+          }).join('');
+          document.getElementById('pdf-frame').src = firstUrl;
+        }
+      } catch (_) {}
+    }
+    document.getElementById('btn-papers').addEventListener('click', openPapersModal);
+    document.getElementById('btn-close-papers').addEventListener('click', () => { papersModal.style.display = 'none'; });
+    papersModal.addEventListener('click', (ev) => { if (ev.target === papersModal) papersModal.style.display = 'none'; });
+    window.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') papersModal.style.display = 'none'; });
+
+    let WORLD_SEED = 4201;
+    function terrainHeight(x, z) {
+      const s = (WORLD_SEED % 997) * 0.013;
+      const riverCenter = Math.sin(z * 0.075 + s) * 9.5 - 6.0;
+      const distRiver = Math.abs(x - riverCenter);
+      const riverCarve = -1.35 * Math.exp(-(distRiver * distRiver) / 12.0);
+      const seaStrait = -1.25 * Math.exp(-Math.pow(z - Math.sin(x * 0.06) * 8.0 + 10.0, 2) / 14.0);
+      const continents = Math.sin(x * 0.038 + s) * Math.cos(z * 0.038 - s) * 1.15;
+      const hills = Math.sin(x * 0.085 + s) * Math.cos(z * 0.085 - s) * 0.85
+                  + Math.sin((x * 0.16 - z * 0.13) + s * 2.0) * 0.36;
+      const ridgeBelt = Math.max(0.0, Math.sin(x * 0.055 - z * 0.045 + 0.8) - 0.52) * 3.1;
+      return 0.55 + continents + hills + ridgeBelt + riverCarve + seaStrait * 0.55;
+    }
+
+    function shortestAngleLerp(current, target, alpha) {
+      const diff = ((target - current + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+      return current + diff * alpha;
+    }
+
+    function drawEmotionalFace(ctx, mood, blink = false) {
+      ctx.clearRect(0, 0, 256, 256);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      if (mood === 'affectionate' || mood === 'content') {
+        ctx.fillStyle = mood === 'affectionate' ? 'rgba(251, 113, 133, 0.55)' : 'rgba(251, 113, 133, 0.25)';
+        ctx.beginPath(); ctx.ellipse(58, 152, 22, 12, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(198, 152, 22, 12, 0, 0, Math.PI * 2); ctx.fill();
+      } else if (mood === 'cold') {
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.50)';
+        ctx.beginPath(); ctx.ellipse(58, 152, 22, 13, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(198, 152, 22, 13, 0, 0, Math.PI * 2); ctx.fill();
+      }
+
+      ctx.strokeStyle = '#0f172a';
+      ctx.fillStyle = '#0f172a';
+      ctx.lineWidth = 10;
+
+      if (blink || mood === 'sleepy') {
+        for (const ex of [82, 174]) {
+          ctx.beginPath(); ctx.arc(ex, 118, 22, 0.15 * Math.PI, 0.85 * Math.PI, false); ctx.stroke();
+        }
+      } else if (mood === 'affectionate') {
+        for (const ex of [82, 174]) {
+          ctx.beginPath(); ctx.arc(ex, 126, 22, 1.15 * Math.PI, 1.85 * Math.PI, false); ctx.stroke();
+        }
+      } else {
+        const ry = (mood === 'curious' || mood === 'inventing') ? 28 : 23;
+        for (const ex of [82, 174]) {
+          ctx.fillStyle = '#090d16';
+          ctx.beginPath(); ctx.ellipse(ex, 118, 21, ry, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath(); ctx.arc(ex - 6, 108, 7.5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(ex + 7, 124, 3.5, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 8;
+      if (mood === 'tense') {
+        ctx.beginPath(); ctx.moveTo(56, 74); ctx.lineTo(104, 92); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(200, 74); ctx.lineTo(152, 92); ctx.stroke();
+      } else if (mood === 'grieving' || mood === 'hungry' || mood === 'cold') {
+        ctx.beginPath(); ctx.moveTo(56, 92); ctx.lineTo(102, 76); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(200, 92); ctx.lineTo(154, 76); ctx.stroke();
+        if (mood === 'grieving') {
+          ctx.fillStyle = '#38bdf8';
+          ctx.beginPath(); ctx.arc(62, 146, 6, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(194, 146, 6, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (mood === 'curious' || mood === 'inventing') {
+        ctx.beginPath(); ctx.arc(82, 82, 22, 1.15 * Math.PI, 1.85 * Math.PI); ctx.stroke();
+        ctx.beginPath(); ctx.arc(174, 82, 22, 1.15 * Math.PI, 1.85 * Math.PI); ctx.stroke();
+      }
+
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 8;
+      if (mood === 'affectionate' || mood === 'content') {
+        ctx.beginPath(); ctx.arc(128, 166, mood === 'affectionate' ? 22 : 15, 0.15 * Math.PI, 0.85 * Math.PI, false); ctx.stroke();
+      } else if (mood === 'curious' || mood === 'inventing') {
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath(); ctx.ellipse(128, 176, 10, 13, 0, 0, Math.PI * 2); ctx.fill();
+      } else if (mood === 'tense') {
+        ctx.beginPath(); ctx.arc(128, 190, 18, 1.2 * Math.PI, 1.8 * Math.PI, false); ctx.stroke();
+      } else if (mood === 'cold') {
+        ctx.beginPath();
+        ctx.moveTo(106, 178); ctx.quadraticCurveTo(117, 170, 128, 178); ctx.quadraticCurveTo(139, 186, 150, 178);
+        ctx.stroke();
+      } else {
+        ctx.beginPath(); ctx.arc(128, 192, 15, 1.2 * Math.PI, 1.8 * Math.PI, false); ctx.stroke();
+      }
+    }
+
+    const wrap = document.getElementById('canvas-wrap');
+    const labelsLayer = document.getElementById('labels-layer');
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    wrap.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+    scene.fog = new THREE.FogExp2(0x93c5fd, 0.0050);
+
+    const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.5, 650);
+    camera.position.set(8, 42, 54);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(4, 0.5, 8);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.maxPolarAngle = Math.PI * 0.48;
+    controls.minDistance = 1.8;
+    controls.maxDistance = 250;
+    controls.enablePan = true;
+    controls.screenSpacePanning = false;
+    controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+
+    // Mobile 1-finger long-press (320ms hold) switches to smooth World Pan across continents!
+    const panToast = document.getElementById('pan-toast');
+    let touchHoldTimer = null;
+    let touchStartPt = { x: 0, y: 0 };
+    renderer.domElement.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        touchStartPt = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        clearTimeout(touchHoldTimer);
+        touchHoldTimer = setTimeout(() => {
+          controls.touches.ONE = THREE.TOUCH.PAN;
+          panToast.style.display = 'block';
+        }, 320);
+      } else {
+        clearTimeout(touchHoldTimer);
+      }
+    }, { passive: true });
+    renderer.domElement.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1 && controls.touches.ONE !== THREE.TOUCH.PAN) {
+        const moved = Math.hypot(e.touches[0].clientX - touchStartPt.x, e.touches[0].clientY - touchStartPt.y);
+        if (moved > 12) clearTimeout(touchHoldTimer);
+      }
+    }, { passive: true });
+    const resetTouchPan = () => {
+      clearTimeout(touchHoldTimer);
+      controls.touches.ONE = THREE.TOUCH.ROTATE;
+      panToast.style.display = 'none';
+    };
+    renderer.domElement.addEventListener('touchend', resetTouchPan, { passive: true });
+    renderer.domElement.addEventListener('touchcancel', resetTouchPan, { passive: true });
+
+    // PC Keyboard Arrows & WASD smooth planetary navigation
+    const heldKeys = new Set();
+    window.addEventListener('keydown', (e) => {
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyW','KeyA','KeyS','KeyD'].includes(e.code)) {
+        heldKeys.add(e.code);
+        if (camMode === 'closeup' || camMode === 'auto') setCamMode('topdown');
+      }
+    });
+    window.addEventListener('keyup', (e) => heldKeys.delete(e.code));
+
+    const hemiLight = new THREE.HemisphereLight(0xf0f9ff, 0x3f6212, 1.35);
+    scene.add(hemiLight);
+
+    const sunLight = new THREE.DirectionalLight(0xfffbeb, 1.75);
+    sunLight.position.set(48, 72, 42);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.set(2048, 2048);
+    const sd = 78;
+    sunLight.shadow.camera.left = -sd; sunLight.shadow.camera.right = sd;
+    sunLight.shadow.camera.top = sd; sunLight.shadow.camera.bottom = -sd;
+    scene.add(sunLight);
+
+    // Surface World Group vs 3D Spherical Super-Earth Globe Group!
+    const surfaceWorld = new THREE.Group();
+    scene.add(surfaceWorld);
+
+    const globeGroup = new THREE.Group();
+    globeGroup.visible = false;
+    scene.add(globeGroup);
+
+    function buildSphericalPlanet() {
+      const gGeo = new THREE.SphereGeometry(28, 72, 54);
+      const gPos = gGeo.attributes.position;
+      const gCols = new Float32Array(gPos.count * 3);
+      const c = new THREE.Color();
+      for (let i = 0; i < gPos.count; i++) {
+        const vx = gPos.getX(i), vy = gPos.getY(i), vz = gPos.getZ(i);
+        const lat = vy / 28.0;
+        const n = Math.sin(vx * 0.14 + 1.2) * Math.cos(vz * 0.14 - 0.8) + 0.45 * Math.sin(vy * 0.22 + vx * 0.19);
+        let rMul = 1.0;
+        if (Math.abs(lat) > 0.82) { c.setHex(0xf8fafc); rMul = 1.012; }
+        else if (n < -0.05) { c.setHex(0x0284c7); }
+        else if (n < 0.08) { c.setHex(0xfde68a); rMul = 1.005; }
+        else if (Math.abs(lat) < 0.25 && n > 0.25) { c.setHex(0x65a30d); rMul = 1.022; }
+        else if (n > 0.65) { c.setHex(0x94a3b8); rMul = 1.045; }
+        else { c.setHex(0x16a34a); rMul = 1.018; }
+        gPos.setXYZ(i, vx * rMul, vy * rMul, vz * rMul);
+        gCols[i * 3] = c.r; gCols[i * 3 + 1] = c.g; gCols[i * 3 + 2] = c.b;
+      }
+      gGeo.setAttribute('color', new THREE.BufferAttribute(gCols, 3));
+      gGeo.computeVertexNormals();
+      const planetMesh = new THREE.Mesh(gGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.08 }));
+      const atmoMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(29.8, 48, 36),
+        new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.16, side: THREE.BackSide })
+      );
+      globeGroup.add(planetMesh, atmoMesh);
+
+      // Starfield backdrop for Globe Mode
+      const starGeo = new THREE.BufferGeometry();
+      const starPts = new Float32Array(900 * 3);
+      for (let i = 0; i < 900; i++) {
+        const th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1), rad = 180 + Math.random() * 80;
+        starPts[i * 3] = rad * Math.sin(ph) * Math.cos(th);
+        starPts[i * 3 + 1] = rad * Math.cos(ph);
+        starPts[i * 3 + 2] = rad * Math.sin(ph) * Math.sin(th);
+      }
+      starGeo.setAttribute('position', new THREE.BufferAttribute(starPts, 3));
+      globeGroup.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.9 })));
+
+      // 3 Glowing Continental Lineage Beacons on the Round Planet!
+      const beacons = [
+        { lin: 'Sylphid', col: 0x38bdf8, lat: 0.52, lon: -0.75 },
+        { lin: 'Lithokin', col: 0xfbbf24, lat: 0.55, lon: 0.85 },
+        { lin: 'Vespera', col: 0xc084fc, lat: -0.35, lon: 0.05 },
+      ];
+      globeGroup.userData.beacons = [];
+      for (const b of beacons) {
+        const r = 28.9;
+        const bx = r * Math.cos(b.lat) * Math.sin(b.lon);
+        const by = r * Math.sin(b.lat);
+        const bz = r * Math.cos(b.lat) * Math.cos(b.lon);
+        const pin = new THREE.Mesh(
+          new THREE.SphereGeometry(1.15, 16, 16),
+          new THREE.MeshStandardMaterial({ color: b.col, emissive: b.col, emissiveIntensity: 1.4 })
+        );
+        pin.position.set(bx, by, bz);
+        pin.userData = { jumpLineage: b.lin };
+        globeGroup.add(pin);
+        globeGroup.userData.beacons.push(pin);
+      }
+    }
+    buildSphericalPlanet();
+
+    let terrainMesh = null;
+    const waterGeo = new THREE.PlaneGeometry(260, 260, 48, 48);
+    waterGeo.rotateX(-Math.PI / 2);
+    const waterMesh = new THREE.Mesh(
+      waterGeo,
+      new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.15, metalness: 0.35, transparent: true, opacity: 0.84 })
+    );
+    waterMesh.position.set(4, -0.04, 4);
+    surfaceWorld.add(waterMesh);
+
+    function buildContinuousTerrain(isWinter = false) {
+      if (terrainMesh) { terrainMesh.geometry.dispose(); surfaceWorld.remove(terrainMesh); }
+      const geo = new THREE.PlaneGeometry(220, 220, 180, 180);
+      geo.rotateX(-Math.PI / 2);
+      const pos = geo.attributes.position;
+      const colors = new Float32Array(pos.count * 3);
+      const c = new THREE.Color();
+      const s = (WORLD_SEED % 997) * 0.013;
+
+      for (let i = 0; i < pos.count; i++) {
+        const vx = pos.getX(i) + 4;
+        const vz = pos.getZ(i) + 4;
+        const h = terrainHeight(vx, vz);
+        pos.setX(i, vx); pos.setY(i, h); pos.setZ(i, vz);
+
+        const moist = Math.sin(vx * 0.09 - s) + Math.cos(vz * 0.10 + s);
+        const isBoreal = vz < -20 && vx >= 8;
+        const isSavanna = vz > 22;
+        if (h < 0.02) c.setHex(0xd97706);
+        else if (h < 0.24) c.setHex(0xfde68a);
+        else if (h > 2.45 || isBoreal && h > 1.15 || (isWinter && h > 1.25)) c.setHex(0xf1f5f9);
+        else if (h > 1.75) c.setHex(0x64748b);
+        else if (isBoreal) c.setHex(0x0f766e);
+        else if (isSavanna && moist < 0.35) c.setHex(0xa3e635);
+        else if (moist > 0.48) c.setHex(isWinter ? 0x3f6212 : 0x15803d);
+        else c.setHex(isWinter ? 0x84cc16 : 0x4ade80);
+        colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+      }
+      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      geo.computeVertexNormals();
+      terrainMesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.86, metalness: 0.04 }));
+      terrainMesh.receiveShadow = true;
+      surfaceWorld.add(terrainMesh);
+    }
+
+    const propsGroup = new THREE.Group();
+    surfaceWorld.add(propsGroup);
+    const trunkGeo = new THREE.CylinderGeometry(0.11, 0.17, 0.75, 7);
+    const foliageGeo1 = new THREE.ConeGeometry(0.68, 1.35, 8);
+    const foliageGeo2 = new THREE.ConeGeometry(0.50, 1.05, 8);
+    const bushGeo = new THREE.DodecahedronGeometry(0.42, 1);
+    const boulderGeo = new THREE.DodecahedronGeometry(0.58, 0);
+    const crystalGeo = new THREE.OctahedronGeometry(0.45, 0);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 });
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.75 });
+    const bushMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.7 });
+    const berryDotMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xd97706, emissiveIntensity: 0.35 });
+    const boulderMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.85 });
+    const oreVeinMat = new THREE.MeshStandardMaterial({ color: 0x10b981, metalness: 0.55, roughness: 0.35 });
+
+    async function initWorldScenery() {
+      try {
+        let data = null;
+        if (!location.hostname.endsWith('github.io')) {
+          try {
+            const res = await fetch(`${API_ORIGIN}/api/world-init`);
+            if (res.ok) data = await res.json();
+          } catch (_) {}
+        }
+        if (!data) {
+          const r2 = await fetch('./chronicles/world_init.json');
+          if (r2.ok) data = await r2.json();
+        }
+        if (!data) { buildContinuousTerrain(false); return; }
+        WORLD_SEED = data.seed || 4201;
+        buildContinuousTerrain(false);
+        for (const p of (data.props || [])) {
+          const y = terrainHeight(p.x, p.y);
+          if (y < 0.02) continue;
+          const g = new THREE.Group();
+          if (p.kind === 'tree') {
+            const tr = new THREE.Mesh(trunkGeo, trunkMat); tr.position.y = 0.36; tr.castShadow = true;
+            const f1 = new THREE.Mesh(foliageGeo1, leafMat); f1.position.y = 1.15; f1.castShadow = true;
+            const f2 = new THREE.Mesh(foliageGeo2, leafMat); f2.position.y = 1.82; f2.castShadow = true;
+            g.add(tr, f1, f2);
+          } else if (p.kind === 'bush') {
+            const bu = new THREE.Mesh(bushGeo, bushMat); bu.position.y = 0.28; bu.castShadow = true;
+            const b1 = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), berryDotMat); b1.position.set(0.22, 0.42, 0.18);
+            const b2 = b1.clone(); b2.position.set(-0.18, 0.38, 0.24);
+            g.add(bu, b1, b2);
+          } else if (p.kind === 'crystal') {
+            const cr = new THREE.Mesh(crystalGeo, oreVeinMat); cr.position.y = 0.35; cr.rotation.y = p.scale * 3; cr.castShadow = true;
+            g.add(cr);
+          } else {
+            const bo = new THREE.Mesh(boulderGeo, boulderMat); bo.position.y = 0.28; bo.scale.set(1.2, 0.85, 1.0); bo.castShadow = true;
+            g.add(bo);
+          }
+          g.position.set(p.x, y, p.y);
+          g.scale.setScalar(p.scale || 1.0);
+          propsGroup.add(g);
+        }
+        for (const [vx, vy] of (data.thermal_vents || [])) {
+          const vent = new THREE.Mesh(
+            new THREE.TorusGeometry(0.65, 0.12, 10, 24),
+            new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xea580c, emissiveIntensity: 0.9 })
+          );
+          vent.rotation.x = Math.PI / 2;
+          vent.position.set(vx, terrainHeight(vx, vy) + 0.08, vy);
+          propsGroup.add(vent);
+        }
+      } catch (_) { buildContinuousTerrain(false); }
+    }
+    initWorldScenery();
+
+    const MAX_RES = 600;
+    const resInstanced = new THREE.InstancedMesh(
+      new THREE.SphereGeometry(0.13, 8, 8),
+      new THREE.MeshStandardMaterial({ roughness: 0.3, metalness: 0.1 }),
+      MAX_RES
+    );
+    resInstanced.count = 0;
+    surfaceWorld.add(resInstanced);
+    const resDummy = new THREE.Object3D();
+    const resCol = new THREE.Color();
+
+    const agentRigs = new Map();
+    const animalRigs = new Map();
+    const corpseRigs = new Map();
+    const structMeshes = new Map();
+
+    function createSentientRig(ag) {
+      const group = new THREE.Group();
+      const bodyMat = new THREE.MeshStandardMaterial({ color: ag.body_color, roughness: 0.34 });
+      const accMat = new THREE.MeshStandardMaterial({ color: ag.accent_color, roughness: 0.42 });
+
+      const legGeo = new THREE.CapsuleGeometry(0.085, 0.20, 6, 10);
+      const leftLeg = new THREE.Mesh(legGeo, accMat); leftLeg.position.set(-0.14, 0.18, 0);
+      const rightLeg = new THREE.Mesh(legGeo, accMat); rightLeg.position.set(0.14, 0.18, 0);
+
+      const armGeo = new THREE.CapsuleGeometry(0.068, 0.24, 6, 8);
+      const leftArm = new THREE.Mesh(armGeo, bodyMat); leftArm.position.set(-0.33, 0.56, 0);
+      const rightArm = new THREE.Mesh(armGeo, bodyMat); rightArm.position.set(0.33, 0.56, 0.05);
+
+      let torso;
+      if (ag.lineage === 'Lithokin') {
+        torso = new THREE.Mesh(new THREE.SphereGeometry(0.33, 14, 12), bodyMat);
+        torso.scale.set(1.05, 0.95, 0.95); torso.position.y = 0.52;
+        const shell = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 10), new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.65 }));
+        shell.position.set(0, 0.56, -0.09); shell.scale.set(1.0, 0.92, 0.72);
+        group.add(shell);
+      } else if (ag.lineage === 'Vespera') {
+        torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.30, 8, 14), bodyMat);
+        torso.position.y = 0.55;
+      } else {
+        torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.28, 8, 14), bodyMat);
+        torso.position.y = 0.55;
+      }
+      torso.castShadow = true;
+
+      const headGroup = new THREE.Group();
+      headGroup.position.y = 1.02;
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 18, 16), accMat);
+      head.scale.set(1.06, 0.96, 1.0);
+      head.castShadow = true;
+      headGroup.add(head);
+
+      // Front-mounted Curved PlaneGeometry Face (+Z) — Guaranteed 100% Dead-Center Eyes & Mouth!
+      const faceCanvas = document.createElement('canvas');
+      faceCanvas.width = 256; faceCanvas.height = 256;
+      const faceCtx = faceCanvas.getContext('2d');
+      drawEmotionalFace(faceCtx, ag.mood || 'curious', false);
+      const faceTex = new THREE.CanvasTexture(faceCanvas);
+      const faceGeo = new THREE.PlaneGeometry(0.38, 0.34, 8, 8);
+      const fPos = faceGeo.attributes.position;
+      for (let i = 0; i < fPos.count; i++) {
+        const fx = fPos.getX(i);
+        const fy = fPos.getY(i);
+        fPos.setZ(i, Math.sqrt(Math.max(0.01, 0.278 * 0.278 - fx * fx - fy * fy)));
+      }
+      faceGeo.computeVertexNormals();
+      const faceMesh = new THREE.Mesh(
+        faceGeo,
+        new THREE.MeshBasicMaterial({ map: faceTex, transparent: true, depthWrite: false })
+      );
+      headGroup.add(faceMesh);
+
+      if (ag.lineage === 'Sylphid') {
+        const antMat = new THREE.MeshStandardMaterial({ color: ag.body_color, emissive: ag.body_color, emissiveIntensity: 0.75 });
+        for (const side of [-1, 1]) {
+          const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.03, 0.28, 6), bodyMat);
+          stalk.position.set(side * 0.11, 0.32, 0); stalk.rotation.z = -side * 0.28;
+          const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), antMat);
+          bulb.position.set(side * 0.15, 0.46, 0);
+          headGroup.add(stalk, bulb);
+        }
+      } else if (ag.lineage === 'Vespera') {
+        for (const side of [-1, 1]) {
+          const ear = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.38, 8), bodyMat);
+          ear.position.set(side * 0.28, 0.14, 0); ear.rotation.z = -side * 0.85;
+          headGroup.add(ear);
+        }
+      } else {
+        const crest = new THREE.Mesh(new THREE.OctahedronGeometry(0.13, 0), bodyMat);
+        crest.position.set(0, 0.28, 0.04);
+        headGroup.add(crest);
+      }
+
+      const cloak = new THREE.Mesh(
+        new THREE.ConeGeometry(0.38, 0.48, 12, 1, true),
+        new THREE.MeshStandardMaterial({ color: 0xf472b6, side: THREE.DoubleSide, roughness: 0.8 })
+      );
+      cloak.position.y = 0.56; cloak.visible = false;
+
+      const heldMesh = new THREE.Mesh(new THREE.DodecahedronGeometry(0.13, 0), new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.3 }));
+      heldMesh.position.set(0.36, 0.42, 0.22); heldMesh.visible = false;
+
+      const spearMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.15, 6), new THREE.MeshStandardMaterial({ color: 0x22d3ee, emissive: 0x0891b2, emissiveIntensity: 0.3 }));
+      spearMesh.position.set(-0.36, 0.62, 0.12); spearMesh.rotation.x = 0.25; spearMesh.visible = false;
+
+      const halo = new THREE.Mesh(new THREE.RingGeometry(0.46, 0.58, 28), new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide }));
+      halo.rotation.x = Math.PI / 2; halo.position.y = 0.04; halo.visible = false;
+
+      group.add(leftLeg, rightLeg, torso, leftArm, rightArm, cloak, headGroup, heldMesh, spearMesh, halo);
+      const y0 = terrainHeight(ag.x, ag.y);
+      group.position.set(ag.x, y0, ag.y);
+      group.rotation.y = ag.heading || 0;
+
+      const tag = document.createElement('div');
+      tag.className = 'floating-tag';
+      tag.style.display = 'none';
+      labelsLayer.appendChild(tag);
+
+      group.userData = {
+        id: ag.id,
+        targetPos: new THREE.Vector3(ag.x, y0, ag.y),
+        targetHeading: ag.heading || 0,
+        lastMood: ag.mood || 'curious',
+        faceCtx, faceTex,
+        nextBlink: Math.random() * 4 + 2,
+        isBlinking: false,
+        headGroup, leftLeg, rightLeg, leftArm, rightArm,
+        cloak, heldMesh, spearMesh, halo, tag,
+        tagPriority: 0,
+        phase: Math.random() * Math.PI * 2
+      };
+      surfaceWorld.add(group);
+      return group;
+    }
+
+    function createWildAnimalRig(an) {
+      const g = new THREE.Group();
+      const sp = an.species || 'lumigrazer';
+      if (sp === 'silverfin_shoal') {
+        const fishMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.55, roughness: 0.25 });
+        for (const [fx, fz] of [[0, 0], [0.24, -0.18], [-0.22, -0.22]]) {
+          const f = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.34, 7), fishMat);
+          f.rotation.x = Math.PI / 2; f.position.set(fx, 0.04, fz); g.add(f);
+        }
+      } else if (sp === 'tidecrawler') {
+        const crabMat = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.6 });
+        const shell = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), crabMat);
+        shell.scale.set(1.2, 0.55, 1.0); shell.position.y = 0.10; g.add(shell);
+      } else if (sp === 'pollenwing' || sp === 'skyglider') {
+        const isBig = sp === 'skyglider';
+        const bMat = new THREE.MeshStandardMaterial({ color: isBig ? 0xf8fafc : 0xfacc15, emissive: isBig ? 0x000000 : 0xca8a04, emissiveIntensity: 0.3 });
+        const core = new THREE.Mesh(new THREE.CapsuleGeometry(isBig ? 0.10 : 0.05, isBig ? 0.30 : 0.12, 5, 8), bMat);
+        core.rotation.x = Math.PI / 2;
+        const wing = new THREE.Mesh(new THREE.BoxGeometry(isBig ? 0.95 : 0.34, 0.02, isBig ? 0.22 : 0.12), bMat);
+        g.add(core, wing);
+      } else {
+        const colorMap = {
+          shadowstalker: 0x1e1b4b,
+          packhound: 0xb45309,
+          burrowhare: 0xd6d3d1,
+          lumigrazer: 0xfef3c7
+        };
+        const sc = sp === 'burrowhare' ? 0.62 : (sp === 'packhound' ? 0.82 : 1.0);
+        const isPred = sp === 'shadowstalker';
+        const mat = new THREE.MeshStandardMaterial({ color: colorMap[sp] || 0xfef3c7, roughness: isPred ? 0.4 : 0.7 });
+        const body = new THREE.Mesh(new THREE.CapsuleGeometry((isPred ? 0.18 : 0.22) * sc, 0.46 * sc, 6, 10), mat);
+        body.rotation.x = Math.PI / 2; body.position.y = 0.36 * sc; body.castShadow = true;
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.16 * sc, 10, 10), mat);
+        head.position.set(0, 0.50 * sc, 0.38 * sc);
+        if (isPred) {
+          const eyeMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
+          const e1 = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), eyeMat); e1.position.set(-0.07, 0.53, 0.51);
+          const e2 = e1.clone(); e2.position.x = 0.07;
+          g.add(e1, e2);
+        }
+        if (sp === 'packhound') {
+          const collar = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.025, 6, 14), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+          collar.position.set(0, 0.44 * sc, 0.28 * sc);
+          collar.visible = !!an.tamed;
+          g.add(collar);
+          g.userData.collar = collar;
+        }
+        for (const [lx, lz] of [[-0.13, 0.22], [0.13, 0.22], [-0.13, -0.22], [0.13, -0.22]]) {
+          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.045 * sc, 0.04 * sc, 0.32 * sc, 6), mat);
+          leg.position.set(lx * sc, 0.16 * sc, lz * sc); g.add(leg);
+        }
+        g.add(body, head);
+      }
+      const baseAlt = sp === 'skyglider' ? 4.2 : (sp === 'pollenwing' ? 1.35 : 0.0);
+      const y0 = (sp === 'silverfin_shoal' ? -0.06 : Math.max(-0.02, terrainHeight(an.x, an.y))) + baseAlt;
+      g.position.set(an.x, y0, an.y);
+      g.userData = Object.assign(g.userData || {}, { species: sp, baseAlt, targetPos: new THREE.Vector3(an.x, y0, an.y), heading: 0 });
+      surfaceWorld.add(g);
+      return g;
+    }
+
+    function createCorpseMesh(cp) {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.18, 0.42, 6, 10),
+        new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.9 })
+      );
+      body.rotation.z = Math.PI / 2;
+      body.position.y = 0.14;
+      g.add(body);
+      const fl = new THREE.Mesh(
+        new THREE.SphereGeometry(0.10, 8, 8),
+        new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xd97706, emissiveIntensity: 0.6 })
+      );
+      fl.position.set(0.25, 0.22, 0.20);
+      fl.visible = (cp.offerings || 0) > 0;
+      g.add(fl);
+      g.userData = { offeringDot: fl };
+      g.position.set(cp.x, terrainHeight(cp.x, cp.y), cp.y);
+      surfaceWorld.add(g);
+      return g;
+    }
+
+    function createStructureMesh(st) {
+      const g = new THREE.Group();
+      if (st.kind === 'hearth') {
+        const stones = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.12, 8, 12), new THREE.MeshStandardMaterial({ color: 0x64748b }));
+        stones.rotation.x = Math.PI / 2; stones.position.y = 0.08;
+        const flame = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.72, 8), new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xf97316, emissiveIntensity: 2.2 }));
+        flame.position.y = 0.42;
+        const light = new THREE.PointLight(0xf97316, 4.2, 11.0); light.position.y = 1.0;
+        g.add(stones, flame, light); g.userData = { flame, light };
+      } else if (st.kind === 'shelter') {
+        const hut = new THREE.Mesh(new THREE.SphereGeometry(0.95, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.85 }));
+        hut.castShadow = true; g.add(hut);
+      } else if (st.kind === 'granary') {
+        const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.30, 0.65, 14), new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.6 }));
+        pot.position.y = 0.32; g.add(pot);
+      } else if (st.kind === 'cairn') {
+        for (const [sy, sr] of [[0.14, 0.42], [0.38, 0.30], [0.58, 0.18]]) {
+          const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(sr, 0), new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.85 }));
+          rock.position.y = sy; rock.castShadow = true; g.add(rock);
+        }
+      } else {
+        const stele = new THREE.Mesh(new THREE.BoxGeometry(0.38, 1.65, 0.24), new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.45 }));
+        stele.position.y = 0.82; stele.castShadow = true; g.add(stele);
+      }
+      g.position.set(st.x, terrainHeight(st.x, st.y), st.y);
+      surfaceWorld.add(g);
+      return g;
+    }
+
+    let latestState = null;
+    let selectedSubjectId = null;
+    let camMode = params.get('closeup') === '1' ? 'closeup' : 'topdown';
+    let timelineFilter = 'all';
+    let activeDisc = 'psychology';
+    let lastWinterState = false;
+    let viewSpeed = 5;
+
+    document.querySelectorAll('.speed-group button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.speed-group button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        viewSpeed = parseInt(btn.dataset.spd, 10);
+        fetch(`${API_ORIGIN}/api/local-pace`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ speed: viewSpeed })
+        }).catch(() => {});
+      });
+    });
+
+    document.getElementById('lang-select').addEventListener('change', (e) => {
+      currentLang = e.target.value;
+      const dict = UI_STRINGS[currentLang] || UI_STRINGS.en;
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const k = el.getAttribute('data-i18n');
+        if (dict[k]) el.textContent = dict[k];
+      });
+      if (latestState) {
+        applyState(latestState);
+      }
+    });
+
+    let snapCloseup = true;
+    const DEFAULT_ENCLAVES = { Sylphid: [-38, -34], Lithokin: [42, -34], Vespera: [4, 38] };
+
+    function setCamMode(mode) {
+      camMode = mode;
+      document.getElementById('btn-globe').classList.toggle('active', mode === 'globe');
+      document.getElementById('btn-topdown').classList.toggle('active', mode === 'topdown');
+      document.getElementById('btn-autodir').classList.toggle('active', mode === 'auto');
+      document.getElementById('btn-closeup').classList.toggle('active', mode === 'closeup');
+      if (mode === 'globe') {
+        surfaceWorld.visible = false;
+        globeGroup.visible = true;
+        scene.background.setHex(0x030712);
+        scene.fog.density = 0.0;
+        controls.maxPolarAngle = Math.PI * 0.92;
+        controls.target.set(0, 0, 0);
+        camera.position.set(0, 18, 78);
+      } else {
+        surfaceWorld.visible = true;
+        globeGroup.visible = false;
+        scene.background.setHex(0x87ceeb);
+        scene.fog.density = 0.0032;
+        controls.maxPolarAngle = Math.PI * 0.48;
+        if (mode === 'topdown' && camera.position.length() > 140) {
+          camera.position.set(8, 36, 48);
+          controls.target.set(4, 0.5, 10);
+        } else if (mode === 'closeup') {
+          snapCloseup = true;
+        }
+      }
+    }
+
+    function flyToLineage(lin) {
+      setCamMode('topdown');
+      const members = (latestState?.agents || []).filter(a => a.lineage === lin);
+      let tx, tz;
+      if (members.length > 0) {
+        selectedSubjectId = members[0].id;
+        tx = members.reduce((s, a) => s + a.x, 0) / members.length;
+        tz = members.reduce((s, a) => s + a.y, 0) / members.length;
+        showLeftTab('focus');
+      } else {
+        const enc = (latestState?.enclaves && latestState.enclaves[lin]) || DEFAULT_ENCLAVES[lin] || [4, 10];
+        tx = enc[0]; tz = enc[1];
+      }
+      const ty = terrainHeight(tx, tz);
+      controls.target.set(tx, ty + 0.5, tz);
+      camera.position.set(tx + 2, ty + 24, tz + 28);
+    }
+
+    document.querySelectorAll('[data-jump-lineage]').forEach(pill => {
+      pill.addEventListener('click', () => flyToLineage(pill.dataset.jumpLineage));
+    });
+
+    document.getElementById('btn-globe').addEventListener('click', () => setCamMode('globe'));
+    document.getElementById('btn-topdown').addEventListener('click', () => setCamMode('topdown'));
+    document.getElementById('btn-autodir').addEventListener('click', () => setCamMode('auto'));
+    document.getElementById('btn-closeup').addEventListener('click', () => setCamMode('closeup'));
+
+    document.getElementById('btn-snap').addEventListener('click', () => {
+      renderer.render(scene, camera);
+      const a = document.createElement('a');
+      a.download = `universe_xxv_day_${latestState?.world?.day || 1}.png`;
+      a.href = renderer.domElement.toDataURL('image/png');
+      a.click();
+    });
+
+    const btnRec = document.getElementById('btn-rec');
+    btnRec.addEventListener('click', () => {
+      if (btnRec.disabled) return;
+      const stream = renderer.domElement.captureStream(30);
+      const rec = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      const chunks = [];
+      rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      rec.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `universe_xxv_day_${latestState?.world?.day || 1}.webm`;
+        a.click();
+        btnRec.disabled = false;
+        btnRec.textContent = '🎬';
+      };
+      btnRec.disabled = true;
+      btnRec.textContent = '⏺8s';
+      rec.start();
+      setTimeout(() => rec.stop(), 8000);
+    });
+
+    const tabFocus = document.getElementById('tab-focus');
+    const tabRoster = document.getElementById('tab-roster');
+    const tabDaily = document.getElementById('tab-daily');
+    const focusBox = document.getElementById('focus-box');
+    const rosterBox = document.getElementById('roster-box');
+    const dailyBox = document.getElementById('daily-box');
+
+    function showLeftTab(which) {
+      tabFocus.classList.toggle('active', which === 'focus');
+      tabRoster.classList.toggle('active', which === 'roster');
+      tabDaily.classList.toggle('active', which === 'daily');
+      focusBox.style.display = which === 'focus' ? 'block' : 'none';
+      rosterBox.style.display = which === 'roster' ? 'flex' : 'none';
+      dailyBox.style.display = which === 'daily' ? 'flex' : 'none';
+    }
+    tabFocus.addEventListener('click', () => showLeftTab('focus'));
+    tabRoster.addEventListener('click', () => showLeftTab('roster'));
+    tabDaily.addEventListener('click', () => showLeftTab('daily'));
+
+    document.querySelectorAll('#disc-tabs button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#disc-tabs button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeDisc = btn.dataset.disc;
+        if (latestState?.metrics) {
+          const src = (currentLang === 'es' && latestState.metrics.disciplines_es) ? latestState.metrics.disciplines_es : (latestState.metrics.disciplines || {});
+          document.getElementById('disc-text').textContent = src[activeDisc] || '';
+        }
+      });
+    });
+
+    document.querySelectorAll('.filter-pills button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-pills button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        timelineFilter = btn.dataset.filter;
+        if (latestState) renderTimeline(latestState.timeline);
+      });
+    });
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    renderer.domElement.addEventListener('pointerdown', (ev) => {
+      pointer.x = (ev.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(ev.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      if (globeGroup.visible) {
+        const bHits = raycaster.intersectObjects(globeGroup.userData.beacons || [], false);
+        if (bHits.length > 0 && bHits[0].object.userData?.jumpLineage) {
+          flyToLineage(bHits[0].object.userData.jumpLineage);
+          return;
+        }
+      }
+      const hits = raycaster.intersectObjects(Array.from(agentRigs.values()), true);
+      if (hits.length > 0) {
+        let obj = hits[0].object;
+        while (obj && !obj.userData?.id) obj = obj.parent;
+        if (obj?.userData?.id) {
+          selectedSubjectId = obj.userData.id;
+          showLeftTab('focus');
+          if (window.innerWidth <= 940) document.body.classList.add('mob-left');
+          if (ev.detail === 2) setCamMode('closeup');
+        }
+      } else if (window.innerWidth <= 940) {
+        document.body.classList.remove('mob-left', 'mob-right');
+        document.querySelectorAll('#mobile-dock button').forEach(b => b.classList.remove('active'));
+        document.querySelector('#mobile-dock button[data-mob="map"]')?.classList.add('active');
+      }
+    });
+
+    function drawPopChart(history) {
+      const canvas = document.getElementById('pop-chart');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!history || history.length < 2) return;
+      const maxPop = Math.max(28, ...history.map(h => Math.max(h.live, h.ctrl)));
+      const plot = (key, stroke, width) => {
+        ctx.beginPath(); ctx.strokeStyle = stroke; ctx.lineWidth = width;
+        history.forEach((pt, i) => {
+          const x = (i / (history.length - 1)) * (canvas.width - 12) + 6;
+          const y = canvas.height - 6 - (pt[key] / maxPop) * (canvas.height - 12);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      };
+      plot('ctrl', 'rgba(203, 213, 225, 0.55)', 1.5);
+      plot('live', '#34d399', 2.4);
+    }
+
+    function renderDailyLogs(logs) {
+      if (!logs || !logs.length) return;
+      dailyBox.innerHTML = logs.map(d => {
+        const txt = currentLang === 'es' ? d.summary_es : d.summary_en;
+        return `<div class="daily-item">${txt}</div>`;
+      }).join('');
+    }
+
+    function renderTimeline(events) {
+      const box = document.getElementById('timeline-list');
+      const filtered = (events || []).filter(ev => {
+        if (timelineFilter === 'all') return true;
+        if (timelineFilter === 'invention') return ['invention', 'craft', 'insight', 'philosophy'].includes(ev.kind);
+        if (timelineFilter === 'conflict') return ['conflict', 'predation', 'defense', 'hunt', 'death'].includes(ev.kind);
+        return ev.kind === timelineFilter;
+      });
+      box.innerHTML = filtered.slice().reverse().map(ev => {
+        const cls = ['invention', 'philosophy'].includes(ev.kind) ? 'breakthrough'
+          : ['conflict', 'predation', 'death'].includes(ev.kind) ? 'conflict'
+          : ev.kind === 'lexicon' ? 'lexicon' : '';
+        return `<div class="ev-item ${cls}"><span class="ev-day">[Y${ev.year}·D${ev.day}]</span> ${ev.summary}</div>`;
+      }).join('');
+    }
+
+    function applyState(state) {
+      latestState = state;
+      const w = state.world;
+      const m = state.metrics;
+
+      document.getElementById('ui-time').textContent = `Y${w.year} · Day ${w.day}`;
+      document.getElementById('ui-season').textContent = w.season;
+      document.getElementById('ui-temp').textContent = `${w.ambient_temp}°C`;
+      document.getElementById('ui-pop').textContent = m.live_population;
+      document.getElementById('ui-ctrl').textContent = m.control_population;
+      document.getElementById('ui-km2').textContent = `${m.explored_area_km2 || 225} km²`;
+      document.getElementById('ui-llm').textContent = `${m.llm_deliberations}`;
+      document.getElementById('ui-hash').textContent = `#${m.ledger_head_hash.slice(0, 10)}`;
+      tabRoster.textContent = currentLang === 'es' ? `👥 Seres (${m.live_population})` : `👥 Beings (${m.live_population})`;
+
+      const arch = currentLang === 'es' ? m.archetype_es : m.archetype_en;
+      document.getElementById('ui-archetype').textContent = `🔒 ${arch || ''}`;
+
+      const sp = m.species_counts || {};
+      document.getElementById('sp-syl').textContent = sp.Sylphid || 0;
+      document.getElementById('sp-lit').textContent = sp.Lithokin || 0;
+      document.getElementById('sp-ves').textContent = sp.Vespera || 0;
+
+      const isWinter = w.season.includes('Winter');
+      if (isWinter !== lastWinterState) {
+        lastWinterState = isWinter;
+        buildContinuousTerrain(isWinter);
+      }
+      if (w.is_night) {
+        scene.background.setHex(0x1e293b); scene.fog.color.setHex(0x1e293b);
+        sunLight.intensity = 0.65; hemiLight.intensity = 0.85;
+      } else {
+        scene.background.setHex(isWinter ? 0xcbd5e1 : 0x7dd3fc);
+        scene.fog.color.setHex(isWinter ? 0xe2e8f0 : 0xbae6fd);
+        sunLight.intensity = 1.75; hemiLight.intensity = 1.35;
+      }
+
+      if (!selectedSubjectId || !state.agents.some(a => a.id === selectedSubjectId)) {
+        selectedSubjectId = state.spotlight_id;
+      }
+
+      const activeIds = new Set();
+      for (const ag of state.agents) {
+        activeIds.add(ag.id);
+        let rig = agentRigs.get(ag.id);
+        if (!rig) {
+          rig = createSentientRig(ag);
+          agentRigs.set(ag.id, rig);
+        }
+        rig.scale.setScalar(ag.scale || 1.0);
+        rig.userData.targetPos.set(ag.x, terrainHeight(ag.x, ag.y), ag.y);
+        rig.userData.targetHeading = ag.heading || 0;
+        rig.userData.cloak.visible = ag.has_cloak;
+        rig.userData.spearMesh.visible = ag.has_tool;
+
+        rig.userData.isSleeping = !!ag.sleeping;
+        if (ag.mood !== rig.userData.lastMood || ag.sleeping !== rig.userData.wasSleeping) {
+          rig.userData.lastMood = ag.mood;
+          rig.userData.wasSleeping = !!ag.sleeping;
+          drawEmotionalFace(rig.userData.faceCtx, ag.mood, !!ag.sleeping);
+          rig.userData.faceTex.needsUpdate = true;
+        }
+
+        if (ag.held_item && ag.held_color) {
+          rig.userData.heldMesh.visible = true;
+          rig.userData.heldMesh.material.color.set(ag.held_color);
+        } else {
+          rig.userData.heldMesh.visible = false;
+        }
+
+        if (ag.id === selectedSubjectId) {
+          rig.userData.tagPriority = 3;
+          rig.userData.tag.className = ag.utterance ? 'floating-tag speech' : 'floating-tag';
+          rig.userData.tag.innerHTML = ag.utterance
+            ? `<strong>${ag.id}</strong>: <span class="phoneme">«${ag.utterance}»</span> (${ag.referent})`
+            : `<strong>${ag.id}</strong> · ${ag.sleeping ? '💤 Sleeping' : ag.action}`;
+        } else if (ag.utterance) {
+          rig.userData.tagPriority = 2;
+          rig.userData.tag.className = 'floating-tag speech';
+          rig.userData.tag.innerHTML = `<span class="phoneme">«${ag.utterance}»</span> (${ag.referent})`;
+        } else if (ag.sleeping) {
+          rig.userData.tagPriority = 1;
+          rig.userData.tag.className = 'floating-tag';
+          rig.userData.tag.innerHTML = `💤 ${ag.id}`;
+        } else {
+          rig.userData.tagPriority = 0;
+          rig.userData.tag.style.display = 'none';
+        }
+      }
+      for (const [id, rig] of agentRigs.entries()) {
+        if (!activeIds.has(id)) {
+          rig.userData.tag.remove(); surfaceWorld.remove(rig); agentRigs.delete(id);
+        }
+      }
+
+      const animIds = new Set();
+      for (const an of (state.animals || [])) {
+        animIds.add(an.id);
+        let ar = animalRigs.get(an.id);
+        if (!ar) { ar = createWildAnimalRig(an); animalRigs.set(an.id, ar); }
+        const ay = (an.species === 'silverfin_shoal' ? -0.06 : Math.max(-0.02, terrainHeight(an.x, an.y))) + (ar.userData.baseAlt || 0);
+        ar.userData.targetPos.set(an.x, ay, an.y);
+        if (ar.userData.collar) ar.userData.collar.visible = !!an.tamed;
+      }
+      for (const [id, ar] of animalRigs.entries()) {
+        if (!animIds.has(id)) { surfaceWorld.remove(ar); animalRigs.delete(id); }
+      }
+
+      const cpIds = new Set();
+      for (const cp of (state.corpses || [])) {
+        cpIds.add(cp.id);
+        let cm = corpseRigs.get(cp.id);
+        if (!cm) { cm = createCorpseMesh(cp); corpseRigs.set(cp.id, cm); }
+        if (cm.userData.offeringDot) cm.userData.offeringDot.visible = (cp.offerings || 0) > 0;
+      }
+      for (const [cid, cm] of corpseRigs.entries()) {
+        if (!cpIds.has(cid)) { surfaceWorld.remove(cm); corpseRigs.delete(cid); }
+      }
+
+      const sIds = new Set();
+      for (const st of state.structures) {
+        sIds.add(st.id);
+        let sm = structMeshes.get(st.id);
+        if (!sm) { sm = createStructureMesh(st); structMeshes.set(st.id, sm); }
+        if (st.kind === 'hearth' && sm.userData.flame) {
+          const on = st.fuel > 0;
+          sm.userData.flame.visible = on; sm.userData.light.intensity = on ? 4.2 : 0.0;
+        }
+      }
+      for (const [sid, sm] of structMeshes.entries()) {
+        if (!sIds.has(sid)) { surfaceWorld.remove(sm); structMeshes.delete(sid); }
+      }
+
+      const rList = state.resources || [];
+      const rCount = Math.min(MAX_RES, rList.length);
+      resInstanced.count = rCount;
+      for (let i = 0; i < rCount; i++) {
+        const [rx, rz, hex] = rList[i];
+        resDummy.position.set(rx, terrainHeight(rx, rz) + 0.14, rz);
+        resDummy.updateMatrix();
+        resInstanced.setMatrixAt(i, resDummy.matrix);
+        resCol.set(hex);
+        resInstanced.setColorAt(i, resCol);
+      }
+      resInstanced.instanceMatrix.needsUpdate = true;
+      if (resInstanced.instanceColor) resInstanced.instanceColor.needsUpdate = true;
+
+      rosterBox.innerHTML = state.agents.map(a =>
+        `<div class="roster-row" data-aid="${a.id}">
+          <span><span class="swatch" style="background:${a.body_color}"></span><strong>${a.id}</strong> · ${a.lineage} (${a.stage})</span>
+          <span style="color:var(--muted)">${a.mood}</span>
+        </div>`
+      ).join('');
+      rosterBox.querySelectorAll('.roster-row').forEach(r => {
+        r.addEventListener('click', () => {
+          selectedSubjectId = r.dataset.aid;
+          showLeftTab('focus');
+          setCamMode('closeup');
+        });
+      });
+
+      const subj = state.agents.find(a => a.id === selectedSubjectId) || state.agents[0];
+      if (subj) {
+        selectedSubjectId = subj.id;
+        for (const [id, rig] of agentRigs.entries()) rig.userData.halo.visible = (id === subj.id);
+        document.getElementById('subj-bio').textContent = subj.bio;
+        document.getElementById('val-energy').textContent = `${Math.round(subj.energy)}%`;
+        document.getElementById('bar-energy').style.width = `${subj.energy}%`;
+        document.getElementById('val-warmth').textContent = `${Math.round(subj.warmth)}%`;
+        document.getElementById('bar-warmth').style.width = `${subj.warmth}%`;
+        const restVal = subj.rest !== undefined ? subj.rest : 85;
+        document.getElementById('val-rest').textContent = `${Math.round(restVal)}%`;
+        document.getElementById('bar-rest').style.width = `${restVal}%`;
+        document.getElementById('val-stress').textContent = `${Math.round(subj.stress)}%`;
+        document.getElementById('bar-stress').style.width = `${subj.stress}%`;
+        document.getElementById('subj-thought').textContent = `«${subj.thought}»`;
+        document.getElementById('subj-memories').innerHTML = (subj.memories || []).slice().reverse().map(
+          mem => `<div>• ${mem}</div>`
+        ).join('');
+      }
+
+      const discSource = (currentLang === 'es' && m.disciplines_es) ? m.disciplines_es : (m.disciplines || {});
+      document.getElementById('disc-text').textContent = discSource[activeDisc] || '';
+      renderDailyLogs(state.daily_logs);
+      drawPopChart(state.history);
+      renderTimeline(state.timeline);
+
+      const refTransEs = { food: 'comida', kin: 'familia/clan', cold: 'frío', stranger: 'desconocido', wonder: 'asombro/estrellas', danger: 'peligro' };
+      document.getElementById('lex-count').textContent = currentLang === 'es' ? `${m.shared_words_count} palabras` : `${m.shared_words_count} words`;
+      const lexBox = document.getElementById('lex-list');
+      if (m.shared_lexicon.length > 0) {
+        lexBox.innerHTML = m.shared_lexicon.map(w => {
+          const meaning = currentLang === 'es' ? (refTransEs[w.referent] || w.referent) : w.referent;
+          const desc = currentLang === 'es'
+            ? `significa "${meaning}" (${w.consensus_pct}% del grupo)`
+            : `means "${meaning}" (${w.consensus_pct}% of group)`;
+          return `<div class="lex-row">
+            <span><strong style="color:var(--amber)">«${w.word}»</strong></span>
+            <span>→ ${desc}</span>
+          </div>`;
+        }).join('');
+      }
+
+      const msList = currentLang === 'es' ? (m.milestone_list_es || []) : (m.milestone_list_en || []);
+      if (msList.length > 0) {
+        document.getElementById('milestones-box').innerHTML = msList.slice().reverse().map(line =>
+          `<div class="m-tag" style="width:100%">✓ ${line}</div>`
+        ).join('');
+      } else {
+        const mKeys = Object.entries(m.discoveries || {});
+        if (mKeys.length > 0) {
+          document.getElementById('milestones-box').innerHTML = mKeys.map(([k, d]) =>
+            `<span class="m-tag">✓ ${k} (D${d})</span>`
+          ).join('');
+        }
+      }
+    }
+
+    const CLOUD_TELEMETRY_URL = 'https://raw.githubusercontent.com/sergiobuedo/the-new-genesis/live-telemetry/chronicles/latest_public_state.json';
+    let cloudPollTimer = null;
+
+    async function pollCloudState() {
+      try {
+        const r = await fetch(`${CLOUD_TELEMETRY_URL}?t=${Date.now()}`, { cache: 'no-store' });
+        if (r.ok) { applyState(await r.json()); return; }
+      } catch (_) {}
+      try {
+        const r2 = await fetch(`./chronicles/latest_public_state.json?t=${Date.now()}`, { cache: 'no-store' });
+        if (r2.ok) applyState(await r2.json());
+      } catch (_) {}
+    }
+
+    function startCloudPolling() {
+      if (cloudPollTimer) return;
+      pollCloudState();
+      cloudPollTimer = setInterval(pollCloudState, 4000);
+    }
+
+    function connectStream() {
+      if (location.hostname.endsWith('github.io') || (location.hostname === 'agobac-ia.es' && !params.get('api'))) {
+        startCloudPolling();
+        return;
+      }
+      const wsProto = API_ORIGIN.startsWith('https') ? 'wss' : 'ws';
+      const hostPart = API_ORIGIN.replace(/^https?:\/\//, '');
+      try {
+        const ws = new WebSocket(`${wsProto}://${hostPart}/ws`);
+        ws.onmessage = (ev) => applyState(JSON.parse(ev.data));
+        ws.onerror = () => startCloudPolling();
+        ws.onclose = () => { if (!cloudPollTimer) setTimeout(connectStream, 3000); };
+      } catch (_) {
+        startCloudPolling();
+      }
+    }
+    connectStream();
+
+    const clock = new THREE.Clock();
+    const projVec = new THREE.Vector3();
+    const desiredCam = new THREE.Vector3();
+    const topbarEl = document.getElementById('topbar-el');
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const t = clock.getElapsedTime();
+      waterMesh.position.y = -0.04 + Math.sin(t * 1.6) * 0.02;
+
+      // Smooth keyboard Arrow / WASD planetary panning
+      if (heldKeys.size > 0 && !globeGroup.visible) {
+        const panSpd = Math.max(0.28, camera.position.y * 0.022);
+        let dx = 0, dz = 0;
+        if (heldKeys.has('ArrowUp') || heldKeys.has('KeyW')) dz -= panSpd;
+        if (heldKeys.has('ArrowDown') || heldKeys.has('KeyS')) dz += panSpd;
+        if (heldKeys.has('ArrowLeft') || heldKeys.has('KeyA')) dx -= panSpd;
+        if (heldKeys.has('ArrowRight') || heldKeys.has('KeyD')) dx += panSpd;
+        camera.position.x += dx; camera.position.z += dz;
+        controls.target.x += dx; controls.target.z += dz;
+      }
+
+      // Seamless zoom-out transition to Round 3D Planet (> 175m) and zoom-in back to Continent (< 52m in Globe)
+      const camDist = camera.position.distanceTo(controls.target);
+      if (camMode === 'topdown' && camDist > 175) {
+        setCamMode('globe');
+      } else if (camMode === 'globe') {
+        globeGroup.rotation.y += 0.0018;
+        if (camDist < 42) setCamMode('topdown');
+      }
+
+      const labelCandidates = [];
+      const cleanMode = document.body.classList.contains('clean-shot');
+      const isMobile = window.innerWidth <= 940;
+      const safeLeft = cleanMode || isMobile ? 16 : 368;
+      const safeRight = cleanMode || isMobile ? window.innerWidth - 16 : window.innerWidth - 388;
+      const safeTop = cleanMode ? 16 : (topbarEl.offsetHeight + 22);
+      const safeBottom = isMobile ? window.innerHeight - 76 : window.innerHeight - 24;
+
+      for (const rig of agentRigs.values()) {
+        const ud = rig.userData;
+        const target = ud.targetPos;
+        const dx = target.x - rig.position.x;
+        const dz = target.z - rig.position.z;
+        const distSq = dx * dx + dz * dz;
+
+        rig.rotation.y = shortestAngleLerp(rig.rotation.y, ud.targetHeading, 0.12);
+
+        const targetTilt = ud.isSleeping ? -Math.PI * 0.42 : 0.0;
+        rig.rotation.x += (targetTilt - rig.rotation.x) * 0.14;
+
+        if (!ud.isSleeping && distSq > 0.0008) {
+          rig.position.x += dx * 0.11;
+          rig.position.z += dz * 0.11;
+          const sw = Math.sin(t * 8.5 + ud.phase) * 0.36;
+          ud.leftLeg.rotation.x = sw;
+          ud.rightLeg.rotation.x = -sw;
+          ud.leftArm.rotation.x = -sw * 0.75;
+          ud.rightArm.rotation.x = sw * 0.75;
+          rig.position.y = terrainHeight(rig.position.x, rig.position.z) + Math.abs(Math.sin(t * 8.5 + ud.phase)) * 0.035;
+        } else {
+          rig.position.y = terrainHeight(rig.position.x, rig.position.z) + (ud.isSleeping ? 0.12 : 0.0);
+          ud.leftLeg.rotation.x *= 0.85;
+          ud.rightLeg.rotation.x *= 0.85;
+          ud.leftArm.rotation.x *= 0.85;
+          ud.rightArm.rotation.x *= 0.85;
+        }
+
+        if (!ud.isSleeping && t > ud.nextBlink && !ud.isBlinking) {
+          ud.isBlinking = true;
+          drawEmotionalFace(ud.faceCtx, ud.lastMood, true);
+          ud.faceTex.needsUpdate = true;
+          setTimeout(() => {
+            ud.isBlinking = false;
+            drawEmotionalFace(ud.faceCtx, ud.lastMood, false);
+            ud.faceTex.needsUpdate = true;
+          }, 140);
+          ud.nextBlink = t + 3.0 + Math.random() * 4.5;
+        }
+
+        ud.headGroup.rotation.z = Math.sin(t * 1.8 + ud.phase) * 0.045;
+
+        if (ud.tagPriority > 0) {
+          projVec.copy(rig.position);
+          projVec.y += 1.68 * rig.scale.y;
+          projVec.project(camera);
+          if (projVec.z < 1) {
+            const sx = (projVec.x * 0.5 + 0.5) * window.innerWidth;
+            const sy = (-projVec.y * 0.5 + 0.5) * window.innerHeight;
+            if (sx > safeLeft && sx < safeRight && sy > safeTop && sy < safeBottom) {
+              labelCandidates.push({ tag: ud.tag, sx, sy, prio: ud.tagPriority });
+            } else {
+              ud.tag.style.display = 'none';
+            }
+          } else {
+            ud.tag.style.display = 'none';
+          }
+        } else {
+          ud.tag.style.display = 'none';
+        }
+      }
+
+      labelCandidates.sort((a, b) => b.prio - a.prio);
+      const placed = [];
+      for (const cand of labelCandidates) {
+        if (placed.length >= 6) { cand.tag.style.display = 'none'; continue; }
+        const collides = placed.some(p => Math.abs(p.sx - cand.sx) < 130 && Math.abs(p.sy - cand.sy) < 34);
+        if (collides) {
+          cand.tag.style.display = 'none';
+        } else {
+          cand.tag.style.display = 'block';
+          cand.tag.style.left = `${cand.sx}px`;
+          cand.tag.style.top = `${cand.sy}px`;
+          placed.push(cand);
+        }
+      }
+
+      for (const ar of animalRigs.values()) {
+        const tp = ar.userData.targetPos;
+        const dx = tp.x - ar.position.x;
+        const dz = tp.z - ar.position.z;
+        if (dx * dx + dz * dz > 0.0015) {
+          ar.position.x += dx * 0.09;
+          ar.position.z += dz * 0.09;
+          ar.userData.heading = shortestAngleLerp(ar.userData.heading, Math.atan2(dx, dz), 0.10);
+          ar.rotation.y = ar.userData.heading;
+        }
+        const baseAlt = ar.userData.baseAlt || 0;
+        const groundY = ar.userData.species === 'silverfin_shoal' ? -0.06 : Math.max(-0.02, terrainHeight(ar.position.x, ar.position.z));
+        ar.position.y = groundY + baseAlt + (baseAlt > 0 ? Math.sin(t * 3.5 + ar.position.x) * 0.18 : 0);
+      }
+
+      let skipOrbitUpdate = false;
+      if (selectedSubjectId && agentRigs.has(selectedSubjectId)) {
+        const focus = agentRigs.get(selectedSubjectId);
+        if (camMode === 'auto') {
+          controls.target.lerp(new THREE.Vector3(focus.position.x, focus.position.y + 0.6, focus.position.z), 0.06);
+        } else if (camMode === 'closeup') {
+          skipOrbitUpdate = true;
+          const s = focus.scale.y || 1.0;
+          const headY = focus.position.y + 0.92 * s;
+          const faceDirX = Math.sin(focus.rotation.y);
+          const faceDirZ = Math.cos(focus.rotation.y);
+          desiredCam.set(
+            focus.position.x + faceDirX * (2.05 * s + 0.35),
+            focus.position.y + 1.12 * s,
+            focus.position.z + faceDirZ * (2.05 * s + 0.35)
+          );
+          if (snapCloseup) {
+            camera.position.copy(desiredCam);
+            controls.target.set(focus.position.x, headY, focus.position.z);
+            snapCloseup = false;
+          } else {
+            camera.position.lerp(desiredCam, 0.16);
+            controls.target.lerp(new THREE.Vector3(focus.position.x, headY, focus.position.z), 0.22);
+          }
+          camera.lookAt(controls.target);
+        }
+      }
+
+      if (!skipOrbitUpdate) controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

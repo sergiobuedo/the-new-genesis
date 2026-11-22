@@ -1,0 +1,137 @@
+[
+  {
+    "key": "axelrod1981",
+    "in_text": "(Axelrod & Hamilton, 1981)",
+    "doi": "10.1126/science.7466396",
+    "apa_ref": "Axelrod, R., & Hamilton, W. D. (1981). The evolution of cooperation. Science, 211(4489), 1390–1396.",
+    "doi_url": "https://doi.org/10.1126/science.7466396",
+    "crossref_title": "The Evolution of Cooperation",
+    "doi_verified": true
+  },
+  {
+    "key": "bedau2000",
+    "in_text": "(Bedau et al., 2000)",
+    "doi": "10.1162/106454600300103683",
+    "apa_ref": "Bedau, M. A., McCaskill, J. S., Packard, N. H., Rasmussen, S., Adami, C., Green, D. G., Ikegami, T., Kaneko, K., & Ray, T. S. (2000). Open problems in artificial life. Artificial Life, 6(4), 363–376.",
+    "doi_url": "https://doi.org/10.1162/106454600300103683",
+    "crossref_title": "Open Problems in Artificial Life",
+    "doi_verified": true
+  },
+  {
+    "key": "bonabeau2002",
+    "in_text": "(Bonabeau, 2002)",
+    "doi": "10.1073/pnas.082080899",
+    "apa_ref": "Bonabeau, E. (2002). Agent-based modeling: Methods and techniques for simulating human systems. Proceedings of the National Academy of Sciences, 99(suppl_3), 7280–7287.",
+    "doi_url": "https://doi.org/10.1073/pnas.082080899",
+    "crossref_title": "Agent-based modeling: Methods and techniques for simulating human systems",
+    "doi_verified": true
+  },
+  {
+    "key": "bostrom2003",
+    "in_text": "(Bostrom, 2003)",
+    "doi": "10.1111/1467-9213.00309",
+    "apa_ref": "Bostrom, N. (2003). Are we living in a computer simulation? The Philosophical Quarterly, 53(211), 243–255.",
+    "doi_url": "https://doi.org/10.1111/1467-9213.00309",
+    "crossref_title": "Are We Living in a Computer Simulation?",
+    "doi_verified": true
+  },
+  {
+    "key": "boyd2009",
+    "in_text": "(Boyd & Richerson, 2009)",
+    "doi": "10.1098/rstb.2009.0134",
+    "apa_ref": "Boyd, R., & Richerson, P. J. (2009). Culture and the evolution of human cooperation. Philosophical Transactions of the Royal Society B: Biological Sciences, 364(1533), 3281–3288.",
+    "doi_url": "https://doi.org/10.1098/rstb.2009.0134",
+    "crossref_title": "Culture and the evolution of human cooperation",
+    "doi_verified": true
+  },
+  {
+    "key": "calhoun1973",
+    "in_text": "(Calhoun, 1973)",
+    "doi": "10.1177/00359157730661p202",
+    "apa_ref": "Calhoun, J. B. (1973). Death squared: The explosive growth and demise of a mouse population. Proceedings of the Royal Society of Medicine, 66(1P2), 80–88.",
+    "doi_url": "https://doi.org/10.1177/00359157730661p202",
+    "crossref_title": "Death Squared: The Explosive Growth and Demise of a Mouse Population",
+    "doi_verified": true
+  },
+  {
+    "key": "dunbar1992",
+    "in_text": "(Dunbar, 1992)",
+    "doi": "10.1016/0047-2484(92)90081-j",
+    "apa_ref": "Dunbar, R. I. M. (1992). Neocortex size as a constraint on group size in primates. Journal of Human Evolution, 22(6), 469–493.",
+    "doi_url": "https://doi.org/10.1016/0047-2484(92)90081-j",
+    "crossref_title": "Neocortex size as a constraint on group size in primates",
+    "doi_verified": true
+  },
+  {
+    "key": "henrich2004",
+    "in_text": "(Henrich, 2004)",
+    "doi": "10.2307/4128416",
+    "apa_ref": "Henrich, J. (2004). Demography and cultural evolution: How adaptive cultural processes can produce maladaptive losses—The Tasmanian case. American Antiquity, 69(2), 197–214.",
+    "doi_url": "https://doi.org/10.2307/4128416",
+    "crossref_title": "Demography and Cultural Evolution: How Adaptive Cultural Processes Can Produce Maladaptive Losses—The Tasmanian Case",
+    "doi_verified": true
+  },
+  {
+    "key": "kirby2008",
+    "in_text": "(Kirby et al., 2008)",
+    "doi": "10.1073/pnas.0707835105",
+    "apa_ref": "Kirby, S., Cornish, H., & Smith, K. (2008). Cumulative cultural evolution in the laboratory: An experimental approach to the origins of structure in human language. Proceedings of the National Academy of Sciences, 105(31), 10681–10686.",
+    "doi_url": "https://doi.org/10.1073/pnas.0707835105",
+    "crossref_title": "Cumulative cultural evolution in the laboratory: An experimental approach to the origins of structure in human language",
+    "doi_verified": true
+  },
+  {
+    "key": "laland2000",
+    "in_text": "(Laland et al., 2000)",
+    "doi": "10.1017/s0140525x00002417",
+    "apa_ref": "Laland, K. N., Odling-Smee, J., & Feldman, M. W. (2000). Niche construction, biological evolution, and cultural change. Behavioral and Brain Sciences, 23(1), 131–146.",
+    "doi_url": "https://doi.org/10.1017/s0140525x00002417",
+    "crossref_title": "Niche construction, biological evolution, and cultural change",
+    "doi_verified": true
+  },
+  {
+    "key": "nowak2006",
+    "in_text": "(Nowak, 2006)",
+    "doi": "10.1126/science.1133755",
+    "apa_ref": "Nowak, M. A. (2006). Five rules for the evolution of cooperation. Science, 314(5805), 1560–1563.",
+    "doi_url": "https://doi.org/10.1126/science.1133755",
+    "crossref_title": "Five Rules for the Evolution of Cooperation",
+    "doi_verified": true
+  },
+  {
+    "key": "park2023",
+    "in_text": "(Park et al., 2023)",
+    "doi": "10.1145/3586183.3606763",
+    "apa_ref": "Park, J. S., O'Brien, J. C., Cai, C. J., Morris, M. R., Liang, P., & Bernstein, M. S. (2023). Generative agents: Interactive simulacra of human behavior. In Proceedings of the 36th Annual ACM Symposium on User Interface Software and Technology (pp. 1–22). ACM.",
+    "doi_url": "https://doi.org/10.1145/3586183.3606763",
+    "crossref_title": "Generative Agents: Interactive Simulacra of Human Behavior",
+    "doi_verified": true
+  },
+  {
+    "key": "reynolds1987",
+    "in_text": "(Reynolds, 1987)",
+    "doi": "10.1145/37402.37406",
+    "apa_ref": "Reynolds, C. W. (1987). Flocks, herds and schools: A distributed behavioral model. ACM SIGGRAPH Computer Graphics, 21(4), 25–34.",
+    "doi_url": "https://doi.org/10.1145/37402.37406",
+    "crossref_title": "Flocks, herds and schools: A distributed behavioral model",
+    "doi_verified": true
+  },
+  {
+    "key": "shannon1948",
+    "in_text": "(Shannon, 1948)",
+    "doi": "10.1002/j.1538-7305.1948.tb01338.x",
+    "apa_ref": "Shannon, C. E. (1948). A mathematical theory of communication. The Bell System Technical Journal, 27(3), 379–423.",
+    "doi_url": "https://doi.org/10.1002/j.1538-7305.1948.tb01338.x",
+    "crossref_title": "A Mathematical Theory of Communication",
+    "doi_verified": true
+  },
+  {
+    "key": "tomasello2005",
+    "in_text": "(Tomasello et al., 2005)",
+    "doi": "10.1017/s0140525x05000129",
+    "apa_ref": "Tomasello, M., Carpenter, M., Call, J., Behne, T., & Moll, H. (2005). Understanding and sharing intentions: The origins of cultural cognition. Behavioral and Brain Sciences, 28(5), 675–691.",
+    "doi_url": "https://doi.org/10.1017/s0140525x05000129",
+    "crossref_title": "Understanding and sharing intentions: The origins of cultural cognition",
+    "doi_verified": true
+  }
+]

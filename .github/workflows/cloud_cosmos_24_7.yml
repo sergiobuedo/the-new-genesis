@@ -1,0 +1,58 @@
+name: "24/7 Autonomous Cloud Cosmos (TheNewGenesis)"
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: the-new-genesis-cosmos-singleton
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  evolve-cosmos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout main codebase
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Restore persistent chronicles from live-telemetry branch
+        run: |
+          git config user.name "Dr. Sergio Buedo Martínez (Observatory Daemon)"
+          git config user.email "observatory@agobac-ia.es"
+          if git ls-remote --exit-code --heads origin live-telemetry; then
+            git fetch origin live-telemetry:live-telemetry
+            git checkout live-telemetry -- chronicles/ || true
+          fi
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install scientific dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Start local Ollama Cortex (`qwen2.5:1.5b`) inside cloud runner
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          nohup ollama serve > /tmp/ollama.log 2>&1 &
+          sleep 4
+          ollama pull qwen2.5:1.5b
+
+      - name: Verify Epistemic Veil & Scientific Integrity Suite
+        run: pytest tests/ -v
+
+      - name: Run continuous 24/7 planetary evolution burst
+        env:
+          OLLAMA_MODEL: "qwen2.5:1.5b"
+          COSMOS_SPEED: "5"
+          CLOUD_BURST_SECONDS: "660"
+        run: python -m backend.cloud_runner

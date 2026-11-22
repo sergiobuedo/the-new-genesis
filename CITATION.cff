@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you reference TheNewGenesis · God's Window or its longitudinal datasets in academic work, please cite it as below."
+type: software
+title: "TheNewGenesis · God's Window: An Open Longitudinal Multi-Species Artificial Life & Computational Anthropology Cosmos"
+version: 6.0.0
+date-released: 2026-11-22
+url: "https://agobac-ia.es"
+repository-code: "https://github.com/sergiobuedo/the-new-genesis"
+license: MIT
+authors:
+  - family-names: "Buedo Martínez"
+    given-names: "Sergio"
+    honorific-prefix: "Dr."
+keywords:
+  - artificial-life
+  - computational-anthropology
+  - multi-agent-systems
+  - emergent-language
+  - evolutionary-sociology
+  - epistemic-isolation

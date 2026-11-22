@@ -1,0 +1,29 @@
+# 24/7 Autonomous Cloud Stack (Portainer / Linux VPS / Docker Compose)
+# Runs Universe XXV + embedded local Ollama LLM 24/7 with zero dependency on your laptop!
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: universe_xxv_ollama
+    restart: always
+    volumes:
+      - ollama_weights:/root/.ollama
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull qwen2.5:1.5b && wait"]
+
+  universe-xxv:
+    build: .
+    container_name: universe_xxv_observatory
+    restart: always
+    depends_on:
+      - ollama
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - LLM_MODEL=qwen2.5:1.5b
+      - COSMOS_SPEED=5
+    ports:
+      - "8000:7860"
+    volumes:
+      - universe_chronicles:/app/chronicles
+
+volumes:
+  ollama_weights:
+  universe_chronicles:

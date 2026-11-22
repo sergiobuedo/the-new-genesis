@@ -1,0 +1,1 @@
+from .daily_digest import generate_daily_x_digest
