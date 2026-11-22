@@ -416,6 +416,11 @@ class PopulationSimulation:
                 agent.action_label = "Sleeping deeply to restore strength"
 
         stress_delta = -0.12
+        sheltered_now = self.world.is_sheltered_at(agent.x, agent.y)
+        if not sheltered_now and self.world.weather in ("storm", "snow"):
+            stress_delta += 0.16
+        elif self.world.is_night and self.world.lunar_illumination > 0.82 and self.world.weather == "clear":
+            stress_delta -= 0.06  # Calm silver full-moon illumination reduces nocturnal dread
         if local_crowd >= 6:
             stress_delta += (local_crowd - 5) * 0.18
         if agent.energy < 35.0 or agent.warmth < 40.0:
@@ -569,12 +574,12 @@ class PopulationSimulation:
                         agent.pause_ticks = 4
                         return
 
-        # 2. Seek warmth when freezing
-        if agent.warmth < 50.0:
-            warm_targets: List[Tuple[float, float]] = []
+        # 2. Seek warmth or cave/subterranean shelter when freezing or caught in a storm/blizzard!
+        if agent.warmth < 50.0 or (self.world.weather in ("storm", "snow") and agent.stress > 45.0 and not self.world.is_sheltered_at(agent.x, agent.y)):
+            warm_targets: List[Tuple[float, float]] = [(cv.x, cv.y) for cv in self.world.caves.values()]
             if self.enable_culture:
                 for st in self.world.structures.values():
-                    if (st.kind == "hearth" and st.fuel > 0) or st.kind == "shelter":
+                    if (st.kind == "hearth" and st.fuel > 0) or st.kind in ("shelter", "edifice", "burrow_network"):
                         warm_targets.append((st.x, st.y))
                         if st.kind == "hearth" and st.fuel < 35.0 and math.hypot(st.x - agent.x, st.y - agent.y) < 2.4:
                             fuel_idx = next(
@@ -587,7 +592,7 @@ class PopulationSimulation:
             warm_targets.extend(self.world.thermal_vents)
             if warm_targets:
                 nearest = min(warm_targets, key=lambda p: math.hypot(p[0] - agent.x, p[1] - agent.y))
-                agent.action_label = "Seeking warmth near heat/shelter"
+                agent.action_label = "Seeking cave/hearth shelter from weather"
                 self._move_smooth(agent, nearest[0], nearest[1], nearby_others, speed=0.26 * spd_mul)
                 return
 
@@ -1054,6 +1059,68 @@ class PopulationSimulation:
                     k_lore, lvl = max(agent.insight_map.items(), key=lambda kv: kv[1])
                     if partner.insight_map.get(k_lore, 0) < lvl:
                         partner.insight_map[k_lore] = partner.insight_map.get(k_lore, 0) + 1
+                # Long-Range Telecommunication Broadcast if near a Comm Relay or Orbital Satellite!
+                active_relay = next(
+                    (
+                        s for s in self.world.structures.values()
+                        if s.signal_range > 0 and (s.layer == "orbital" or math.hypot(s.x - agent.x, s.y - agent.y) <= 5.0)
+                    ),
+                    None,
+                )
+                if active_relay is not None and agent.last_utterance:
+                    for listener in self.living_agents:
+                        if listener.id != agent.id and math.hypot(listener.x - agent.x, listener.y - agent.y) <= active_relay.signal_range:
+                            listener.personal_lexicon.setdefault(agent.last_referent or "kin", agent.last_utterance)
+
+        # 5B. Subterranean Colony Excavation (`excavate` — Ant-like underground tunnels if freely chosen!)
+        if (
+            self.enable_culture
+            and agent.current_intent == "excavate"
+            and agent.energy > 62.0
+            and len(self.world.structures) < 32
+        ):
+            agent.current_intent = "forage"
+            existing_b = next(
+                (s for s in self.world.structures.values() if s.kind == "burrow_network" and math.hypot(s.x - agent.x, s.y - agent.y) < 9.5),
+                None,
+            )
+            if existing_b is not None:
+                existing_b.chambers += 1
+                existing_b.durability = min(900.0, existing_b.durability + 120.0)
+                agent.action_label = f"Expanding subterranean tunnel network ({existing_b.chambers} chambers)"
+                agent.pause_ticks = 5
+                return
+            elif agent.has_tool or agent.genome.collectivism > 0.76:
+                self.world._struct_seq += 1
+                sx, sy = self.world.find_nearest_dry_spot(agent.x, agent.y)
+                burrow = WorldStructure(
+                    id=f"S-{self.world._struct_seq}",
+                    kind="burrow_network",
+                    sensory_name="excavated subterranean tunnel chamber",
+                    x=sx,
+                    y=sy,
+                    creator_id=agent.id,
+                    creator_lineage=agent.lineage,
+                    created_day=self.world.day,
+                    durability=650.0,
+                    layer="subterranean",
+                    tech_tier=2,
+                    chambers=2,
+                )
+                self.world.structures[burrow.id] = burrow
+                agent.action_label = "Excavating subterranean colony chamber"
+                agent.pause_ticks = 6
+                if "struct_burrow_network" not in self.discoveries:
+                    self.discoveries["struct_burrow_network"] = self.world.day
+                self._record_event(
+                    "invention",
+                    f"SUBTERRANEAN LIFE! {agent.lineage} {agent.id} excavated an underground tunnel chamber ({burrow.id})!",
+                    [agent.id],
+                    sx,
+                    sy,
+                    importance=5,
+                )
+                return
 
         # 6. Cortex-Willed Empirical Tinkering
         if self.enable_culture and agent.cortex_experiment_ready and len(agent.inventory) >= 2:
@@ -1542,6 +1609,14 @@ class MiroFishObservatory:
                     stored_food=int(sd.get("stored_food", 0)),
                     inscription=sd.get("inscription", ""),
                     water_crossing=(skind == "watercraft"),
+                    layer=sd.get("layer", "subterranean" if skind == "burrow_network" else ("orbital" if skind == "orbital_satellite" else ("aerial" if skind == "air_craft" else "surface"))),
+                    tech_tier=int(sd.get("tech_tier", 1)),
+                    is_vehicle=bool(sd.get("is_vehicle", skind in ("watercraft", "land_vehicle", "air_craft", "orbital_satellite"))),
+                    vehicle_speed=float(sd.get("vehicle_speed", 0.34 if skind == "watercraft" else 0.0)),
+                    vehicle_domain=sd.get("vehicle_domain", "water" if skind == "watercraft" else "land"),
+                    signal_range=float(sd.get("signal_range", 0.0)),
+                    stories=int(sd.get("stories", 1)),
+                    chambers=int(sd.get("chambers", 1)),
                     blueprint_3d=bp,
                 )
             self.live.world._struct_seq = max(max_st_seq, len(self.live.world.structures))
@@ -1656,6 +1731,13 @@ class MiroFishObservatory:
         self, mean_stress: float, clustering: float, pidgin_count: int
     ) -> Tuple[str, str]:
         """Purely descriptive sociological classification of what emerged on its own."""
+        if any(s.kind == "orbital_satellite" for s in self.live.world.structures.values()):
+            return ("Spacefaring Orbital Civilization", "Civilización Tecnológica Orbital")
+        if any(s.tech_tier >= 4 for s in self.live.world.structures.values()):
+            return ("Technological & Connected Society", "Sociedad Tecnológica e Interconectada")
+        total_chambers = sum(s.chambers for s in self.live.world.structures.values() if s.kind == "burrow_network")
+        if total_chambers >= 4:
+            return ("Subterranean Fossorial Colony", "Colonia Subterránea Tipo Hormiguero")
         if mean_stress >= 58.0:
             return ("Calhoun Behavioral Sink", "Sumidero Conductual de Calhoun")
         if self.live.hive_pooling_count >= 5 and clustering >= 0.35:
@@ -1822,6 +1904,15 @@ class MiroFishObservatory:
             "struct_open_creation": "Synthesized a brand-new unscripted 3D apparatus",
             "first_fauna_speciation": "Wild fauna evolved into a brand-new daughter species",
             "first_sentient_speciation": "Cross-continent lineages birthed a new hybrid sentient race",
+            "struct_burrow_network": "Excavated subterranean chambers & tunnel networks beneath the earth",
+            "craft_silica_glass": "Fused siliceous stone into clear glass & optical lenses",
+            "craft_copper_coil": "Discovered electromagnetic copper coils & induction",
+            "craft_refined_fuel": "Distilled high-energy hydrocarbon propellant",
+            "struct_edifice": "Erected multi-story stone-and-glass architectural edifices",
+            "struct_comm_relay": "Built long-range acoustic/electromagnetic communication relays",
+            "struct_land_vehicle": "Engineered self-propelled wheeled land vehicles",
+            "struct_air_craft": "Launched buoyant aerial sky-vessels",
+            "struct_orbital_satellite": "Launched an autonomous orbital satellite around the planet",
         }
         MILESTONE_LABELS_ES = {
             "first_shared_word": "Inventaron su primera palabra hablada común",
@@ -1857,6 +1948,15 @@ class MiroFishObservatory:
             "struct_open_creation": "Invención libre de un artefacto 3D inédito",
             "first_fauna_speciation": "Especiación darwiniana: nace una nueva especie animal salvaje",
             "first_sentient_speciation": "Hibridación fértil: nace una nueva raza inteligente",
+            "struct_burrow_network": "Excavación de galerías y cámaras subterráneas (vida bajo tierra)",
+            "craft_silica_glass": "Fundición de vidrio de sílice y lentes ópticas",
+            "craft_copper_coil": "Descubrimiento de bobinas de cobre e inducción electromagnética",
+            "craft_refined_fuel": "Destilación de combustible líquido de alta energía",
+            "struct_edifice": "Arquitectura de edificios de varias plantas en piedra y vidrio",
+            "struct_comm_relay": "Medios de comunicación a larga distancia (acústica / antenas)",
+            "struct_land_vehicle": "Ingeniería de vehículos terrestres autopropulsados",
+            "struct_air_craft": "Aeronaves capaces de volar sobre continentes y océanos",
+            "struct_orbital_satellite": "Era Espacial: lanzamiento de satélite artificial en órbita planetaria",
         }
 
         milestone_list_en = [
@@ -2040,6 +2140,10 @@ class MiroFishObservatory:
                 for p in self.live.world.props.values()
             ],
             "thermal_vents": self.live.world.thermal_vents,
+            "caves": [
+                {"id": cv.id, "x": cv.x, "y": cv.y, "zone": cv.climate_zone, "depth": cv.depth_m}
+                for cv in self.live.world.caves.values()
+            ],
         }
 
     def snapshot_for_ui(self) -> Dict[str, Any]:
@@ -2067,6 +2171,12 @@ class MiroFishObservatory:
                 "day_phase": round(self.live.world.day_phase, 3),
                 "is_night": self.live.world.is_night,
                 "ambient_temp": self.live.world.ambient_temperature,
+                "weather": self.live.world.weather,
+                "solar_au": self.live.world.solar_distance_au,
+                "lunar_phase": self.live.world.lunar_phase,
+                "lunar_name": self.live.world.lunar_phase_name,
+                "lunar_illum": self.live.world.lunar_illumination,
+                "tidal_offset": self.live.world.tidal_offset,
                 "speed": self.speed_multiplier,
                 "cortex_active": self.cortex.available,
                 "cortex_label": self.cortex.provider_label,
@@ -2135,6 +2245,10 @@ class MiroFishObservatory:
                 for an in self.live.world.animals.values()
                 if an.alive
             ],
+            "caves": [
+                {"id": cv.id, "x": cv.x, "y": cv.y, "zone": cv.climate_zone, "depth": cv.depth_m}
+                for cv in self.live.world.caves.values()
+            ],
             "structures": [
                 {
                     "id": s.id,
@@ -2148,6 +2262,13 @@ class MiroFishObservatory:
                     "fuel": round(s.fuel, 1),
                     "stored_food": s.stored_food,
                     "inscription": s.inscription,
+                    "layer": s.layer,
+                    "tech_tier": s.tech_tier,
+                    "is_vehicle": s.is_vehicle,
+                    "vehicle_domain": s.vehicle_domain,
+                    "signal_range": s.signal_range,
+                    "stories": s.stories,
+                    "chambers": s.chambers,
                     "blueprint_3d": s.blueprint_3d,
                 }
                 for s in self.live.world.structures.values()

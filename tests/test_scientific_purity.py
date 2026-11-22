@@ -134,3 +134,34 @@ def test_darwinian_speciation_and_open_ended_3d_blueprint() -> None:
     )
     assert kind2 == "breakthrough"
     assert st2 is not None and st2.blueprint_3d is not None and len(st2.blueprint_3d) >= 2
+
+
+def test_astrophysics_caves_vehicles_relays_and_satellites() -> None:
+    world = CosmosWorld(seed=4201)
+    assert len(world.caves) == 8
+    cave = next(iter(world.caves.values()))
+    assert world.is_sheltered_at(cave.x, cave.y) is True
+    assert 0.95 <= world.solar_distance_au <= 1.05
+    assert 0.0 <= world.lunar_illumination <= 1.0
+
+    # Subterranean excavation, land vehicle, comm relay & orbital satellite substrate
+    insights = {"build_lore": 4, "bronze_lore": 2, "subterranean_lore": 1}
+    _, burrow, k_b, _ = world.attempt_empirical_experiment(
+        "composite_tool", "slab_dense", ["composite_tool", "slab_dense"], insights, cave.x, cave.y, "S-001"
+    )
+    assert k_b == "breakthrough" and burrow is not None and burrow.layer == "subterranean"
+
+    _, veh, k_v, _ = world.attempt_empirical_experiment(
+        "wheeled_cart", "bronze_tool", ["wheeled_cart", "bronze_tool"], insights, 6.0, 6.0, "S-001"
+    )
+    assert k_v == "breakthrough" and veh is not None and veh.is_vehicle is True and veh.vehicle_domain == "land"
+
+    insights["extra_lore"] = 5
+    _, sat, k_s, _ = world.attempt_empirical_experiment(
+        "copper_coil", "refined_fuel", ["copper_coil", "refined_fuel"], insights, 6.0, 6.0, "S-001"
+    )
+    assert k_s == "breakthrough" and sat is not None and sat.layer == "orbital" and sat.signal_range >= 400.0
+    pos_before = (sat.x, sat.y)
+    world.step_environment()
+    assert (sat.x, sat.y) != pos_before
+

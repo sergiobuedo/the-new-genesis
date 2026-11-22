@@ -56,6 +56,7 @@ VALID_INTENTS = frozenset(
         "pool_nest",
         "confront",
         "tinker",
+        "excavate",
         "hunt",
         "migrate",
         "rest",
@@ -274,7 +275,26 @@ class KobAgent:
             if local_temp < 25
             else "dry heat"
         )
-        light_feel = "starlit night" if world.is_night else "sunlit day"
+        if world.is_night:
+            light_feel = (
+                "bright silver full-moon night"
+                if world.lunar_illumination > 0.78
+                else "pitch-dark moonless night"
+                if world.lunar_illumination < 0.18
+                else "starlit crescent-moon night"
+            )
+        else:
+            light_feel = "sunlit day"
+        weather_feel = {
+            "clear": "clear breeze",
+            "rain": "steady falling rain",
+            "storm": "flashing thunder and gusting wind",
+            "fog": "drifting cool mist",
+            "snow": "swirling white frost-flakes",
+            "drought": "parched shimmering heat",
+        }.get(world.weather, "calm air")
+        near_cave = any(math.hypot(self.x - cv.x, self.y - cv.y) <= 6.5 for cv in world.caves.values())
+        cave_note = " A dark sheltered rock cavern opens nearby." if near_cave else ""
         inv_desc = (
             ", ".join(BLIND_MATERIALS[c].sensory_name for c in self.inventory if c in BLIND_MATERIALS)
             or "empty hands"
@@ -304,7 +324,7 @@ class KobAgent:
 
         prompt = (
             "Raw sensory impressions:\n"
-            f"- Sky: {light_feel}. Air: {temp_feel}.\n"
+            f"- Sky: {light_feel} ({weather_feel}). Air: {temp_feel}.{cave_note}\n"
             f"- Body: nourishment={self.energy:.0f}/100, warmth={self.warmth:.0f}/100, "
             f"tension={self.stress:.0f}/100, health={self.integrity:.0f}/100.\n"
             f"- Inner drives: curiosity={self.genome.curiosity}, empathy={self.genome.empathy}, "
@@ -316,10 +336,10 @@ class KobAgent:
             f"- Memories: {recent_mem}.\n\n"
             "Nothing is forbidden or commanded—follow your own drives freely: "
             "forage, warm_up, socialize, share, barter (exchange held items), plant_seed (sow seeds in soil), "
-            "pool_nest, confront, tinker, hunt, migrate, rest, vigil, leave_offering, or bury_cairn.\n"
+            "pool_nest, confront, tinker, excavate (dig subsoil or rock), hunt, migrate, rest, vigil, leave_offering, or bury_cairn.\n"
             "Use zero modern, mechanical, or artificial concepts. Reply ONLY with valid JSON:\n"
             '{"thought": "brief first-person inner thought (max 20 words)", '
-            '"intent": "forage|warm_up|socialize|share|barter|plant_seed|pool_nest|confront|tinker|hunt|migrate|rest|vigil|leave_offering|bury_cairn", '
+            '"intent": "forage|warm_up|socialize|share|barter|plant_seed|pool_nest|confront|tinker|excavate|hunt|migrate|rest|vigil|leave_offering|bury_cairn", '
             '"utterance": "1 or 2 invented syllables like ka-ru or lu-ma", '
             '"referent": "food|cold|warmth|kin|stranger|hive|beast|craft|death|wonder", '
             '"wonder": true or false if questioning stars, death, nature, or existence itself}'

@@ -358,6 +358,7 @@
       <div class="top-stats">
         <div class="stat-pill"><strong id="ui-time">Y1 · Day 1</strong></div>
         <div class="stat-pill"><strong id="ui-season">Spring</strong> (<span id="ui-temp">19.0°C</span>)</div>
+        <div class="stat-pill" id="ui-astro" title="Solar Orbit, Lunar Cycle & Live Weather">☀️ Clear · 🌕 Moon · 1.00 AU</div>
         <div class="stat-pill">Live: <strong id="ui-pop">21</strong> · Null: <strong id="ui-ctrl">21</strong></div>
         <div class="stat-pill hide-sm" title="Living Wild Animal Species out of 24 Total">Fauna: <strong id="ui-fauna">24/24</strong></div>
         <div class="stat-pill hide-sm" title="10x Earth Super-Earth Surface (5.10B km²)">Planet: <strong id="ui-km2">825 km²</strong> / 5.1B km²</div>
@@ -877,8 +878,36 @@
         globeGroup.add(pin);
         globeGroup.userData.beacons.push(pin);
       }
+
+      // 3D Synodic Moon + Orbital Satellite Layer around the Super-Earth!
+      const moonMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(2.6, 24, 18),
+        new THREE.MeshStandardMaterial({ color: 0xe2e8f0, emissive: 0x94a3b8, emissiveIntensity: 0.28, roughness: 0.88 })
+      );
+      moonMesh.position.set(44, 6, 0);
+      globeGroup.add(moonMesh);
+      globeGroup.userData.moonMesh = moonMesh;
+
+      const globeSatGroup = new THREE.Group();
+      globeGroup.add(globeSatGroup);
+      globeGroup.userData.globeSatGroup = globeSatGroup;
     }
     buildSphericalPlanet();
+
+    // 3D Rain / Storm / Snow Weather Particle System
+    const PRECIP_COUNT = 420;
+    const precipGeo = new THREE.BufferGeometry();
+    const precipArr = new Float32Array(PRECIP_COUNT * 3);
+    for (let i = 0; i < PRECIP_COUNT; i++) {
+      precipArr[i * 3] = (Math.random() - 0.5) * 140 + 4;
+      precipArr[i * 3 + 1] = Math.random() * 28 + 1;
+      precipArr[i * 3 + 2] = (Math.random() - 0.5) * 140 + 4;
+    }
+    precipGeo.setAttribute('position', new THREE.BufferAttribute(precipArr, 3));
+    const precipMat = new THREE.PointsMaterial({ color: 0xbae6fd, size: 0.24, transparent: true, opacity: 0.75 });
+    const precipPoints = new THREE.Points(precipGeo, precipMat);
+    precipPoints.visible = false;
+    surfaceWorld.add(precipPoints);
 
     let terrainMesh = null;
     const waterGeo = new THREE.PlaneGeometry(260, 260, 48, 48);
@@ -1015,8 +1044,66 @@
           vent.position.set(vx, terrainHeight(vx, vy) + 0.08, vy);
           propsGroup.add(vent);
         }
-      } catch (_) { buildContinuousTerrain(false); }
+        syncCaves(data.caves || DEFAULT_CAVES);
+      } catch (_) { buildContinuousTerrain(false); syncCaves(DEFAULT_CAVES); }
     }
+
+    const DEFAULT_CAVES = [
+      { id: 'CAVE-1', x: -32, y: -28, zone: 'temperate_archipelago', depth: 36 },
+      { id: 'CAVE-2', x: -44, y: -39, zone: 'temperate_archipelago', depth: 50 },
+      { id: 'CAVE-3', x: 36, y: -30, zone: 'boreal_highland', depth: 64 },
+      { id: 'CAVE-4', x: 47, y: -38, zone: 'boreal_highland', depth: 22 },
+      { id: 'CAVE-5', x: -2, y: 34, zone: 'equatorial_savanna', depth: 36 },
+      { id: 'CAVE-6', x: 11, y: 42, zone: 'equatorial_savanna', depth: 50 },
+      { id: 'CAVE-7', x: -8, y: -4, zone: 'mediterranean_crossroads', depth: 64 },
+      { id: 'CAVE-8', x: 14, y: 8, zone: 'mediterranean_crossroads', depth: 22 }
+    ];
+
+    const agentRigs = new Map();
+    const animalRigs = new Map();
+    const corpseRigs = new Map();
+    const structMeshes = new Map();
+    const caveMeshes = new Map();
+    const globeSatMeshes = new Map();
+
+    function createCaveMesh(cv) {
+      const g = new THREE.Group();
+      const rockMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.92 });
+      const arch = new THREE.Mesh(new THREE.DodecahedronGeometry(1.35, 1), rockMat);
+      arch.scale.set(1.25, 0.88, 1.1); arch.position.y = 0.55; arch.castShadow = true;
+      const portal = new THREE.Mesh(
+        new THREE.CircleGeometry(0.62, 14),
+        new THREE.MeshBasicMaterial({ color: 0x020617, side: THREE.DoubleSide })
+      );
+      portal.position.set(0, 0.45, 0.88);
+      const crystal = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.22, 0),
+        new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.85 })
+      );
+      crystal.position.set(0.55, 0.32, 0.72);
+      const halo = new THREE.Mesh(new THREE.RingGeometry(1.45, 1.65, 28), new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide }));
+      halo.rotation.x = Math.PI / 2; halo.position.y = 0.06; halo.visible = false;
+      const tag = document.createElement('div');
+      tag.className = 'floating-tag'; tag.style.display = 'none';
+      labelsLayer.appendChild(tag);
+      g.add(arch, portal, crystal, halo);
+      const y0 = Math.max(0.05, terrainHeight(cv.x, cv.y));
+      g.position.set(cv.x, y0, cv.y);
+      g.userData = { id: cv.id, entityType: 'cave', data: cv, halo, tag };
+      surfaceWorld.add(g);
+      return g;
+    }
+
+    function syncCaves(caveList) {
+      for (const cv of (caveList || [])) {
+        if (!caveMeshes.has(cv.id)) {
+          caveMeshes.set(cv.id, createCaveMesh(cv));
+        } else {
+          caveMeshes.get(cv.id).userData.data = cv;
+        }
+      }
+    }
+
     initWorldScenery();
 
     const MAX_RES = 600;
@@ -1029,11 +1116,6 @@
     surfaceWorld.add(resInstanced);
     const resDummy = new THREE.Object3D();
     const resCol = new THREE.Color();
-
-    const agentRigs = new Map();
-    const animalRigs = new Map();
-    const corpseRigs = new Map();
-    const structMeshes = new Map();
 
     function disposeObject3D(root) {
       if (!root) return;
@@ -1379,6 +1461,14 @@
         return g;
       }
 
+      const initAlt = st.layer === 'orbital' ? 18.5 : (st.layer === 'aerial' ? 7.5 : 0.0);
+      const initY = (st.kind === 'watercraft' ? -0.02 : terrainHeight(st.x, st.y)) + initAlt;
+      g.userData.serverAnchor = { x: st.x, z: st.y };
+      g.userData.targetPos = new THREE.Vector3(st.x, initY, st.y);
+      g.userData.heading = 0;
+      g.userData.pauseUntil = 0;
+      g.userData.baseAlt = initAlt;
+
       // 2. Open-Ended Procedural 3D Blueprint Engine (watercraft & novel AI-invented apparatuses!)
       if (st.blueprint_3d && st.blueprint_3d.length > 0) {
         for (const part of st.blueprint_3d) {
@@ -1398,12 +1488,86 @@
           m.castShadow = true;
           g.add(m);
         }
-        const ySurf = st.kind === 'watercraft' ? -0.02 : terrainHeight(st.x, st.y);
-        g.position.set(st.x, ySurf, st.y);
+        g.position.set(st.x, initY, st.y);
         surfaceWorld.add(g);
         return g;
       }
-      if (st.kind === 'hearth') {
+
+      if (st.kind === 'burrow_network') {
+        // Subterranean Ant-Colony Mound + Glowing Underground Chamber Cross-Section!
+        const mound = new THREE.Mesh(new THREE.ConeGeometry(0.95, 0.55, 12, 1, true), new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.95, side: THREE.DoubleSide }));
+        mound.position.y = 0.27;
+        const hole = new THREE.Mesh(new THREE.CircleGeometry(0.42, 12), new THREE.MeshBasicMaterial({ color: 0x090d16, side: THREE.DoubleSide }));
+        hole.rotation.x = -Math.PI / 2; hole.position.y = 0.36;
+        g.add(mound, hole);
+        const chambers = Math.min(6, st.chambers || 2);
+        for (let c = 0; c < chambers; c++) {
+          const ang = (c / chambers) * Math.PI * 2;
+          const dome = new THREE.Mesh(
+            new THREE.SphereGeometry(0.32, 10, 8),
+            new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xd97706, emissiveIntensity: 0.65, transparent: true, opacity: 0.62 })
+          );
+          dome.scale.set(1.2, 0.45, 1.2);
+          dome.position.set(Math.cos(ang) * 1.15, 0.08, Math.sin(ang) * 1.15);
+          g.add(dome);
+        }
+      } else if (st.kind === 'edifice') {
+        const stories = Math.min(6, Math.max(2, st.stories || 2));
+        const stoneMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.65 });
+        const winMat = new THREE.MeshStandardMaterial({ color: 0xbae6fd, emissive: 0x38bdf8, emissiveIntensity: 0.9 });
+        for (let lv = 0; lv < stories; lv++) {
+          const w = 1.35 - lv * 0.08;
+          const blk = new THREE.Mesh(new THREE.BoxGeometry(w, 0.72, w), stoneMat);
+          blk.position.y = 0.36 + lv * 0.74; blk.castShadow = true;
+          const win = new THREE.Mesh(new THREE.BoxGeometry(w * 1.02, 0.22, w * 0.65), winMat);
+          win.position.y = 0.42 + lv * 0.74;
+          g.add(blk, win);
+        }
+      } else if (st.kind === 'comm_relay') {
+        const isEm = (st.tech_tier || 2) >= 4;
+        if (isEm) {
+          const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.28, 2.8, 6), new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8, roughness: 0.25 }));
+          mast.position.y = 1.4;
+          const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), new THREE.MeshStandardMaterial({ color: 0x22d3ee, emissive: 0x06b6d4, emissiveIntensity: 2.0 }));
+          beacon.position.y = 2.85;
+          const wave = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.45, 24), new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.75, side: THREE.DoubleSide }));
+          wave.rotation.x = Math.PI / 2; wave.position.y = 2.85;
+          g.add(mast, beacon, wave);
+          g.userData.waveRing = wave;
+        } else {
+          const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.38, 0.75, 12), new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8 }));
+          drum.position.y = 0.38;
+          const horn = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.85, 10, 1, true), new THREE.MeshStandardMaterial({ color: 0xfef9c3, side: THREE.DoubleSide }));
+          horn.position.set(0, 0.95, 0.15); horn.rotation.x = -0.45;
+          g.add(drum, horn);
+        }
+      } else if (st.kind === 'land_vehicle') {
+        const deck = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.28, 1.55), new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.55, roughness: 0.35 }));
+        deck.position.y = 0.32; deck.castShadow = true;
+        const cab = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.38, 0.72), new THREE.MeshStandardMaterial({ color: 0xbae6fd, transparent: true, opacity: 0.78 }));
+        cab.position.set(0, 0.62, 0.15);
+        g.add(deck, cab);
+        const wMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 });
+        for (const [wx, wz] of [[-0.56, 0.5], [0.56, 0.5], [-0.56, -0.5], [0.56, -0.5]]) {
+          const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.14, 12), wMat);
+          wh.rotation.z = Math.PI / 2; wh.position.set(wx, 0.24, wz); g.add(wh);
+        }
+      } else if (st.kind === 'air_craft') {
+        const env = new THREE.Mesh(new THREE.CapsuleGeometry(0.62, 1.35, 8, 14), new THREE.MeshStandardMaterial({ color: 0xfde68a, roughness: 0.5 }));
+        env.rotation.x = Math.PI / 2; env.position.y = 1.1;
+        const gond = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.32, 0.85), new THREE.MeshStandardMaterial({ color: 0x78350f }));
+        gond.position.y = 0.22;
+        g.add(env, gond);
+      } else if (st.kind === 'orbital_satellite') {
+        const bus = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.78, 10), new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.9, roughness: 0.2 }));
+        bus.rotation.z = Math.PI / 2;
+        const panelMat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, emissive: 0x1e40af, emissiveIntensity: 0.55, metalness: 0.6 });
+        const pL = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.04, 1.55), panelMat); pL.position.z = -1.15;
+        const pR = pL.clone(); pR.position.z = 1.15;
+        const dish = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.22, 12, 1, true), new THREE.MeshStandardMaterial({ color: 0xf8fafc, side: THREE.DoubleSide }));
+        dish.position.y = -0.42;
+        g.add(bus, pL, pR, dish);
+      } else if (st.kind === 'hearth') {
         const stones = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.12, 8, 12), new THREE.MeshStandardMaterial({ color: 0x64748b }));
         stones.rotation.x = Math.PI / 2; stones.position.y = 0.08;
         const flame = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.72, 8), new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xf97316, emissiveIntensity: 2.2 }));
@@ -1432,7 +1596,7 @@
         const stele = new THREE.Mesh(new THREE.BoxGeometry(0.38, 1.65, 0.24), new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.45 }));
         stele.position.y = 0.82; stele.castShadow = true; g.add(stele);
       }
-      g.position.set(st.x, terrainHeight(st.x, st.y), st.y);
+      g.position.set(st.x, initY, st.y);
       surfaceWorld.add(g);
       return g;
     }
@@ -1672,23 +1836,101 @@
           bioEn: `🪨 Stone Burial Cairn (${st.id}) — Raised by ${creator} (${lin}) on Day ${day}.`,
           funcEs: 'Monumento funerario espontáneo en memoria de un compañero fallecido.',
           funcEn: 'Spontaneous funerary stone memorial honoring a fallen peer.'
+        },
+        burrow_network: {
+          tagEs: `🐜 Colonia Subterránea (${st.id}) · ${st.chambers || 2} cámaras`,
+          tagEn: `🐜 Subterranean Colony (${st.id}) · ${st.chambers || 2} chambers`,
+          bioEs: `🐜 Red de Galerías Subterráneas (${st.id}) — Excavada bajo tierra por ${creator} (${lin}) en el Día ${day}. Cámaras abovedadas: ${st.chambers || 2}. En entrada: ${caretakerEs}.`,
+          bioEn: `🐜 Subterranean Tunnel Network (${st.id}) — Excavated underground by ${creator} (${lin}) on Day ${day}. Vaulted chambers: ${st.chambers || 2}. Near shaft: ${caretakerEn}.`,
+          funcEs: 'Vida subterránea tipo hormiguero/ciudad excavada: mantiene temperatura constante (~15.5°C) todo el año y protege de tormentas y depredadores.',
+          funcEn: 'Ant-like subterranean colony maintaining geothermal ~15.5°C year-round and shielding the clan from storms and predators.'
+        },
+        edifice: {
+          tagEs: `🏛️ Edificio (${st.id}) · ${st.stories || 2} plantas`,
+          tagEn: `🏛️ Edifice (${st.id}) · ${st.stories || 2} stories`,
+          bioEs: `🏛️ Edificio Arquitectónico de ${st.stories || 2} Plantas (${st.id}) — Erigido por ${creator} (${lin}) en el Día ${day}. Residente cercano: ${caretakerEs}.`,
+          bioEn: `🏛️ ${st.stories || 2}-Story Stone & Glass Edifice (${st.id}) — Erected by ${creator} (${lin}) on Day ${day}. Nearest resident: ${caretakerEn}.`,
+          funcEs: 'Arquitectura vertical en piedra tallada y vidrio de sílice fundido para vivienda densa y resguardo climático.',
+          funcEn: 'Multi-story masonry and fused-silica glass architecture supporting dense settlement and climate insulation.'
+        },
+        comm_relay: {
+          tagEs: `📡 Medio Comunicación (${st.id}) · ${Math.round(st.signal_range || 42)}m`,
+          tagEn: `📡 Comm Relay (${st.id}) · ${Math.round(st.signal_range || 42)}m`,
+          bioEs: `📡 ${(st.tech_tier || 2) >= 4 ? 'Torre Electromagnética de Telecomunicación' : 'Tambor-Cuerno de Señales Acústicas'} (${st.id}) — Creado por ${creator} (${lin}) en el Día ${day}.`,
+          bioEn: `📡 ${(st.tech_tier || 2) >= 4 ? 'Electromagnetic Wireless Relay Spire' : 'Long-Range Acoustic Signal Drum-Horn'} (${st.id}) — Built by ${creator} (${lin}) on Day ${day}.`,
+          funcEs: `Transmite palabras habladas y conocimientos a larga distancia (${Math.round(st.signal_range || 42)}m de alcance) conectando clanes lejanos.`,
+          funcEn: `Transmits spoken vocabulary and cultural knowledge across ${Math.round(st.signal_range || 42)}m, linking distant clans.`
+        },
+        land_vehicle: {
+          tagEs: `🚙 Vehículo Terrestre (${st.id}) · ${lin}`,
+          tagEn: `🚙 Land Vehicle (${st.id}) · ${lin}`,
+          bioEs: `🚙 Vehículo Terrestre Autopropulsado (${st.id}) — Ingeniado por ${creator} (${lin}) en el Día ${day}. Piloto/clan cercano: ${caretakerEs}.`,
+          bioEn: `🚙 Self-Propelled Land Vehicle (${st.id}) — Engineered by ${creator} (${lin}) on Day ${day}. Nearby crew: ${caretakerEn}.`,
+          funcEs: 'Transporte mecánico sobre ruedas para recorrer continentes y trasladar recursos a alta velocidad.',
+          funcEn: 'Wheeled mechanical transport vehicle cruising across continents to carry beings and cargo rapidly.'
+        },
+        air_craft: {
+          tagEs: `🛸 Aeronave (${st.id}) · ${lin}`,
+          tagEn: `🛸 Aerial Vessel (${st.id}) · ${lin}`,
+          bioEs: `🛸 Aeronave Atmosférica (${st.id}) — Lanzada al cielo por ${creator} (${lin}) en el Día ${day}.`,
+          bioEn: `🛸 Buoyant Aerial Sky-Vessel (${st.id}) — Launched by ${creator} (${lin}) on Day ${day}.`,
+          funcEs: 'Vehículo aéreo capaz de sobrevolar océanos, cordilleras y continentes enteros.',
+          funcEn: 'Aerial craft capable of flying across oceans, mountain ranges, and continents.'
+        },
+        orbital_satellite: {
+          tagEs: `🛰️ Satélite Orbital (${st.id}) · ${lin}`,
+          tagEn: `🛰️ Orbital Satellite (${st.id}) · ${lin}`,
+          bioEs: `🛰️ Satélite Artificial en Órbita Planetaria (${st.id}) — Puesto en órbita por ${creator} (Civilización ${lin}) en el Día ${day}.`,
+          bioEn: `🛰️ Autonomous Planetary Orbital Satellite (${st.id}) — Placed into orbit by ${creator} (${lin} civilization) on Day ${day}.`,
+          funcEs: `Hito de Era Espacial (Nivel 5): orbita el planeta continuamente y enlaza comunicaciones globales (${Math.round(st.signal_range || 500)}m).`,
+          funcEn: `Tier-5 Spaceflight milestone: continuously orbits the planet providing global signal relay (${Math.round(st.signal_range || 500)}m).`
         }
       };
+      const dynTraitsEs = [
+        st.is_vehicle ? `Vehículo móvil (${st.vehicle_domain || 'tierra'})` : null,
+        st.signal_range > 0 ? `Alcance señal: ${Math.round(st.signal_range)}m` : null,
+        (st.stories || 1) > 1 ? `Altura: ${st.stories} niveles` : null
+      ].filter(Boolean).join(' · ');
+      const dynTraitsEn = [
+        st.is_vehicle ? `Mobile vehicle (${st.vehicle_domain || 'land'})` : null,
+        st.signal_range > 0 ? `Signal range: ${Math.round(st.signal_range)}m` : null,
+        (st.stories || 1) > 1 ? `Height: ${st.stories} levels` : null
+      ].filter(Boolean).join(' · ');
+
       const spec = catalog[st.kind] || {
         tagEs: `⚙️ ${st.name || st.kind} (${st.id})`,
         tagEn: `⚙️ ${st.name || st.kind} (${st.id})`,
-        bioEs: `⚙️ Creación Libre (${st.id}: ${st.name || st.kind}) — Inventada por ${creator} (${lin}) en el Día ${day}. Cerca: ${caretakerEs}.`,
-        bioEn: `⚙️ Autonomous Creation (${st.id}: ${st.name || st.kind}) — Built by ${creator} (${lin}) on Day ${day}. Nearby: ${caretakerEn}.`,
-        funcEs: st.inscription ? `Inscripción grabada: «${st.inscription}». Estructura emergente creada sin guion previo.` : 'Artefacto 3D emergente sintetizado libremente combinando materias primas.',
-        funcEn: st.inscription ? `Carved inscription: «${st.inscription}». Unscripted emergent landmark.` : 'Emergent 3D apparatus synthesized freely from raw planetary materials.'
+        bioEs: `⚙️ Invención Inédita (${st.id}: ${st.name || st.kind}) — Creada por ${creator} (${lin}) en el Día ${day}. Cerca: ${caretakerEs}.`,
+        bioEn: `⚙️ Unscripted Invention (${st.id}: ${st.name || st.kind}) — Created by ${creator} (${lin}) on Day ${day}. Nearby: ${caretakerEn}.`,
+        funcEs: (st.inscription ? `Inscripción grabada: «${st.inscription}». ` : 'Artefacto 3D emergente sintetizado sin guion previo. ') + (dynTraitsEs || `Nivel tecnológico ${st.tech_tier || 1}.`),
+        funcEn: (st.inscription ? `Carved inscription: «${st.inscription}». ` : 'Unscripted emergent 3D apparatus. ') + (dynTraitsEn || `Tech Tier ${st.tech_tier || 1}.`)
       };
       return {
         tag: es ? spec.tagEs : spec.tagEn,
         bio: es ? spec.bioEs : spec.bioEn,
         thought: es ? spec.funcEs : spec.funcEn,
         notes: es
-          ? [`Creador original: ${creator} (${lin})`, `Construido en: Día ${day}`, `Actividad cercana: ${caretakerEs}`]
-          : [`Original builder: ${creator} (${lin})`, `Built on: Day ${day}`, `Nearest activity: ${caretakerEn}`]
+          ? [`Creador original: ${creator} (${lin})`, `Construido en: Día ${day} · Nivel Tec ${st.tech_tier || 1}`, `Actividad cercana: ${caretakerEs}`]
+          : [`Original builder: ${creator} (${lin})`, `Built on: Day ${day} · Tech Tier ${st.tech_tier || 1}`, `Nearest activity: ${caretakerEn}`]
+      };
+    }
+
+    function describeCave(cv) {
+      const es = currentLang === 'es';
+      const inside = (latestState?.agents || []).filter(a => Math.hypot(a.x - cv.x, a.y - cv.y) <= 5.5);
+      const insideTxtEs = inside.length > 0 ? inside.map(a => `${a.id} (${a.lineage})`).join(', ') : 'Ningún ser dentro ahora mismo';
+      const insideTxtEn = inside.length > 0 ? inside.map(a => `${a.id} (${a.lineage})`).join(', ') : 'Unoccupied right now';
+      return {
+        tag: es ? `🕳️ Cueva ${cv.id} (${cv.depth || 36}m prof.)` : `🕳️ Cave ${cv.id} (${cv.depth || 36}m deep)`,
+        bio: es
+          ? `🕳️ Cueva Natural Kárstica (${cv.id}) — Profundidad: ${cv.depth || 36}m (${cv.zone}). Seres refugiados/explorando cerca: ${insideTxtEs}.`
+          : `🕳️ Natural Karst Cavern (${cv.id}) — Depth: ${cv.depth || 36}m (${cv.zone}). Beings sheltered/mining nearby: ${insideTxtEn}.`,
+        thought: es
+          ? 'Refugio subterráneo natural (~15.5°C constantes todo el año) frente a tormentas, ventiscas y sequías, rico en vetas de cobre, pirita, estaño y magnetita. Permite iniciar vida cavernícola o excavar galerías subterráneas.'
+          : 'Natural subterranean shelter (~15.5°C year-round) against storms, blizzards, and droughts, rich in copper, pyrite, tin, and magnetite veins. Allows cave-dwelling or subterranean colony excavation.',
+        notes: es
+          ? [`Profundidad geológica: ${cv.depth || 36}m`, `Microclima interno: ~15.5°C estable`, `Ocupantes actuales: ${insideTxtEs}`]
+          : [`Geological depth: ${cv.depth || 36}m`, `Internal microclimate: ~15.5°C stable`, `Current occupants: ${insideTxtEn}`]
       };
     }
 
@@ -1739,6 +1981,30 @@
         if (ar.userData.halo) ar.userData.halo.visible = sel;
         if (!sel && ar.userData.tag) ar.userData.tag.style.display = 'none';
       }
+      for (const [cid, cm] of caveMeshes.entries()) {
+        const sel = (selectedEntity.type === 'cave' && cid === selectedEntity.id);
+        if (cm.userData.halo) cm.userData.halo.visible = sel;
+        if (!sel && cm.userData.tag) cm.userData.tag.style.display = 'none';
+      }
+
+      if (selectedEntity.type === 'cave' && caveMeshes.has(selectedEntity.id)) {
+        const cv = caveMeshes.get(selectedEntity.id).userData.data;
+        const info = describeCave(cv);
+        document.getElementById('subj-bio').textContent = info.bio;
+        document.getElementById('val-energy').textContent = '⛏️ 100%';
+        document.getElementById('bar-energy').style.width = '100%';
+        document.getElementById('val-warmth').textContent = '🌡️ 15.5°C';
+        document.getElementById('bar-warmth').style.width = '78%';
+        document.getElementById('val-rest').textContent = '🕳️ 100%';
+        document.getElementById('bar-rest').style.width = '100%';
+        document.getElementById('val-stress').textContent = '0%';
+        document.getElementById('bar-stress').style.width = '0%';
+        document.getElementById('subj-thought').textContent = info.thought;
+        document.getElementById('subj-memories').innerHTML = info.notes.map(n => `<div>• ${n}</div>`).join('');
+        const cm = caveMeshes.get(cv.id);
+        if (cm?.userData?.tag) cm.userData.tag.innerHTML = `<strong>${info.tag}</strong>`;
+        return;
+      }
 
       if (selectedEntity.type === 'structure') {
         const st = (latestState.structures || []).find(s => s.id === selectedEntity.id);
@@ -1747,10 +2013,10 @@
           document.getElementById('subj-bio').textContent = info.bio;
           document.getElementById('val-energy').textContent = st.kind === 'crop_plot' ? '🌾 100%' : `${Math.round(st.fuel || 100)}%`;
           document.getElementById('bar-energy').style.width = st.kind === 'crop_plot' ? '100%' : `${Math.min(100, st.fuel || 100)}%`;
-          document.getElementById('val-warmth').textContent = st.kind === 'hearth' ? '🔥 100%' : '—';
-          document.getElementById('bar-warmth').style.width = st.kind === 'hearth' ? '100%' : '0%';
-          document.getElementById('val-rest').textContent = st.kind === 'shelter' ? '🛖 100%' : '—';
-          document.getElementById('bar-rest').style.width = st.kind === 'shelter' ? '100%' : '0%';
+          document.getElementById('val-warmth').textContent = st.kind === 'hearth' ? '🔥 100%' : (st.layer === 'subterranean' ? '15.5°C' : '—');
+          document.getElementById('bar-warmth').style.width = (st.kind === 'hearth' || st.layer === 'subterranean') ? '100%' : '0%';
+          document.getElementById('val-rest').textContent = ['shelter', 'edifice', 'burrow_network'].includes(st.kind) ? '100%' : '—';
+          document.getElementById('bar-rest').style.width = ['shelter', 'edifice', 'burrow_network'].includes(st.kind) ? '100%' : '0%';
           document.getElementById('val-stress').textContent = '0%';
           document.getElementById('bar-stress').style.width = '0%';
           document.getElementById('subj-thought').textContent = info.thought;
@@ -1816,6 +2082,17 @@
       pointer.y = -(ev.clientY / window.innerHeight) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
       if (globeGroup.visible) {
+        const satHits = raycaster.intersectObjects(Array.from(globeSatMeshes.values()), true);
+        if (satHits.length > 0) {
+          let sobj = satHits[0].object;
+          while (sobj && !sobj.userData?.satId) sobj = sobj.parent;
+          if (sobj?.userData?.satId) {
+            selectedEntity = { type: 'structure', id: sobj.userData.satId };
+            renderSelectedInspector();
+            showLeftTab('focus');
+            return;
+          }
+        }
         const bHits = raycaster.intersectObjects(globeGroup.userData.beacons || [], false);
         if (bHits.length > 0 && bHits[0].object.userData?.jumpLineage) {
           flyToLineage(bHits[0].object.userData.jumpLineage);
@@ -1825,6 +2102,7 @@
       const interactiveRoots = [
         ...Array.from(agentRigs.values()),
         ...Array.from(structMeshes.values()),
+        ...Array.from(caveMeshes.values()),
         ...Array.from(animalRigs.values())
       ];
       const hits = raycaster.intersectObjects(interactiveRoots, true);
@@ -1902,6 +2180,33 @@
       document.getElementById('ui-time').textContent = `Y${w.year} · Day ${w.day}`;
       document.getElementById('ui-season').textContent = w.season;
       document.getElementById('ui-temp').textContent = `${w.ambient_temp}°C`;
+      const weatherMap = {
+        clear: ['☀️ Clear', '☀️ Despejado'],
+        rain: ['🌧️ Rain', '🌧️ Lluvia'],
+        storm: ['⛈️ Storm', '⛈️ Tormenta'],
+        fog: ['🌫️ Fog', '🌫️ Niebla'],
+        snow: ['❄️ Snow', '❄️ Nevada'],
+        drought: ['🏜️ Drought', '🏜️ Sequía']
+      };
+      const wState = w.weather || 'clear';
+      const wLabel = (weatherMap[wState] || weatherMap.clear)[currentLang === 'es' ? 1 : 0];
+      const lPhase = w.lunar_phase !== undefined ? w.lunar_phase : ((w.day % 28) / 28);
+      const moonIcon = (lPhase < 0.08 || lPhase >= 0.92) ? '🌑' : (lPhase < 0.36 ? '🌓' : (lPhase < 0.62 ? '🌕' : '🌗'));
+      const sAu = w.solar_au || 1.0;
+      const astroEl = document.getElementById('ui-astro');
+      if (astroEl) astroEl.textContent = `${wLabel} · ${moonIcon} ${w.lunar_name || 'Moon'} · ${sAu.toFixed(2)} AU`;
+
+      precipPoints.visible = ['rain', 'storm', 'snow'].includes(wState);
+      if (precipPoints.visible) {
+        precipMat.color.setHex(wState === 'snow' ? 0xffffff : 0x93c5fd);
+        precipMat.size = wState === 'snow' ? 0.34 : 0.22;
+      }
+
+      if (globeGroup.userData.moonMesh) {
+        const mAng = lPhase * Math.PI * 2;
+        globeGroup.userData.moonMesh.position.set(Math.cos(mAng) * 44, Math.sin(mAng * 0.5) * 8, Math.sin(mAng) * 44);
+      }
+
       document.getElementById('ui-pop').textContent = m.live_population;
       document.getElementById('ui-ctrl').textContent = m.control_population;
       if (m.wild_species_alive !== undefined) {
@@ -1926,15 +2231,22 @@
         buildContinuousTerrain(isWinter);
       }
       if (!globeGroup.visible) {
+        const lIllum = w.lunar_illum !== undefined ? w.lunar_illum : 0.5;
         if (w.is_night) {
-          scene.background.setHex(0x1e293b); scene.fog.color.setHex(0x1e293b);
-          sunLight.intensity = 0.65; hemiLight.intensity = 0.85;
+          scene.background.setHex(lIllum > 0.75 ? 0x1e293b : 0x0f172a);
+          scene.fog.color.setHex(lIllum > 0.75 ? 0x1e293b : 0x0f172a);
+          sunLight.intensity = 0.25 + lIllum * 0.55;
+          hemiLight.intensity = 0.55 + lIllum * 0.45;
         } else {
-          scene.background.setHex(isWinter ? 0xcbd5e1 : 0x7dd3fc);
-          scene.fog.color.setHex(isWinter ? 0xe2e8f0 : 0xbae6fd);
-          sunLight.intensity = 1.75; hemiLight.intensity = 1.35;
+          const overcast = ['rain', 'storm', 'fog'].includes(wState);
+          scene.background.setHex(overcast ? 0x94a3b8 : (isWinter ? 0xcbd5e1 : 0x7dd3fc));
+          scene.fog.color.setHex(overcast ? 0x94a3b8 : (isWinter ? 0xe2e8f0 : 0xbae6fd));
+          sunLight.intensity = overcast ? 1.15 : 1.75;
+          hemiLight.intensity = 1.35;
         }
       }
+
+      syncCaves(state.caves || DEFAULT_CAVES);
 
       if (!selectedSubjectId || !state.agents.some(a => a.id === selectedSubjectId)) {
         selectedSubjectId = state.spotlight_id;
@@ -2033,6 +2345,21 @@
         let sm = structMeshes.get(st.id);
         if (!sm) { sm = createStructureMesh(st); structMeshes.set(st.id, sm); }
         sm.userData.data = st;
+        if (st.is_vehicle && (!isCloudMode || isNewServerTick)) {
+          sm.userData.serverAnchor = { x: st.x, z: st.y };
+          const alt = st.layer === 'orbital' ? 18.5 : (st.layer === 'aerial' ? 7.5 : 0.0);
+          const gy = (st.kind === 'watercraft' ? -0.02 : terrainHeight(st.x, st.y)) + alt;
+          sm.userData.targetPos.set(st.x, gy, st.y);
+        }
+        if (st.layer === 'orbital' && globeGroup.userData.globeSatGroup && !globeSatMeshes.has(st.id)) {
+          const satG = new THREE.Group();
+          const core = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 1.4), new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xca8a04, emissiveIntensity: 0.8 }));
+          const wings = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.08, 0.85), new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.7 }));
+          satG.add(core, wings);
+          satG.userData = { satId: st.id, phase: globeSatMeshes.size * 1.9 };
+          globeGroup.userData.globeSatGroup.add(satG);
+          globeSatMeshes.set(st.id, satG);
+        }
         if (st.kind === 'hearth' && sm.userData.flame) {
           const on = st.fuel > 0;
           sm.userData.flame.visible = on; sm.userData.light.intensity = on ? 4.2 : 0.0;
@@ -2040,6 +2367,9 @@
       }
       for (const [sid, sm] of structMeshes.entries()) {
         if (!sIds.has(sid)) { surfaceWorld.remove(sm); disposeObject3D(sm); structMeshes.delete(sid); }
+      }
+      for (const [sid, gs] of globeSatMeshes.entries()) {
+        if (!sIds.has(sid)) { globeGroup.userData.globeSatGroup?.remove(gs); disposeObject3D(gs); globeSatMeshes.delete(sid); }
       }
 
       const rList = state.resources || [];
@@ -2056,9 +2386,13 @@
       resInstanced.instanceMatrix.needsUpdate = true;
       if (resInstanced.instanceColor) resInstanced.instanceColor.needsUpdate = true;
 
-      const structIcon = { crop_plot: '🌾', hearth: '🔥', shelter: '🛖', granary: '🏺', watercraft: '🛶', palisade: '🪵', cairn: '🪨' };
+      const structIcon = {
+        crop_plot: '🌾', hearth: '🔥', shelter: '🛖', granary: '🏺', watercraft: '🛶',
+        palisade: '🪵', cairn: '🪨', burrow_network: '🐜', edifice: '🏛️',
+        comm_relay: '📡', land_vehicle: '🚙', air_craft: '🛸', orbital_satellite: '🛰️'
+      };
       const structsHtml = (state.structures || []).length > 0
-        ? `<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--border);font-size:10px;color:var(--amber);font-weight:700">${currentLang === 'es' ? '🌾 CULTIVOS Y CONSTRUCCIONES (Toca para ver)' : '🌾 GARDENS & STRUCTURES (Tap to inspect)'}</div>` +
+        ? `<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--border);font-size:10px;color:var(--amber);font-weight:700">${currentLang === 'es' ? '🌾 CULTIVOS, VEHÍCULOS Y CREACIONES (Toca para ver)' : '🌾 GARDENS, VEHICLES & CREATIONS (Tap to inspect)'}</div>` +
           state.structures.map(st =>
             `<div class="roster-row" data-sid="${st.id}">
               <span>${structIcon[st.kind] || '⚙️'} <strong>${st.id}</strong> · ${st.kind === 'crop_plot' ? (currentLang === 'es' ? 'Huerto Cereal' : 'Cereal Garden') : (st.name || st.kind)}</span>
@@ -2067,12 +2401,21 @@
           ).join('')
         : '';
 
+      const cavesList = state.caves || DEFAULT_CAVES;
+      const cavesHtml = `<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--border);font-size:10px;color:var(--accent);font-weight:700">${currentLang === 'es' ? '🕳️ CUEVAS NATURALES Y ACCESO SUBTERRÁNEO' : '🕳️ NATURAL CAVES & SUBTERRANEAN ACCESS'}</div>` +
+        cavesList.map(cv =>
+          `<div class="roster-row" data-cid="${cv.id}">
+            <span>🕳️ <strong>${cv.id}</strong> · ${currentLang === 'es' ? 'Cueva Kárstica' : 'Karst Cavern'} (${cv.depth || 36}m)</span>
+            <span style="color:var(--muted)">15.5°C</span>
+          </div>`
+        ).join('');
+
       rosterBox.innerHTML = state.agents.map(a =>
         `<div class="roster-row" data-aid="${a.id}">
           <span><span class="swatch" style="background:${a.body_color}"></span><strong>${a.id}</strong> · ${a.lineage} (${a.stage})</span>
           <span style="color:var(--muted)">${a.mood}</span>
         </div>`
-      ).join('') + structsHtml;
+      ).join('') + structsHtml + cavesHtml;
 
       rosterBox.querySelectorAll('.roster-row[data-aid]').forEach(r => {
         r.addEventListener('click', () => {
@@ -2090,10 +2433,28 @@
           selectedEntity = { type: 'structure', id: st.id };
           renderSelectedInspector();
           showLeftTab('focus');
+          if (st.layer === 'orbital') {
+            setCamMode('globe');
+          } else {
+            setCamMode('topdown');
+            const sm = structMeshes.get(st.id);
+            const px = sm ? sm.position.x : st.x, pz = sm ? sm.position.z : st.y;
+            const py = sm ? sm.position.y : terrainHeight(st.x, st.y);
+            controls.target.set(px, py + 0.4, pz);
+            camera.position.set(px + 2.5, py + 11.0, pz + 13.0);
+          }
+        });
+      });
+      rosterBox.querySelectorAll('.roster-row[data-cid]').forEach(r => {
+        r.addEventListener('click', () => {
+          const cm = caveMeshes.get(r.dataset.cid);
+          if (!cm) return;
+          selectedEntity = { type: 'cave', id: r.dataset.cid };
+          renderSelectedInspector();
+          showLeftTab('focus');
           setCamMode('topdown');
-          const ty = terrainHeight(st.x, st.y);
-          controls.target.set(st.x, ty + 0.4, st.y);
-          camera.position.set(st.x + 2.5, ty + 11.0, st.y + 13.0);
+          controls.target.set(cm.position.x, cm.position.y + 0.5, cm.position.z);
+          camera.position.set(cm.position.x + 2.5, cm.position.y + 10.5, cm.position.z + 12.5);
         });
       });
 
@@ -2199,7 +2560,22 @@
       elapsedSimTime += dt;
       const t = elapsedSimTime;
       const isCloudMode = Boolean(cloudPollTimer);
-      waterMesh.position.y = -0.04 + Math.sin(t * 1.6) * 0.02;
+      const tidal = (latestState?.world?.tidal_offset || 0) * 0.32;
+      waterMesh.position.y = -0.04 + tidal + Math.sin(t * 1.6) * 0.02;
+
+      // 3D Rain / Storm / Snow Precipitation Fall
+      if (precipPoints.visible) {
+        const isSnow = latestState?.world?.weather === 'snow';
+        const fallSpd = (isSnow ? 4.5 : 19.0) * dt;
+        const pAttr = precipGeo.attributes.position;
+        for (let i = 0; i < PRECIP_COUNT; i++) {
+          let py = pAttr.getY(i) - fallSpd;
+          if (py < 0.2) py = 26.0 + Math.random() * 4.0;
+          pAttr.setY(i, py);
+          if (isSnow) pAttr.setX(i, pAttr.getX(i) + Math.sin(t * 2.0 + i) * 0.015);
+        }
+        pAttr.needsUpdate = true;
+      }
 
       // Smooth keyboard Arrow / WASD planetary panning
       if (heldKeys.size > 0 && !globeGroup.visible) {
@@ -2219,14 +2595,55 @@
         setCamMode('globe');
       } else if (camMode === 'globe') {
         globeGroup.rotation.y += 0.0018;
+        for (const gs of globeSatMeshes.values()) {
+          const oAng = t * 0.65 + (gs.userData.phase || 0);
+          gs.position.set(Math.cos(oAng) * 31.5, Math.sin(oAng * 1.4) * 14.0, Math.sin(oAng) * 31.5);
+          gs.lookAt(0, 0, 0);
+        }
         if (camDist < 42) setCamMode('topdown');
       }
 
-      // Gentle wind sway on cultivated cereal gardens!
+      // Gentle wind sway on cereal gardens + Comm Relay waves + 60 FPS Vehicle & Satellite Motion!
+      const vehSpdCloud = 1.05 + viewSpeed * 0.22;
       for (const sm of structMeshes.values()) {
-        if (sm.userData.stalks && sm.userData.stalks.length > 0) {
-          for (let i = 0; i < sm.userData.stalks.length; i++) {
-            sm.userData.stalks[i].rotation.z = Math.sin(t * 2.2 + i * 0.8 + sm.position.x) * 0.085;
+        const sud = sm.userData;
+        if (sud.stalks && sud.stalks.length > 0) {
+          for (let i = 0; i < sud.stalks.length; i++) {
+            sud.stalks[i].rotation.z = Math.sin(t * 2.2 + i * 0.8 + sm.position.x) * 0.085;
+          }
+        }
+        if (sud.waveRing) {
+          const pulse = (t * 1.4) % 1.0;
+          sud.waveRing.scale.setScalar(1.0 + pulse * 5.5);
+          sud.waveRing.material.opacity = (1.0 - pulse) * 0.75;
+        }
+        if (sud.data?.is_vehicle && sud.targetPos) {
+          const dom = sud.data.vehicle_domain || 'land';
+          if (dom === 'orbit') {
+            const oAng = t * (0.18 + viewSpeed * 0.02) + sm.position.y * 0.1;
+            sm.position.set(Math.cos(oAng) * 44, 18.5 + Math.sin(t * 1.5) * 0.4, Math.sin(oAng) * 44);
+            sm.rotation.y = -oAng;
+          } else {
+            const tp = sud.targetPos;
+            let dx = tp.x - sm.position.x, dz = tp.z - sm.position.z;
+            let distSq = dx * dx + dz * dz;
+            if (isCloudMode && distSq <= 0.15 && t >= (sud.pauseUntil || 0)) {
+              const anc = sud.serverAnchor || { x: sm.position.x, z: sm.position.z };
+              const wp = pickNaturalWaypoint(anc.x, anc.z, dom === 'air' ? 16.0 : 10.0, dom);
+              tp.set(wp.x, wp.y + (sud.baseAlt || 0), wp.z);
+              sud.pauseUntil = t + 0.4;
+              dx = tp.x - sm.position.x; dz = tp.z - sm.position.z; distSq = dx * dx + dz * dz;
+            }
+            if (distSq > 0.002) {
+              const dist = Math.sqrt(distSq);
+              const step = isCloudMode ? Math.min(dist, dt * vehSpdCloud) : dist * 0.10;
+              sm.position.x += (dx / dist) * step;
+              sm.position.z += (dz / dist) * step;
+              sud.heading = shortestAngleLerp(sud.heading || 0, Math.atan2(dx, dz), 0.10);
+              sm.rotation.y = sud.heading;
+            }
+            const gY = dom === 'water' ? -0.02 + tidal : terrainHeight(sm.position.x, sm.position.z);
+            sm.position.y = gY + (sud.baseAlt || 0) + (dom === 'air' ? Math.sin(t * 2.0) * 0.25 : 0);
           }
         }
       }
@@ -2334,7 +2751,7 @@
         }
       }
 
-      // Project floating 3D badge for any clicked Structure or Wild Animal!
+      // Project floating 3D badge for any clicked Structure, Cave, or Wild Animal!
       if (selectedEntity.type === 'structure' && structMeshes.has(selectedEntity.id)) {
         const sm = structMeshes.get(selectedEntity.id);
         projVec.copy(sm.position); projVec.y += 1.25; projVec.project(camera);
@@ -2342,6 +2759,14 @@
           const sx = (projVec.x * 0.5 + 0.5) * window.innerWidth;
           const sy = (-projVec.y * 0.5 + 0.5) * window.innerHeight;
           labelCandidates.push({ tag: sm.userData.tag, sx, sy, prio: 5 });
+        }
+      } else if (selectedEntity.type === 'cave' && caveMeshes.has(selectedEntity.id)) {
+        const cm = caveMeshes.get(selectedEntity.id);
+        projVec.copy(cm.position); projVec.y += 1.85; projVec.project(camera);
+        if (projVec.z < 1 && cm.userData.tag) {
+          const sx = (projVec.x * 0.5 + 0.5) * window.innerWidth;
+          const sy = (-projVec.y * 0.5 + 0.5) * window.innerHeight;
+          labelCandidates.push({ tag: cm.userData.tag, sx, sy, prio: 5 });
         }
       } else if (selectedEntity.type === 'animal' && animalRigs.has(selectedEntity.id)) {
         const ar = animalRigs.get(selectedEntity.id);

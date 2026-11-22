@@ -375,6 +375,34 @@ BLIND_MATERIALS: Dict[str, BlindMaterial] = {
         color_hex="#ca8a04",
         hardness=0.65,
     ),
+    "silica_glass": BlindMaterial(
+        code="silica_glass",
+        formula="Fused Amorphous SiO2 Silicate",
+        sensory_name="clear smooth fused pane",
+        observer_label="Fused Silica Glass & Lens (Optics Tech!)",
+        color_hex="#bae6fd",
+        hardness=0.82,
+        luster=0.96,
+    ),
+    "copper_coil": BlindMaterial(
+        code="copper_coil",
+        formula="Drawn Cu Conductor + Fe3O4 Core",
+        sensory_name="spiraled gleaming wire that hums near lodestone",
+        observer_label="Electromagnetic Copper Coil (Signal/Power Tech!)",
+        color_hex="#34d399",
+        hardness=0.72,
+        metallic=1.0,
+        magnetic=0.95,
+    ),
+    "refined_fuel": BlindMaterial(
+        code="refined_fuel",
+        formula="Pyrolyzed Terpene-Hydrocarbon Distillate",
+        sensory_name="volatile warm dark-amber liquid",
+        observer_label="Refined High-Energy Propellant (Energetic Tech!)",
+        color_hex="#f97316",
+        flammability=1.0,
+        spark_potential=0.98,
+    ),
 }
 
 
@@ -474,9 +502,18 @@ class MortalRemains:
 
 
 @dataclass
+class CaveSite:
+    id: str
+    x: float
+    y: float
+    climate_zone: str
+    depth_m: float = 28.0
+
+
+@dataclass
 class WorldStructure:
     id: str
-    kind: str  # "hearth"|"shelter"|"granary"|"monolith"|"cairn"|"palisade"|"watercraft"|"kiln"|"crop_plot"|"open_creation"
+    kind: str  # hearth|shelter|granary|monolith|cairn|palisade|watercraft|crop_plot|burrow_network|edifice|comm_relay|land_vehicle|air_craft|orbital_satellite|open_creation
     sensory_name: str
     x: float
     y: float
@@ -489,16 +526,26 @@ class WorldStructure:
     inscription: str = ""
     water_crossing: bool = False
     crop_timer: int = 0
+    layer: str = "surface"  # "subterranean" | "surface" | "aerial" | "orbital"
+    tech_tier: int = 1      # 1..5 cumulative civilizational tier
+    is_vehicle: bool = False
+    vehicle_speed: float = 0.0
+    vehicle_domain: str = "land"  # "land" | "water" | "air" | "orbit"
+    vehicle_target: Optional[Tuple[float, float]] = None
+    signal_range: float = 0.0  # > 0 enables long-distance speech & lore transmission!
+    stories: int = 1
+    chambers: int = 1
     blueprint_3d: Optional[List[Dict[str, Any]]] = None
 
 
 SEASONS = ["Spring", "Summer", "Autumn", "Deep Winter"]
 DAYS_PER_SEASON = 10
 TICKS_PER_DAY = 200
+LUNAR_CYCLE_DAYS = 28
 
 
 class CosmosWorld:
-    """10x Super-Earth Planetary Environment with O(1) Spatial Indexing & Real Chemistry."""
+    """10x Super-Earth Planetary Environment with Orbital Astrophysics, Lunar Tides, Caves & Unbounded Tech."""
 
     def __init__(self, seed: int = 4201) -> None:
         self.seed = seed
@@ -520,6 +567,11 @@ class CosmosWorld:
         self.extinct_fauna: Dict[str, int] = {}  # Permanent extinction ledger (species -> day extinct)!
         self.evolved_fauna: Dict[str, Dict[str, Any]] = {}  # Newly speciated wild species!
         self.thermal_vents: List[Tuple[float, float]] = []
+        self.caves: Dict[str, CaveSite] = {}
+        # Stochastic Weather & Solar Anomaly State
+        self.weather: str = "clear"  # "clear" | "rain" | "storm" | "fog" | "snow" | "drought"
+        self.weather_ticks_left: int = 90
+        self.solar_anomaly_c: float = 0.0
 
         # Generate the Central Crossroads + all 3 distant Continental Homelands!
         seed_centers = [(0, 0), (-3, -2), (3, -2), (0, 2)]
@@ -533,6 +585,27 @@ class CosmosWorld:
         for off_x, off_y in ((-3.0, 2.0), (4.0, -2.5)):
             vx, vy = self.find_nearest_dry_spot(42.0 + off_x, -34.0 + off_y)
             self.thermal_vents.append((vx, vy))
+
+        # Seed natural Karst & Basalt Caves across rocky slopes of all 3 Continents + Crossroads!
+        cave_anchors = [
+            (-32.0, -28.0), (-44.0, -39.0),  # NW Archipelago Caves
+            (36.0, -30.0), (47.0, -38.0),    # NE Boreal Caves
+            (-2.0, 34.0), (11.0, 42.0),      # South Savanna Caves
+            (-8.0, -4.0), (14.0, 8.0),       # Central Crossroads Caves
+        ]
+        for idx, (ax, ay) in enumerate(cave_anchors, start=1):
+            cx, cy = self.find_nearest_dry_spot(ax, ay)
+            cid = f"CAVE-{idx}"
+            self.caves[cid] = CaveSite(
+                id=cid,
+                x=cx,
+                y=cy,
+                climate_zone=classify_climate_zone(cx, cy),
+                depth_m=round(22.0 + (idx % 4) * 14.0, 1),
+            )
+            gx, gy = int(round(cx)), int(round(cy))
+            self._add_resource_at(gx, gy, "slab_dense")
+            self._add_resource_at(gx, gy, "nodule_red" if idx % 2 == 0 else "copper_ore")
 
         self._spawn_initial_fauna()
 
@@ -561,10 +634,59 @@ class CosmosWorld:
         return self.day_phase >= 0.64 or self.day_phase < 0.08
 
     @property
+    def solar_distance_au(self) -> float:
+        """Elliptical planetary orbit (0.965 AU perihelion .. 1.035 AU aphelion)."""
+        ang = ((self.day - 1) / float(DAYS_PER_SEASON * 4)) * 2.0 * math.pi
+        return round(1.00 - 0.035 * math.cos(ang + 0.6), 3)
+
+    @property
+    def lunar_phase(self) -> float:
+        """28-day synodic lunar cycle [0.0=New Moon, 0.5=Full Moon]."""
+        return round(((self.tick_count / float(TICKS_PER_DAY)) % LUNAR_CYCLE_DAYS) / LUNAR_CYCLE_DAYS, 3)
+
+    @property
+    def lunar_illumination(self) -> float:
+        return round(0.5 * (1.0 - math.cos(self.lunar_phase * 2.0 * math.pi)), 3)
+
+    @property
+    def lunar_phase_name(self) -> str:
+        p = self.lunar_phase
+        if p < 0.08 or p >= 0.92:
+            return "New Moon"
+        if p < 0.22:
+            return "Waxing Crescent"
+        if p < 0.34:
+            return "First Quarter"
+        if p < 0.44:
+            return "Waxing Gibbous"
+        if p < 0.58:
+            return "Full Moon"
+        if p < 0.70:
+            return "Waning Gibbous"
+        if p < 0.82:
+            return "Last Quarter"
+        return "Waning Crescent"
+
+    @property
+    def tidal_offset(self) -> float:
+        """Spring tides peak at New & Full Moon; modulates coastal shellfish deposition."""
+        return round(0.14 * math.cos((self.lunar_phase * 4.0 + self.day_phase * 2.0) * math.pi), 3)
+
+    @property
     def ambient_temperature(self) -> float:
         season_base = [19.0, 25.5, 13.5, 5.2][self.season_index]
+        # Inverse-square solar flux effect from orbital eccentricity (~ +/- 2.6°C)
+        orbital_delta = (1.0 / (self.solar_distance_au ** 2) - 1.0) * 34.0
+        weather_delta = {
+            "clear": 0.0,
+            "rain": -2.0,
+            "storm": -3.5,
+            "fog": -1.0,
+            "snow": -5.8,
+            "drought": 4.2,
+        }.get(self.weather, 0.0)
         diurnal = math.sin((self.day_phase - 0.08) * 2.0 * math.pi) * 4.6
-        return round(season_base + diurnal, 2)
+        return round(season_base + orbital_delta + weather_delta + self.solar_anomaly_c + diurnal, 2)
 
     @property
     def explored_area_km2(self) -> float:
@@ -815,6 +937,16 @@ class CosmosWorld:
             if rng.random() < 0.12 * p:
                 self._add_resource_at(tx, ty, "nodule_red")
 
+    def is_sheltered_at(self, x: float, y: float) -> bool:
+        """True if inside a natural cave, subterranean burrow, shelter hut, or multi-story edifice."""
+        for cv in self.caves.values():
+            if math.hypot(x - cv.x, y - cv.y) <= 3.8:
+                return True
+        for st in self.structures.values():
+            if st.kind in ("shelter", "edifice", "burrow_network") and math.hypot(x - st.x, y - st.y) <= 4.5:
+                return True
+        return False
+
     def local_temperature_at(self, x: float, y: float) -> float:
         temp = self.ambient_temperature
         # Real Earth-like latitudinal climate gradient: North (y < 0) cooler, South (y > 0) warmer!
@@ -828,6 +960,12 @@ class CosmosWorld:
         elev = self.elevation_at(x, y)
         if elev > 1.8:
             temp -= (elev - 1.8) * 2.5
+        # Subterranean / Cave geothermal homeostasis (~15.5°C year-round!)
+        in_cave_or_burrow = any(math.hypot(x - cv.x, y - cv.y) <= 3.8 for cv in self.caves.values()) or any(
+            st.layer == "subterranean" and math.hypot(x - st.x, y - st.y) <= 4.8 for st in self.structures.values()
+        )
+        if in_cave_or_burrow:
+            temp = temp * 0.35 + 15.5 * 0.65
         for vx, vy in self.thermal_vents:
             d = math.hypot(x - vx, y - vy)
             if d < 6.5:
@@ -836,19 +974,35 @@ class CosmosWorld:
             d = math.hypot(x - st.x, y - st.y)
             if st.kind == "hearth" and st.fuel > 0 and d < 6.0:
                 temp += (6.0 - d) * 4.5
-            elif st.kind == "shelter" and d < 4.5:
-                temp += (4.5 - d) * 3.0
+            elif st.kind in ("shelter", "edifice") and d < 4.8:
+                temp += (4.8 - d) * (3.0 + st.stories * 0.4)
         return round(temp, 2)
 
     def step_environment(self) -> None:
         self.tick_count += 1
+        # Stochastic Weather & Solar Flux Evolution
+        self.weather_ticks_left -= 1
+        if self.weather_ticks_left <= 0:
+            self.solar_anomaly_c = max(-2.2, min(2.4, round(self.solar_anomaly_c * 0.7 + self.rng.gauss(0.0, 0.65), 2)))
+            s_idx = self.season_index
+            r_w = self.rng.random()
+            if s_idx == 3:  # Deep Winter
+                self.weather = "snow" if r_w < 0.38 else ("storm" if r_w < 0.52 else ("fog" if r_w < 0.68 else "clear"))
+            elif s_idx == 1:  # Summer (influenced by perihelion solar distance!)
+                drought_p = 0.24 if self.solar_distance_au < 0.985 else 0.12
+                self.weather = "drought" if r_w < drought_p else ("storm" if r_w < drought_p + 0.16 else ("rain" if r_w < drought_p + 0.36 else "clear"))
+            else:  # Spring / Autumn
+                self.weather = "rain" if r_w < 0.28 else ("fog" if r_w < 0.44 else ("storm" if r_w < 0.56 else "clear"))
+            self.weather_ticks_left = self.rng.randint(75, 165)
+
         pollinator_pop = sum(1 for a in self.animals.values() if a.alive and a.species == "pollenwing")
         pollinator_factor = max(0.35, min(1.25, pollinator_pop / 5.0))
+        weather_growth = 1.35 if self.weather == "rain" else (0.52 if self.weather in ("drought", "snow") else 1.0)
 
         if self.tick_count % 22 == 0 and self.chunks:
             chunk_keys = list(self.chunks.keys())
             base_trials = 22 if self.season_index != 3 else 9
-            trials = max(4, int(round(base_trials * pollinator_factor)))
+            trials = max(4, int(round(base_trials * pollinator_factor * weather_growth)))
             for _ in range(trials):
                 cx, cy = self.rng.choice(chunk_keys)
                 tx = cx * CHUNK_SIZE + self.rng.randrange(0, CHUNK_SIZE)
@@ -856,6 +1010,18 @@ class CosmosWorld:
                 biome = classify_biome(tx, ty, self.seed)
                 if biome != "water":
                     self._seed_tile_resources(tx, ty, biome, self.rng, initial=False)
+                # Lunar spring tides wash shells & nutrients onto riverbanks/shores!
+                if biome == "riverbank" and abs(self.tidal_offset) > 0.11 and self.rng.random() < 0.22:
+                    self._add_resource_at(tx, ty, "nacre_shell")
+
+        # Subterranean Cave Mineral & Root Seepage
+        if self.tick_count % 90 == 0:
+            for cv in self.caves.values():
+                if self.rng.random() < 0.35:
+                    gx = int(round(cv.x + self.rng.uniform(-1.5, 1.5)))
+                    gy = int(round(cv.y + self.rng.uniform(-1.5, 1.5)))
+                    ore = self.rng.choice(("orb_root", "slab_dense", "nodule_red", "copper_ore", "tin_ore", "magnetite_ore"))
+                    self._add_resource_at(gx, gy, ore)
 
         # TRUE LOTKA-VOLTERRA TROPHIC WEB + DARWINIAN ALLOPATRIC SPECIATION!
         if self.tick_count % 220 == 0:
@@ -1016,18 +1182,48 @@ class CosmosWorld:
             if st.kind == "hearth" and st.fuel > 0:
                 st.fuel = max(0.0, st.fuel - 0.08)
             elif st.kind == "crop_plot":
-                st.crop_timer += 1
+                st.crop_timer += 2 if self.weather == "rain" else 1
                 if st.crop_timer >= 130:
                     st.crop_timer = 0
                     self._add_resource_at(int(round(st.x)), int(round(st.y)), "grain_seed")
-            st.durability -= 0.004 if st.kind not in ("monolith", "cairn") else 0.0003
+            # Mobile Vehicles & Orbital Satellites move across their physical domain!
+            if st.is_vehicle and st.vehicle_speed > 0.0:
+                if st.vehicle_domain == "orbit":
+                    ang = (self.tick_count * 0.035 + int(st.id.split("-")[1]) * 1.7) % (2.0 * math.pi)
+                    st.x = round(math.cos(ang) * 46.0, 2)
+                    st.y = round(math.sin(ang) * 46.0, 2)
+                else:
+                    if st.vehicle_target is None or math.hypot(st.vehicle_target[0] - st.x, st.vehicle_target[1] - st.y) < 1.5:
+                        span = 18.0 if st.vehicle_domain == "air" else 11.0
+                        tx = max(-62.0, min(66.0, st.x + self.rng.uniform(-span, span)))
+                        ty = max(-62.0, min(66.0, st.y + self.rng.uniform(-span, span)))
+                        if st.vehicle_domain == "water" and self.elevation_at(tx, ty) < -0.04:
+                            st.vehicle_target = (tx, ty)
+                        elif st.vehicle_domain == "air":
+                            st.vehicle_target = (tx, ty)
+                        elif st.vehicle_domain == "land" and self.is_walkable(tx, ty):
+                            st.vehicle_target = (tx, ty)
+                    if st.vehicle_target is not None:
+                        dx, dy = st.vehicle_target[0] - st.x, st.vehicle_target[1] - st.y
+                        dist = math.hypot(dx, dy)
+                        if dist > 0.1:
+                            nx = round(st.x + (dx / dist) * min(dist, st.vehicle_speed), 2)
+                            ny = round(st.y + (dy / dist) * min(dist, st.vehicle_speed), 2)
+                            if st.vehicle_domain == "water" and self.elevation_at(nx, ny) >= -0.02:
+                                st.vehicle_target = None
+                            elif st.vehicle_domain == "land" and not self.is_walkable(nx, ny):
+                                st.vehicle_target = None
+                            else:
+                                st.x, st.y = nx, ny
+            decay = 0.0002 if (st.kind in ("monolith", "cairn", "orbital_satellite") or st.tech_tier >= 3) else 0.004
+            st.durability -= decay
             if st.durability <= 0:
                 dead_ids.append(sid)
         for sid in dead_ids:
             del self.structures[sid]
-        if len(self.structures) > 28:
-            recyclable = [sid for sid, st in self.structures.items() if st.kind not in ("monolith", "cairn")]
-            for sid in recyclable[: len(self.structures) - 28]:
+        if len(self.structures) > 32:
+            recyclable = [sid for sid, st in self.structures.items() if st.kind == "crop_plot" or (st.tech_tier <= 1 and st.kind not in ("monolith", "cairn"))]
+            for sid in recyclable[: len(self.structures) - 32]:
                 del self.structures[sid]
 
         expired_corpses = [cid for cid, c in self.corpses.items() if c.ttl_ticks <= 1]
@@ -1175,8 +1371,12 @@ class CosmosWorld:
                 "Wove cellulose fibers into an insulating textile cloak!",
             )
 
+        has_adv_component = bool(
+            {code_a, code_b} & {"composite_tool", "bronze_tool", "wheeled_cart", "silica_glass", "copper_coil", "refined_fuel"}
+        )
+
         # 6. Masonry / Earthen Shelter
-        if max_insul >= 0.72 and (max_hard >= 0.4 or max_mall >= 0.8):
+        if not has_adv_component and max_insul >= 0.72 and (max_hard >= 0.4 or max_mall >= 0.8) and {code_a, code_b} != {"rod_porous", "slab_dense"}:
             lvl = insight_map.get("build_lore", 0) + 1
             insight_map["build_lore"] = lvl
             if lvl < 2:
@@ -1208,7 +1408,7 @@ class CosmosWorld:
             )
 
         # 7. Kaolin Ceramic Storage Granary
-        if max_mall >= 0.88 and (max_bind >= 0.75 or max_flam >= 0.7 or near_hearth):
+        if not has_adv_component and max_mall >= 0.88 and (max_bind >= 0.75 or max_flam >= 0.7 or near_hearth):
             lvl = insight_map.get("vessel_lore", 0) + 1
             insight_map["vessel_lore"] = lvl
             if lvl < 2:
@@ -1275,7 +1475,7 @@ class CosmosWorld:
 
         # 9. Unprompted Symbolic Art / Precious Mineral Working (ONLY if they experiment on rare minerals!)
         max_luster = max(mat_a.luster, mat_b.luster)
-        if max_luster >= 0.80 and (max_bind >= 0.75 or max_hard >= 0.78):
+        if not has_adv_component and max_luster >= 0.80 and (max_bind >= 0.75 or max_hard >= 0.78):
             lvl = insight_map.get("lapidary_lore", 0) + 1
             insight_map["lapidary_lore"] = lvl
             if lvl < 2:
@@ -1354,6 +1554,10 @@ class CosmosWorld:
                     created_day=self.day,
                     durability=420.0,
                     water_crossing=True,
+                    tech_tier=2,
+                    is_vehicle=True,
+                    vehicle_speed=0.34,
+                    vehicle_domain="water",
                     blueprint_3d=bp,
                 )
                 self.structures[st.id] = st
@@ -1376,8 +1580,186 @@ class CosmosWorld:
                     "Mounted carved stone disks onto a wooden axle, inventing the wheeled transport cart!",
                 )
 
-        # 12. Open-Ended Generative Creation Engine (Unbounded Physical Synthesis -> Real 3D Procedural Structure!)
+        # 12A. Subterranean Colony Excavation (Tool + Stone/Clay -> Underground Chamber & Tunnel Network!)
+        if {code_a, code_b} & {"composite_tool", "bronze_tool"} and {code_a, code_b} & {"slab_dense", "clay_gray"}:
+            lvl = insight_map.get("subterranean_lore", 0) + 1
+            insight_map["subterranean_lore"] = lvl
+            if lvl < 2:
+                return (
+                    None,
+                    None,
+                    "partial_insight",
+                    "Chiseled into the dense subsoil; vaulted arches hold underground chambers without collapsing.",
+                )
+            existing_burrow = next(
+                (s for s in self.structures.values() if s.kind == "burrow_network" and math.hypot(s.x - x, s.y - y) < 8.0),
+                None,
+            )
+            if existing_burrow is not None:
+                existing_burrow.chambers += 1
+                existing_burrow.durability = min(900.0, existing_burrow.durability + 150.0)
+                return (
+                    None,
+                    existing_burrow,
+                    "breakthrough",
+                    f"Expanded the subterranean tunnel colony into a {existing_burrow.chambers}-chamber underground network!",
+                )
+            self._struct_seq += 1
+            sx, sy = self.find_nearest_dry_spot(x, y)
+            st = WorldStructure(
+                id=f"S-{self._struct_seq}",
+                kind="burrow_network",
+                sensory_name="excavated subterranean tunnel chamber",
+                x=sx,
+                y=sy,
+                creator_id=actor_id,
+                creator_lineage=actor_lineage,
+                created_day=self.day,
+                durability=650.0,
+                layer="subterranean",
+                tech_tier=2,
+                chambers=2,
+            )
+            self.structures[st.id] = st
+            return (
+                None,
+                st,
+                "breakthrough",
+                "Excavated a subterranean chamber & tunnel network sheltered beneath the earth!",
+            )
+
+        # 12B. High-Temperature Silica Glass, Electromagnetic Coils & Energetic Propellant
+        if near_hearth and {code_a, code_b} == {"shard_translucent", "clay_gray"}:
+            lvl = insight_map.get("glass_lore", 0) + 1
+            insight_map["glass_lore"] = lvl
+            if lvl >= 2:
+                return ("silica_glass", None, "breakthrough", "Fused siliceous stone and clay at high heat into clear silica glass & lenses!")
+        if ({code_a, code_b} & {"copper_ore", "bronze_tool"}) and ({code_a, code_b} & {"magnetite_ore", "compass_stone"}) and insight_map.get("bronze_lore", 0) >= 1:
+            lvl = insight_map.get("electromag_lore", 0) + 1
+            insight_map["electromag_lore"] = lvl
+            if lvl >= 2:
+                return ("copper_coil", None, "breakthrough", "Wound conductive copper around magnetic lodestone, discovering electromagnetic induction!")
+        if near_hearth and "resin_gold" in (code_a, code_b) and ({code_a, code_b} & {"fossil_amber", "nodule_red"}):
+            lvl = insight_map.get("fuel_lore", 0) + 1
+            insight_map["fuel_lore"] = lvl
+            if lvl >= 2:
+                return ("refined_fuel", None, "breakthrough", "Distilled resinous hydrocarbons into a high-energy liquid propellant!")
+
+        # 12C. Multi-Story Architectural Edifice (Stone + Glass/Bronze/Clay at high masonry mastery)
+        if "slab_dense" in (code_a, code_b) and ({code_a, code_b} & {"silica_glass", "bronze_tool"}) and insight_map.get("build_lore", 0) >= 2:
+            self._struct_seq += 1
+            sx, sy = self.find_nearest_dry_spot(x, y)
+            floors = min(6, 2 + insight_map.get("build_lore", 2) // 2)
+            st = WorldStructure(
+                id=f"S-{self._struct_seq}",
+                kind="edifice",
+                sensory_name=f"{floors}-level stone-and-glass edifice",
+                x=sx,
+                y=sy,
+                creator_id=actor_id,
+                creator_lineage=actor_lineage,
+                created_day=self.day,
+                durability=820.0,
+                tech_tier=3,
+                stories=floors,
+            )
+            self.structures[st.id] = st
+            return (None, st, "breakthrough", f"Erected a {floors}-story architectural edifice!")
+
+        # 12D. Long-Range Communication Media (Acoustic Horn/Drum 42m -> Electromagnetic Relay Tower 240m!)
+        if {code_a, code_b} == {"ivory_horn", "fiber_dry"} or ("copper_coil" in (code_a, code_b) and ({code_a, code_b} & {"silica_glass", "compass_stone", "rod_porous"})):
+            is_em = "copper_coil" in (code_a, code_b)
+            self._struct_seq += 1
+            sx, sy = self.find_nearest_dry_spot(x, y)
+            st = WorldStructure(
+                id=f"S-{self._struct_seq}",
+                kind="comm_relay",
+                sensory_name="tall humming signal spire" if is_em else "hollow resonant signal drum-horn",
+                x=sx,
+                y=sy,
+                creator_id=actor_id,
+                creator_lineage=actor_lineage,
+                created_day=self.day,
+                durability=700.0,
+                tech_tier=4 if is_em else 2,
+                signal_range=240.0 if is_em else 42.0,
+            )
+            self.structures[st.id] = st
+            return (
+                None,
+                st,
+                "breakthrough",
+                "Constructed an electromagnetic wireless communication spire!" if is_em else "Built a long-range acoustic resonance drum-horn!",
+            )
+
+        # 12E. Autonomous Land Vehicles, Aerial Craft & Planetary Orbital Satellites!
+        if "wheeled_cart" in (code_a, code_b) and ({code_a, code_b} & {"bronze_tool", "refined_fuel"}):
+            self._struct_seq += 1
+            sx, sy = self.find_nearest_dry_spot(x, y)
+            st = WorldStructure(
+                id=f"S-{self._struct_seq}",
+                kind="land_vehicle",
+                sensory_name="self-propelled wheeled chassis",
+                x=sx,
+                y=sy,
+                creator_id=actor_id,
+                creator_lineage=actor_lineage,
+                created_day=self.day,
+                durability=680.0,
+                tech_tier=4,
+                is_vehicle=True,
+                vehicle_speed=0.55,
+                vehicle_domain="land",
+            )
+            self.structures[st.id] = st
+            return (None, st, "breakthrough", "Engineered a mobile land vehicle capable of rapid continental travel!")
+
+        if {code_a, code_b} == {"warm_cloak", "refined_fuel"}:
+            self._struct_seq += 1
+            sx, sy = self.find_nearest_dry_spot(x, y)
+            st = WorldStructure(
+                id=f"S-{self._struct_seq}",
+                kind="air_craft",
+                sensory_name="buoyant thermal sky-vessel",
+                x=sx,
+                y=sy,
+                creator_id=actor_id,
+                creator_lineage=actor_lineage,
+                created_day=self.day,
+                durability=640.0,
+                layer="aerial",
+                tech_tier=4,
+                is_vehicle=True,
+                vehicle_speed=0.72,
+                vehicle_domain="air",
+            )
+            self.structures[st.id] = st
+            return (None, st, "breakthrough", "Launched a buoyant aerial vessel capable of flying across oceans and mountains!")
+
         total_mastery = sum(insight_map.values())
+        if {code_a, code_b} == {"copper_coil", "refined_fuel"} and total_mastery >= 8:
+            self._struct_seq += 1
+            st = WorldStructure(
+                id=f"S-{self._struct_seq}",
+                kind="orbital_satellite",
+                sensory_name="high-altitude orbiting star-beacon",
+                x=0.0,
+                y=46.0,
+                creator_id=actor_id,
+                creator_lineage=actor_lineage,
+                created_day=self.day,
+                durability=9999.0,
+                layer="orbital",
+                tech_tier=5,
+                is_vehicle=True,
+                vehicle_speed=0.95,
+                vehicle_domain="orbit",
+                signal_range=500.0,
+            )
+            self.structures[st.id] = st
+            return (None, st, "breakthrough", "SPACEFLIGHT ACHIEVED! Launched an autonomous orbital satellite around the planet!")
+
+        # 13. Open-Ended Generative Creation Engine (Unbounded Physical Synthesis -> Real 3D Procedural Structure!)
         if total_mastery >= 4 and (mat_a.hardness + mat_b.hardness + mat_a.malleability + mat_b.bindability) >= 1.1:
             pair_key = f"open_{min(code_a, code_b)}_{max(code_a, code_b)}"
             lvl = insight_map.get(pair_key, 0) + 1
@@ -1399,6 +1781,8 @@ class CosmosWorld:
             ]
             if max(mat_a.luster, mat_b.luster, mat_a.metallic, mat_b.metallic) >= 0.8:
                 bp.append({"shape": "torus", "sx": 0.34, "sy": 0.06, "sz": 0.34, "px": 0, "py": round(0.28 + tall, 2), "pz": 0, "color": "#fde047"})
+            dyn_sig = 85.0 if (mat_a.magnetic + mat_b.magnetic) >= 0.9 and (mat_a.metallic + mat_b.metallic) >= 0.9 else 0.0
+            dyn_veh = (mat_a.flammability + mat_b.flammability) >= 1.5 and (mat_a.hardness + mat_b.hardness) >= 0.8
             st = WorldStructure(
                 id=f"S-{self._struct_seq}",
                 kind="open_creation",
@@ -1408,7 +1792,12 @@ class CosmosWorld:
                 creator_id=actor_id,
                 creator_lineage=actor_lineage,
                 created_day=self.day,
-                durability=450.0,
+                durability=550.0,
+                tech_tier=min(5, 2 + total_mastery // 5),
+                is_vehicle=dyn_veh,
+                vehicle_speed=0.42 if dyn_veh else 0.0,
+                signal_range=dyn_sig,
+                stories=max(1, int(round(tall))),
                 blueprint_3d=bp,
             )
             self.structures[st.id] = st
