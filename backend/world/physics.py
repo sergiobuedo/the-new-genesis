@@ -21,36 +21,55 @@ KM2_PER_SECTOR = 25.0  # Each 16x16 local biome sector represents a 5km x 5km ec
 
 
 ENCLAVE_HOMELANDS: Dict[str, Tuple[float, float]] = {
-    "Sylphid": (-38.0, -34.0),   # NW Temperate Emerald River Archipelago
-    "Lithokin": (42.0, -34.0),   # NE Boreal Volcanic & Mineral Highlands
-    "Vespera": (4.0, 38.0),      # South Equatorial Monsoon Savanna & Oasis
+    "Sylphid": (-135.0, -115.0),  # NW Temperate Emerald River Continent
+    "Lithokin": (145.0, -115.0),  # NE Boreal Volcanic Cordillera
+    "Vespera": (12.0, 145.0),     # South Equatorial Monsoon Savanna Continent
 }
+
+MOUNTAIN_PEAKS: Tuple[Tuple[float, float, float, float], ...] = (
+    # (mx, my, height, sigma_radius) — Real 3D Mountain Massifs across all Continents!
+    (-112.0, -96.0, 10.8, 16.0),
+    (-158.0, -134.0, 11.6, 18.0),
+    (122.0, -98.0, 12.8, 19.0),
+    (168.0, -132.0, 13.4, 20.0),
+    (-14.0, 126.0, 10.2, 16.0),
+    (36.0, 162.0, 11.4, 18.0),
+    (-22.0, -14.0, 11.2, 17.0),
+    (28.0, 18.0, 10.6, 16.0),
+)
 
 
 def terrain_height(x: float, y: float, seed: int = 4201) -> float:
-    """Continuous multi-continent 3D elevation shared 1:1 with Three.js."""
+    """Continuous planetary multi-continent 3D elevation with real Mountain Massifs (1:1 with Three.js)."""
     s = (seed % 997) * 0.013
-    river_center = math.sin(y * 0.075 + s) * 9.5 - 6.0
+    river_center = math.sin(y * 0.026 + s) * 28.0 - 14.0
     dist_river = abs(x - river_center)
-    river_carve = -1.35 * math.exp(-(dist_river * dist_river) / 12.0)
-    sea_strait = -1.25 * math.exp(-((y - math.sin(x * 0.06) * 8.0 + 10.0) ** 2) / 14.0)
+    river_carve = -1.55 * math.exp(-(dist_river * dist_river) / 38.0)
+    sea_strait = -1.45 * math.exp(-((y - math.sin(x * 0.022) * 24.0 + 28.0) ** 2) / 52.0)
 
-    continents = math.sin(x * 0.038 + s) * math.cos(y * 0.038 - s) * 1.15
+    continents = math.sin(x * 0.013 + s) * math.cos(y * 0.013 - s) * 1.45
     hills = (
-        math.sin(x * 0.085 + s) * math.cos(y * 0.085 - s) * 0.85
-        + math.sin((x * 0.16 - y * 0.13) + s * 2.0) * 0.36
+        math.sin(x * 0.036 + s) * math.cos(y * 0.036 - s) * 0.92
+        + math.sin((x * 0.075 - y * 0.065) + s * 2.0) * 0.38
     )
-    ridge_belt = max(0.0, math.sin(x * 0.055 - y * 0.045 + 0.8) - 0.52) * 3.1
-    return round(0.55 + continents + hills + ridge_belt + river_carve + sea_strait * 0.55, 3)
+    ridge_belt = max(0.0, math.sin(x * 0.024 - y * 0.021 + 0.8) - 0.56) * 4.8
+
+    mtn_boost = 0.0
+    for mx, my, mh, mr in MOUNTAIN_PEAKS:
+        d2 = (x - mx) ** 2 + (y - my) ** 2
+        if d2 < (mr * 2.6) ** 2:
+            mtn_boost += mh * math.exp(-d2 / (mr * mr))
+
+    return round(0.62 + continents + hills + ridge_belt + mtn_boost + river_carve + sea_strait * 0.65, 3)
 
 
 def classify_climate_zone(x: float, y: float) -> str:
-    """Real Earth-like latitudinal & regional climate bands across the round Super-Earth."""
-    if y < -20.0 and x >= 8.0:
+    """Real Earth-like latitudinal & regional climate bands across the Super-Earth."""
+    if y < -55.0 and x >= 20.0:
         return "boreal_highland"
-    if y < -18.0 and x < 8.0:
+    if y < -50.0 and x < 20.0:
         return "temperate_archipelago"
-    if y > 22.0:
+    if y > 60.0:
         return "equatorial_savanna"
     return "mediterranean_crossroads"
 
@@ -59,12 +78,12 @@ def classify_biome(x: float, y: float, seed: int = 4201) -> str:
     h = terrain_height(x, y, seed)
     if h < -0.05:
         return "water"
-    if h < 0.22:
+    if h < 0.24:
         return "riverbank"
-    if h > 1.80:
+    if h > 2.20:
         return "ridge"
     s = (seed % 997) * 0.013
-    moisture = math.sin(x * 0.09 - s) + math.cos(y * 0.10 + s)
+    moisture = math.sin(x * 0.04 - s) + math.cos(y * 0.045 + s)
     zone = classify_climate_zone(x, y)
     if zone == "boreal_highland" and moisture < 0.15:
         return "tundra"
@@ -574,34 +593,28 @@ class CosmosWorld:
         self.solar_anomaly_c: float = 0.0
 
         # Generate the Central Crossroads + all 3 distant Continental Homelands!
-        seed_centers = [(0, 0), (-3, -2), (3, -2), (0, 2)]
+        seed_centers = [(0, 0), (-8, -7), (9, -7), (1, 9)]
         for bx, by in seed_centers:
             for dy in (-1, 0, 1):
                 for dx in (-1, 0, 1):
                     if (bx + dx, by + dy) not in self.chunks:
                         self._generate_chunk(bx + dx, by + dy)
 
-        # Guarantee volcanic geothermal vents in the NE Boreal Lithokin Highlands
-        for off_x, off_y in ((-3.0, 2.0), (4.0, -2.5)):
-            vx, vy = self.find_nearest_dry_spot(42.0 + off_x, -34.0 + off_y)
+        # Guarantee volcanic geothermal vents in the NE Boreal Lithokin Cordillera
+        for off_x, off_y in ((-5.0, 4.0), (6.0, -4.5)):
+            vx, vy = self.find_nearest_dry_spot(145.0 + off_x, -115.0 + off_y)
             self.thermal_vents.append((vx, vy))
 
-        # Seed natural Karst & Basalt Caves across rocky slopes of all 3 Continents + Crossroads!
-        cave_anchors = [
-            (-32.0, -28.0), (-44.0, -39.0),  # NW Archipelago Caves
-            (36.0, -30.0), (47.0, -38.0),    # NE Boreal Caves
-            (-2.0, 34.0), (11.0, 42.0),      # South Savanna Caves
-            (-8.0, -4.0), (14.0, 8.0),       # Central Crossroads Caves
-        ]
-        for idx, (ax, ay) in enumerate(cave_anchors, start=1):
-            cx, cy = self.find_nearest_dry_spot(ax, ay)
+        # Seed 8 Natural Mountain Caverns directly into the lower rocky flanks of MOUNTAIN_PEAKS!
+        for idx, (mx, my, _mh, mr) in enumerate(MOUNTAIN_PEAKS, start=1):
+            cx, cy = self.find_nearest_dry_spot(mx, my + mr * 0.62)
             cid = f"CAVE-{idx}"
             self.caves[cid] = CaveSite(
                 id=cid,
                 x=cx,
                 y=cy,
                 climate_zone=classify_climate_zone(cx, cy),
-                depth_m=round(22.0 + (idx % 4) * 14.0, 1),
+                depth_m=round(34.0 + (idx % 4) * 16.0, 1),
             )
             gx, gy = int(round(cx)), int(round(cy))
             self._add_resource_at(gx, gy, "slab_dense")
@@ -840,25 +853,25 @@ class CosmosWorld:
     def _spawn_initial_fauna(self) -> None:
         """Populates all 24 wild animal species in their authentic terrestrial/aquatic/avian biomes!"""
         regional_guilds = [
-            # NW Temperate Emerald River Basin (Sylphid region)
-            ((-38.0, -34.0), ["lumigrazer", "lumigrazer", "rootboar", "burrowhare", "damweaver", "damweaver", "packhound", "packhound", "silverfin_shoal", "silverfin_shoal", "pearlclam", "reedwing", "pollenwing", "pollenwing", "shadowstalker"]),
-            # NE Boreal Volcanic Highlands (Lithokin region)
-            ((42.0, -34.0), ["titanotusk", "thunderhorn", "craghorn", "craghorn", "craghorn", "frostmaw", "frostmaw", "packhound", "packhound", "burrowhare", "silverfin_shoal", "skyglider", "skyglider", "pollenwing"]),
-            # South Equatorial Monsoon Savanna & Coast (Vespera region)
-            ((4.0, 38.0), ["titanotusk", "thunderhorn", "windstrider", "windstrider", "canopykin", "canopykin", "sunmane", "sunmane", "mirejaw", "mirejaw", "venomcoil", "venomcoil", "stingshell", "tidecrawler", "tidecrawler", "pearlclam", "pollenwing", "pollenwing"]),
+            # NW Temperate Emerald River Basin (Sylphid Continent)
+            ((-135.0, -115.0), ["lumigrazer", "lumigrazer", "rootboar", "burrowhare", "damweaver", "damweaver", "packhound", "packhound", "silverfin_shoal", "silverfin_shoal", "pearlclam", "reedwing", "pollenwing", "pollenwing", "shadowstalker"]),
+            # NE Boreal Volcanic Cordillera (Lithokin Continent)
+            ((145.0, -115.0), ["titanotusk", "thunderhorn", "craghorn", "craghorn", "craghorn", "frostmaw", "frostmaw", "packhound", "packhound", "burrowhare", "silverfin_shoal", "skyglider", "skyglider", "pollenwing"]),
+            # South Equatorial Monsoon Savanna & Coast (Vespera Continent)
+            ((12.0, 145.0), ["titanotusk", "thunderhorn", "windstrider", "windstrider", "canopykin", "canopykin", "sunmane", "sunmane", "mirejaw", "mirejaw", "venomcoil", "venomcoil", "stingshell", "tidecrawler", "tidecrawler", "pearlclam", "pollenwing", "pollenwing"]),
             # Central Mediterranean Crossroads & Deep Sea
-            ((4.0, 4.0), ["titanotusk", "thunderhorn", "lumigrazer", "lumigrazer", "windstrider", "rootboar", "burrowhare", "canopykin", "damweaver", "sunmane", "frostmaw", "shadowstalker", "shadowstalker", "mirejaw", "venomcoil", "stingshell", "stingshell", "silverfin_shoal", "silverfin_shoal", "abyssalfin", "abyssalfin", "abyssalfin", "leviathansong", "leviathansong", "leviathansong", "tidecrawler", "pearlclam", "skyglider", "reedwing", "reedwing", "pollenwing"]),
+            ((0.0, 0.0), ["titanotusk", "thunderhorn", "lumigrazer", "lumigrazer", "windstrider", "rootboar", "burrowhare", "canopykin", "damweaver", "sunmane", "frostmaw", "shadowstalker", "shadowstalker", "mirejaw", "venomcoil", "stingshell", "stingshell", "silverfin_shoal", "silverfin_shoal", "abyssalfin", "abyssalfin", "abyssalfin", "leviathansong", "leviathansong", "leviathansong", "tidecrawler", "pearlclam", "skyglider", "reedwing", "reedwing", "pollenwing"]),
         ]
         for (cx, cy), sp_list in regional_guilds:
             for sp in sp_list:
                 self._animal_seq += 1
                 dom = FAUNA_CATALOG[sp]["domain"]
                 if dom == "water":
-                    ax, ay = self.find_nearest_water_spot(cx + self.rng.uniform(-16.0, 16.0), cy + self.rng.uniform(-16.0, 16.0))
+                    ax, ay = self.find_nearest_water_spot(cx + self.rng.uniform(-32.0, 32.0), cy + self.rng.uniform(-32.0, 32.0))
                 elif dom == "air":
-                    ax, ay = round(cx + self.rng.uniform(-18.0, 18.0), 2), round(cy + self.rng.uniform(-18.0, 18.0), 2)
+                    ax, ay = round(cx + self.rng.uniform(-38.0, 38.0), 2), round(cy + self.rng.uniform(-38.0, 38.0), 2)
                 else:
-                    ax, ay = self.find_nearest_dry_spot(cx + self.rng.uniform(-16.0, 16.0), cy + self.rng.uniform(-16.0, 16.0))
+                    ax, ay = self.find_nearest_dry_spot(cx + self.rng.uniform(-30.0, 30.0), cy + self.rng.uniform(-30.0, 30.0))
                 self.animals[f"W-{self._animal_seq:03d}"] = WildAnimal(
                     id=f"W-{self._animal_seq:03d}", species=sp, x=ax, y=ay, health=FAUNA_CATALOG[sp]["hp"]
                 )
@@ -1014,7 +1027,7 @@ class CosmosWorld:
                 if biome == "riverbank" and abs(self.tidal_offset) > 0.11 and self.rng.random() < 0.22:
                     self._add_resource_at(tx, ty, "nacre_shell")
 
-        # Subterranean Cave Mineral & Root Seepage
+        # Subterranean Cave Mineral & Root Seepage + Rare Natural Storm Lightning Embers!
         if self.tick_count % 90 == 0:
             for cv in self.caves.values():
                 if self.rng.random() < 0.35:
@@ -1022,6 +1035,23 @@ class CosmosWorld:
                     gy = int(round(cv.y + self.rng.uniform(-1.5, 1.5)))
                     ore = self.rng.choice(("orb_root", "slab_dense", "nodule_red", "copper_ore", "tin_ore", "magnetite_ore"))
                     self._add_resource_at(gx, gy, ore)
+            if self.weather == "storm" and len(self.structures) < 28 and self.chunks and self.rng.random() < 0.04:
+                cx, cy = self.rng.choice(list(self.chunks.keys()))
+                lx, ly = self.find_nearest_dry_spot(cx * CHUNK_SIZE + 8.0, cy * CHUNK_SIZE + 8.0)
+                self._struct_seq += 1
+                ember = WorldStructure(
+                    id=f"S-{self._struct_seq}",
+                    kind="hearth",
+                    sensory_name="smoldering lightning-struck brush",
+                    x=lx,
+                    y=ly,
+                    creator_id="NATURAL_LIGHTNING",
+                    creator_lineage="Nature",
+                    created_day=self.day,
+                    durability=32.0,
+                    fuel=38.0,
+                )
+                self.structures[ember.id] = ember
 
         # TRUE LOTKA-VOLTERRA TROPHIC WEB + DARWINIAN ALLOPATRIC SPECIATION!
         if self.tick_count % 220 == 0:
@@ -1145,9 +1175,9 @@ class CosmosWorld:
                     self._add_resource_at(gx, gy, "orb_sweet")
 
             if animal.target_xy is None or math.hypot(animal.target_xy[0] - animal.x, animal.target_xy[1] - animal.y) < 1.2:
-                span = 9.0 if dom in ("air", "land") else 5.5
-                nx = max(-55.0, min(70.0, animal.x + self.rng.uniform(-span, span)))
-                ny = max(-55.0, min(70.0, animal.y + self.rng.uniform(-span, span)))
+                span = 14.0 if dom in ("air", "land") else 7.5
+                nx = max(-245.0, min(245.0, animal.x + self.rng.uniform(-span, span)))
+                ny = max(-245.0, min(245.0, animal.y + self.rng.uniform(-span, span)))
                 if dom == "water" and self.elevation_at(nx, ny) < -0.05:
                     animal.target_xy = (nx, ny)
                 elif dom == "air":
@@ -1190,13 +1220,13 @@ class CosmosWorld:
             if st.is_vehicle and st.vehicle_speed > 0.0:
                 if st.vehicle_domain == "orbit":
                     ang = (self.tick_count * 0.035 + int(st.id.split("-")[1]) * 1.7) % (2.0 * math.pi)
-                    st.x = round(math.cos(ang) * 46.0, 2)
-                    st.y = round(math.sin(ang) * 46.0, 2)
+                    st.x = round(math.cos(ang) * 155.0, 2)
+                    st.y = round(math.sin(ang) * 155.0, 2)
                 else:
                     if st.vehicle_target is None or math.hypot(st.vehicle_target[0] - st.x, st.vehicle_target[1] - st.y) < 1.5:
-                        span = 18.0 if st.vehicle_domain == "air" else 11.0
-                        tx = max(-62.0, min(66.0, st.x + self.rng.uniform(-span, span)))
-                        ty = max(-62.0, min(66.0, st.y + self.rng.uniform(-span, span)))
+                        span = 26.0 if st.vehicle_domain == "air" else 16.0
+                        tx = max(-245.0, min(245.0, st.x + self.rng.uniform(-span, span)))
+                        ty = max(-245.0, min(245.0, st.y + self.rng.uniform(-span, span)))
                         if st.vehicle_domain == "water" and self.elevation_at(tx, ty) < -0.04:
                             st.vehicle_target = (tx, ty)
                         elif st.vehicle_domain == "air":

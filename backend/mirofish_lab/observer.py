@@ -22,10 +22,12 @@ from backend.world.physics import (
     BLIND_MATERIALS,
     ENCLAVE_HOMELANDS,
     FAUNA_CATALOG,
+    MOUNTAIN_PEAKS,
     CosmosWorld,
     MortalRemains,
     TICKS_PER_DAY,
     WorldStructure,
+    classify_climate_zone,
 )
 
 
@@ -302,7 +304,7 @@ class PopulationSimulation:
                     agent.last_cortex_tick = self.world.tick_count
                     cortex_requests.append((agent, prompt))
 
-        if self.world.tick_count % 36 == 0 and len(self.living_agents) < 88:
+        if self.world.tick_count % 36 == 0 and len(self.living_agents) < 104:
             self._check_species_reproduction()
 
         # Distant Continental Refugia: if an entire continent's native lineage vanished, isolated far-continent survivors can re-emerge after long eras
@@ -397,6 +399,16 @@ class PopulationSimulation:
 
         burn = 0.024 if agent.is_sleeping else 0.055
         agent.energy = max(0.0, agent.energy - burn)
+        # Freshwater Hydrology & Thirst Homeostasis
+        thirst_burn = 0.088 if self.world.weather == "drought" else (0.018 if agent.is_sleeping else 0.044)
+        agent.hydration = max(0.0, agent.hydration - thirst_burn)
+        if self.world.weather in ("rain", "storm"):
+            agent.hydration = min(100.0, agent.hydration + 0.42)
+        elif self.world.elevation_at(agent.x, agent.y) < 0.28 or any(
+            math.hypot(agent.x - cv.x, agent.y - cv.y) <= 4.5 for cv in self.world.caves.values()
+        ):
+            agent.hydration = min(100.0, agent.hydration + 1.8)
+
         if effective_temp < 8.0:
             agent.warmth = max(0.0, agent.warmth - (8.0 - effective_temp) * 0.022)
         else:
@@ -405,7 +417,7 @@ class PopulationSimulation:
         if agent.is_sleeping:
             agent.rest = min(100.0, agent.rest + 0.68)
             agent.action_label = "Sleeping deeply to restore strength"
-            if agent.rest >= 92.0 or agent.energy < 20.0 or agent.warmth < 24.0:
+            if agent.rest >= 92.0 or agent.energy < 20.0 or agent.hydration < 22.0 or agent.warmth < 24.0:
                 agent.is_sleeping = False
         else:
             agent.rest = max(0.0, agent.rest - 0.058)
@@ -423,14 +435,14 @@ class PopulationSimulation:
             stress_delta -= 0.06  # Calm silver full-moon illumination reduces nocturnal dread
         if local_crowd >= 6:
             stress_delta += (local_crowd - 5) * 0.18
-        if agent.energy < 35.0 or agent.warmth < 40.0:
+        if agent.energy < 35.0 or agent.hydration < 30.0 or agent.warmth < 40.0:
             stress_delta += 0.20
         agent.stress = round(min(100.0, max(2.0, agent.stress + stress_delta)), 1)
 
         max_lifespan = 95.0 + agent.genome.vitality * 55.0
-        if agent.energy <= 1.0 or agent.warmth <= 1.0:
+        if agent.energy <= 1.0 or agent.hydration <= 1.0 or agent.warmth <= 1.0:
             agent.integrity -= 0.50
-        elif agent.energy > 55.0 and agent.warmth > 50.0:
+        elif agent.energy > 55.0 and agent.hydration > 45.0 and agent.warmth > 50.0:
             agent.integrity = min(100.0, agent.integrity + 0.12)
 
         if (self.world.day - agent.born_day) > max_lifespan:
@@ -540,12 +552,16 @@ class PopulationSimulation:
                 if mat.toxicity > 0:
                     agent.integrity = max(0.0, agent.integrity - mat.toxicity)
                     agent.insight_map["avoid_toxic"] = 1
+                    for wit in nearby_others:
+                        wit.insight_map["avoid_toxic"] = 1  # Observational social learning!
                     agent.mood = "tense"
                     agent.action_label = "Sickened by toxic Shadowberry (learned to avoid!)"
                     agent.add_memory(f"Sickened by {mat.sensory_name}—never eat again!", self.world.day)
                     if agent.integrity <= 0:
                         agent.cause_of_death = "toxic plant poisoning"
                 else:
+                    if code == "orb_sweet":
+                        agent.hydration = min(100.0, agent.hydration + 22.0)
                     # Wrangham Cooking Hypothesis: eating near an active Hearth roasts food (+45% caloric bioavailability!)
                     near_fire = self.enable_culture and any(
                         st.kind == "hearth" and st.fuel > 0 and math.hypot(st.x - agent.x, st.y - agent.y) <= 4.5
@@ -573,6 +589,30 @@ class PopulationSimulation:
                         agent.action_label = "Feeding from communal nest store"
                         agent.pause_ticks = 4
                         return
+
+        # 1C. Seek fresh river, shoreline, or cave-spring water when thirsty!
+        if agent.hydration < 36.0:
+            wx, wy = self.world.find_nearest_water_spot(agent.x, agent.y)
+            sx, sy = self.world.find_nearest_dry_spot(wx, wy)
+            agent.action_label = "Walking to river/spring to drink fresh water"
+            self._move_smooth(agent, sx, sy, nearby_others, speed=0.26 * spd_mul)
+            return
+
+        # 1D. Cooperative Parental Provisioning (Hrdy Hypothesis: empathetic kin feed hungry Newborns/Juveniles!)
+        if self.enable_culture and agent.energy > 64.0 and agent.genome.empathy > 0.48:
+            hungry_young = next(
+                (o for o in nearby_others if o.age_days < 11.0 and o.energy < 55.0 and agent.trust_bonds.get(o.id, 0.0) >= 0.65),
+                None,
+            )
+            edible_for_child = next((i for i, c in enumerate(agent.inventory) if BLIND_MATERIALS[c].nutrition > 15 and BLIND_MATERIALS[c].toxicity == 0), None)
+            if hungry_young is not None and edible_for_child is not None:
+                gift = agent.inventory.pop(edible_for_child)
+                hungry_young.energy = min(100.0, hungry_young.energy + BLIND_MATERIALS[gift].nutrition)
+                self.sharing_count += 1
+                self.gifts_today += 1
+                agent.action_label = f"Feeding young {hungry_young.id}"
+                agent.pause_ticks = 3
+                return
 
         # 2. Seek warmth or cave/subterranean shelter when freezing or caught in a storm/blizzard!
         if agent.warmth < 50.0 or (self.world.weather in ("storm", "snow") and agent.stress > 45.0 and not self.world.is_sheltered_at(agent.x, agent.y)):
@@ -1230,16 +1270,16 @@ class PopulationSimulation:
             # Gentle continental drift toward unexplored horizons when migrating, or stay near clan mates otherwise
             drift_x, drift_y = 0.0, 0.0
             if is_migrating:
-                drift_x = (4.0 - agent.x) * 0.12  # Gradual continental convergence toward crossroads!
-                drift_y = (4.0 - agent.y) * 0.12
+                drift_x = (0.0 - agent.x) * 0.035  # Very gradual multi-generational horizon trek across vast continents!
+                drift_y = (0.0 - agent.y) * 0.035
             elif nearby_others:
                 mx = sum(o.x for o in nearby_others) / len(nearby_others)
                 my = sum(o.y for o in nearby_others) / len(nearby_others)
                 drift_x = (mx - agent.x) * 0.15
                 drift_y = (my - agent.y) * 0.15
             tx, ty = self.world.find_nearest_dry_spot(
-                max(-68.0, min(68.0, agent.x + drift_x + self.world.rng.uniform(-span, span))),
-                max(-68.0, min(68.0, agent.y + drift_y + self.world.rng.uniform(-span, span))),
+                max(-245.0, min(245.0, agent.x + drift_x + self.world.rng.uniform(-span, span))),
+                max(-245.0, min(245.0, agent.y + drift_y + self.world.rng.uniform(-span, span))),
             )
             agent.target_xy = (tx, ty)
             agent.pause_ticks = 3
@@ -1307,9 +1347,10 @@ class PopulationSimulation:
         agent.target_xy = None
 
     def _check_species_reproduction(self) -> None:
+        living_all = self.living_agents
         eligible = [
             a
-            for a in self.living_agents
+            for a in living_all
             if a.energy > 68.0
             and a.warmth > 58.0
             and a.stress < 72.0
@@ -1318,6 +1359,10 @@ class PopulationSimulation:
         used = set()
         for a in eligible:
             if a.id in used:
+                continue
+            # Local Continental Carrying Capacity (55m basin max 34 beings) — booming Continent A never blocks distant Continent B/C!
+            local_basin_pop = sum(1 for o in living_all if math.hypot(o.x - a.x, o.y - a.y) < 55.0)
+            if local_basin_pop >= 34:
                 continue
             for b in eligible:
                 if b.id == a.id or b.id in used:
@@ -1499,14 +1544,20 @@ class MiroFishObservatory:
                 if ad.get("held_item") and ad["held_item"] in BLIND_MATERIALS and ad["held_item"] not in inv:
                     inv.append(ad["held_item"])
 
+                raw_x, raw_y = float(ad["x"]), float(ad["y"])
+                if not w.get("scale_v10") and abs(raw_x) < 75.0 and abs(raw_y) < 75.0:
+                    raw_x, raw_y = self.live.world.find_nearest_dry_spot(raw_x * 3.15, raw_y * 3.15)
+                self.live.world.ensure_frontier_around(raw_x, raw_y)
+
                 ag = KobAgent(
                     id=aid,
                     generation=gen_num,
                     born_day=born_d,
-                    x=float(ad["x"]),
-                    y=float(ad["y"]),
+                    x=raw_x,
+                    y=raw_y,
                     genome=genome,
                     energy=float(ad.get("energy", 80.0)),
+                    hydration=float(ad.get("hydration", 85.0)),
                     warmth=float(ad.get("warmth", 85.0)),
                     rest=float(ad.get("rest", 80.0)),
                     integrity=float(ad.get("integrity", 100.0)),
@@ -1579,6 +1630,12 @@ class MiroFishObservatory:
                 skind = sd.get("kind", "shelter")
                 sx = float(sd.get("x", 0.0))
                 sy = float(sd.get("y", 0.0))
+                if not w.get("scale_v10") and abs(sx) < 75.0 and abs(sy) < 75.0:
+                    sx, sy = (
+                        self.live.world.find_nearest_water_spot(sx * 3.15, sy * 3.15)
+                        if skind == "watercraft"
+                        else self.live.world.find_nearest_dry_spot(sx * 3.15, sy * 3.15)
+                    )
                 min_gap = 10.5 if skind == "crop_plot" else 3.8
                 if any(
                     math.hypot(ex.x - sx, ex.y - sy) < (min_gap if (skind == "crop_plot" and ex.kind == "crop_plot") else 3.2)
@@ -1750,6 +1807,94 @@ class MiroFishObservatory:
             return ("Sedentary Proto-Civilization", "Proto-Civilización Sedentaria")
         return ("Primitive Foraging Bands", "Bandas Recolectoras Primitivas")
 
+    def build_daily_briefing(self, m: Dict[str, Any]) -> Dict[str, Any]:
+        """Builds a comprehensive, zero-jargon Daily Report broken down by Continent/Zone, Race & Astrophysics."""
+        day = m["day"]
+        year = m["year"]
+        w = self.live.world
+        living = self.live.living_agents
+
+        zone_meta = {
+            "temperate_archipelago": ("NW Emerald River Continent", "Continente Noroeste (Ríos y Bosques Templados)"),
+            "boreal_highland": ("NE Boreal Volcanic Cordillera", "Cordillera Volcánica Boreal Noreste (Montañas y Frío)"),
+            "equatorial_savanna": ("South Equatorial Monsoon Savanna", "Sabana Monzónica Ecuatorial Sur"),
+            "mediterranean_crossroads": ("Central Continental Crossroads", "Encrucijada Continental Central"),
+        }
+        zones_report = []
+        for z_key, (z_en, z_es) in zone_meta.items():
+            z_agents = [a for a in living if classify_climate_zone(a.x, a.y) == z_key]
+            z_structs = [s for s in w.structures.values() if classify_climate_zone(s.x, s.y) == z_key]
+            z_lins = Counter(a.lineage for a in z_agents)
+            lin_str = ", ".join(f"{k}: {v}" for k, v in z_lins.items()) or "Uninhabited / Sin habitantes"
+            st_counts = Counter(s.kind for s in z_structs)
+            st_str = ", ".join(f"{v} {k}" for k, v in st_counts.items()) or "Wilderness / Naturaleza virgen"
+            in_caves = sum(
+                1 for a in z_agents if any(math.hypot(a.x - cv.x, a.y - cv.y) <= 5.5 for cv in w.caves.values())
+            )
+            zones_report.append(
+                {
+                    "zone": z_key,
+                    "title_en": z_en,
+                    "title_es": z_es,
+                    "pop": len(z_agents),
+                    "lineages": lin_str,
+                    "structures": st_str,
+                    "in_caves": in_caves,
+                }
+            )
+
+        sp_counts = m["species_counts"]
+        all_races = list(dict.fromkeys(["Sylphid", "Lithokin", "Vespera"] + list(sp_counts.keys())))
+        races_report = []
+        for r_name in all_races:
+            cnt = sp_counts.get(r_name, 0)
+            r_members = [a for a in living if a.lineage == r_name]
+            avg_e = round(sum(a.energy for a in r_members) / max(1, len(r_members)), 1) if r_members else 0.0
+            is_hybrid = "-" in r_name
+            if cnt == 0:
+                st_en, st_es = "Extinct (Natural Selection)", "Extinguida por selección natural"
+            elif cnt <= 4:
+                st_en, st_es = "Critical Bottleneck (Endangered!)", "Cuello de botella crítico (¡En peligro!)"
+            elif cnt <= 12:
+                st_en, st_es = "Stable Small Clan", "Clan pequeño estable"
+            else:
+                st_en, st_es = "Thriving & Expanding", "En plena expansión demográfica"
+            races_report.append(
+                {
+                    "lineage": r_name,
+                    "is_hybrid": is_hybrid,
+                    "count": cnt,
+                    "avg_energy": avg_e,
+                    "status_en": st_en,
+                    "status_es": st_es,
+                }
+            )
+
+        todays_events = [ev["summary"] for ev in self.live.timeline if ev["day"] == day][-10:]
+        if not todays_events:
+            todays_events = [ev["summary"] for ev in self.live.timeline[-8:]]
+
+        return {
+            "day": day,
+            "year": year,
+            "season": m["season"],
+            "temp_c": m["ambient_temp_c"],
+            "weather": w.weather,
+            "solar_au": w.solar_distance_au,
+            "lunar_name": w.lunar_phase_name,
+            "archetype_en": m["archetype_en"],
+            "archetype_es": m["archetype_es"],
+            "live_pop": m["live_population"],
+            "null_pop": m["control_population"],
+            "births_today": self.live.births_today,
+            "deaths_today": self.live.deaths_today,
+            "gifts_today": self.live.gifts_today,
+            "clashes_today": self.live.clashes_today,
+            "zones": zones_report,
+            "races": races_report,
+            "events": list(reversed(todays_events)),
+        }
+
     def _build_bilingual_daily_summary(self, m: Dict[str, Any]) -> Dict[str, Any]:
         day = m["day"]
         year = m["year"]
@@ -1792,6 +1937,7 @@ class MiroFishObservatory:
             "live_pop": m["live_population"],
             "null_pop": m["control_population"],
             "milestones": new_milestones,
+            "briefing": self.build_daily_briefing(m),
         }
 
     def compute_scientific_metrics(self) -> Dict[str, Any]:
@@ -2164,6 +2310,7 @@ class MiroFishObservatory:
         return {
             "world": {
                 "seed": self.live.world.seed,
+                "scale_v10": True,
                 "tick": self.live.world.tick_count,
                 "day": self.live.world.day,
                 "year": self.live.world.year,
@@ -2193,6 +2340,7 @@ class MiroFishObservatory:
                     "y": a.y,
                     "heading": round(a.heading, 3),
                     "energy": round(a.energy, 1),
+                    "hydration": round(a.hydration, 1),
                     "warmth": round(a.warmth, 1),
                     "rest": round(a.rest, 1),
                     "integrity": round(a.integrity, 1),
@@ -2279,6 +2427,7 @@ class MiroFishObservatory:
                 if items
             ],
             "metrics": metrics,
+            "current_briefing": self.build_daily_briefing(metrics),
             "daily_logs": self.daily_logs[:25],
             "timeline": self.live.timeline[-45:],
             "spotlight_id": spotlight_id,

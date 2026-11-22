@@ -356,7 +356,7 @@
       </div>
 
       <div class="top-stats">
-        <div class="stat-pill"><strong id="ui-time">Y1 · Day 1</strong></div>
+        <div class="stat-pill" id="pill-day-briefing" style="cursor:pointer;border-color:var(--accent);background:rgba(56,189,248,0.16)" title="Pulsa para ver el Parte Diario por Zonas, Razas y Clima / Click for Daily Briefing">📋 <strong id="ui-time">Y1 · Day 1</strong> ▾</div>
         <div class="stat-pill"><strong id="ui-season">Spring</strong> (<span id="ui-temp">19.0°C</span>)</div>
         <div class="stat-pill" id="ui-astro" title="Solar Orbit, Lunar Cycle & Live Weather">☀️ Clear · 🌕 Moon · 1.00 AU</div>
         <div class="stat-pill">Live: <strong id="ui-pop">21</strong> · Null: <strong id="ui-ctrl">21</strong></div>
@@ -526,6 +526,23 @@
     </div>
   </div>
 
+  <!-- Daily Planetary Briefing Modal (Zones, Races, Astrophysics & Events) -->
+  <div id="daily-modal" style="position:fixed;inset:0;z-index:85;display:none;align-items:center;justify-content:center;background:rgba(6,10,19,0.82);backdrop-filter:blur(10px);padding:18px;">
+    <div class="modal-box" style="max-width:940px;max-height:88vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div>
+          <h2 id="daily-modal-title" style="font-size:15px;color:var(--accent);">📋 Parte Diario Planetario · Resumen por Zonas y Razas</h2>
+          <div id="daily-modal-sub" style="font-size:11px;color:var(--muted);">Observación estricta 0% intervención · Dr. Sergio Buedo Martínez</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="daily-day-select" style="background:rgba(15,23,42,0.95);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:5px 9px;font-size:11px;"></select>
+          <button id="btn-close-daily" style="background:rgba(244,63,94,0.2);border:1px solid var(--rose);color:#fff;border-radius:7px;padding:5px 11px;cursor:pointer;font-weight:700;">✕</button>
+        </div>
+      </div>
+      <div id="daily-modal-body" style="display:flex;flex-direction:column;gap:12px;margin-top:6px;font-size:12px;line-height:1.5;"></div>
+    </div>
+  </div>
+
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -632,20 +649,125 @@
     document.getElementById('btn-papers').addEventListener('click', openPapersModal);
     document.getElementById('btn-close-papers').addEventListener('click', () => { papersModal.style.display = 'none'; });
     papersModal.addEventListener('click', (ev) => { if (ev.target === papersModal) papersModal.style.display = 'none'; });
-    window.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') papersModal.style.display = 'none'; });
+
+    // Daily Planetary Briefing Modal (Zones, Races, Bottleneck Diagnostics & Events)
+    const dailyModal = document.getElementById('daily-modal');
+    const dailySelect = document.getElementById('daily-day-select');
+    const dailyBody = document.getElementById('daily-modal-body');
+
+    function renderBriefingCard(b) {
+      if (!b) return;
+      const es = currentLang === 'es';
+      document.getElementById('daily-modal-title').textContent = es
+        ? `📋 Parte Diario Planetario · Año ${b.year} · Día ${b.day}`
+        : `📋 Daily Planetary Briefing · Year ${b.year} · Day ${b.day}`;
+      document.getElementById('daily-modal-sub').textContent = es
+        ? `Organización emergente: ${b.archetype_es || ''} · 0% Intervención Humana`
+        : `Emergent form: ${b.archetype_en || ''} · Strict 0% Interference`;
+
+      const astroHtml = `
+        <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px 12px;">
+          <div style="font-weight:700;color:var(--amber);margin-bottom:4px;">☀️ ${es ? 'ASTROFÍSICA, LUNA Y CLIMA DEL DÍA' : 'ASTROPHYSICS, MOON & DAILY CLIMATE'}</div>
+          <div>${es ? 'Estación' : 'Season'}: <strong>${b.season}</strong> (${b.temp_c}°C) · ${es ? 'Clima' : 'Weather'}: <strong>${b.weather || 'clear'}</strong> · ${es ? 'Distancia al Sol' : 'Solar Distance'}: <strong>${(b.solar_au || 1.0).toFixed(3)} AU</strong> · ${es ? 'Luna' : 'Moon'}: <strong>${b.lunar_name || 'Moon'}</strong></div>
+          <div style="margin-top:4px;color:var(--muted);">${es ? 'Balance demográfico hoy' : 'Daily vital balance'}: <strong>+${b.births_today || 0}</strong> ${es ? 'nacimientos' : 'births'} · <strong>-${b.deaths_today || 0}</strong> ${es ? 'muertes' : 'deaths'} · <strong>${b.gifts_today || 0}</strong> ${es ? 'ayudas de alimento' : 'food gifts'} · <strong>${b.clashes_today || 0}</strong> ${es ? 'combates' : 'clashes'}</div>
+        </div>`;
+
+      const zonesHtml = (b.zones || []).length > 0 ? `
+        <div>
+          <div style="font-weight:700;color:var(--accent);margin-bottom:6px;">🗺️ ${es ? 'SITUACIÓN POR CONTINENTES, MONTAÑAS Y CUEVAS' : 'STATUS BY CONTINENT, MOUNTAINS & CAVES'}</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;">
+            ${b.zones.map(z => `
+              <div style="background:rgba(15,23,42,0.78);border:1px solid var(--border);border-radius:9px;padding:9px;">
+                <div style="font-weight:700;color:#fff;">${es ? z.title_es : z.title_en}</div>
+                <div style="color:var(--emerald);font-weight:700;margin:2px 0;">👥 ${z.pop} ${es ? 'habitantes' : 'beings'} ${z.in_caves > 0 ? `· 🕳️ ${z.in_caves} ${es ? 'en cuevas' : 'in caves'}` : ''}</div>
+                <div style="font-size:11px;color:var(--muted);">${es ? 'Razas' : 'Lineages'}: ${z.lineages}</div>
+                <div style="font-size:11px;color:var(--amber);margin-top:2px;">🏗️ ${z.structures}</div>
+              </div>`).join('')}
+          </div>
+        </div>` : '';
+
+      const racesHtml = (b.races || []).length > 0 ? `
+        <div>
+          <div style="font-weight:700;color:var(--emerald);margin-bottom:6px;">🧬 ${es ? 'CENSO POR RAZAS Y DIAGNÓSTICO DE EXTINCIÓN (SIN INTERVENIR)' : 'CENSUS BY RACE & EXTINCTION BOTTLENECK STATUS'}</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:8px;">
+            ${b.races.map(r => {
+              const col = r.count === 0 ? 'var(--rose)' : (r.count <= 4 ? 'var(--amber)' : 'var(--emerald)');
+              return `<div style="background:rgba(15,23,42,0.78);border:1px solid ${col};border-radius:9px;padding:8px 10px;">
+                <div style="display:flex;justify-content:space-between;"><strong>${r.lineage} ${r.is_hybrid ? '✨' : ''}</strong><strong style="color:${col}">${r.count}</strong></div>
+                <div style="font-size:11px;color:${col};font-weight:600;">${es ? r.status_es : r.status_en}</div>
+                <div style="font-size:10px;color:var(--muted);">${es ? 'Energía media' : 'Mean nourishment'}: ${r.avg_energy}%</div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>` : '';
+
+      const evHtml = (b.events || []).length > 0 ? `
+        <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px 12px;">
+          <div style="font-weight:700;color:#c084fc;margin-bottom:5px;">📜 ${es ? 'HITOS, TRUEQUES Y SUCESOS RECIENTES' : 'RECENT MILESTONES, TRADES & EVENTS'}</div>
+          ${b.events.map(e => `<div style="padding:3px 0;border-bottom:1px solid rgba(148,163,184,0.12);">• ${e}</div>`).join('')}
+        </div>` : '';
+
+      dailyBody.innerHTML = astroHtml + zonesHtml + racesHtml + evHtml;
+    }
+
+    function openDailyBriefingModal() {
+      if (!latestState) return;
+      dailyModal.style.display = 'flex';
+      const logs = latestState.daily_logs || [];
+      const liveB = latestState.current_briefing;
+      const items = [];
+      if (liveB) items.push({ label: `${currentLang === 'es' ? '🔴 Hoy en vivo' : '🔴 Live Today'}: Y${liveB.year} · D${liveB.day}`, briefing: liveB });
+      for (const l of logs) {
+        if (l.briefing && (!liveB || l.day !== liveB.day)) {
+          items.push({ label: `Y${l.year} · Day ${l.day} (${l.season})`, briefing: l.briefing });
+        } else if (!l.briefing && (!liveB || l.day !== liveB.day)) {
+          items.push({
+            label: `Y${l.year} · Day ${l.day} (${l.season})`,
+            briefing: { day: l.day, year: l.year, season: l.season, temp_c: '—', archetype_en: l.archetype_en, archetype_es: l.archetype_es, zones: [], races: [], events: [currentLang === 'es' ? l.summary_es : l.summary_en] }
+          });
+        }
+      }
+      dailySelect.innerHTML = items.map((it, idx) => `<option value="${idx}">${it.label}</option>`).join('');
+      dailySelect.onchange = () => renderBriefingCard(items[parseInt(dailySelect.value, 10)]?.briefing);
+      if (items[0]) renderBriefingCard(items[0].briefing);
+    }
+
+    document.getElementById('pill-day-briefing').addEventListener('click', openDailyBriefingModal);
+    document.getElementById('btn-close-daily').addEventListener('click', () => { dailyModal.style.display = 'none'; });
+    dailyModal.addEventListener('click', (ev) => { if (ev.target === dailyModal) dailyModal.style.display = 'none'; });
+    window.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') { papersModal.style.display = 'none'; dailyModal.style.display = 'none'; }
+    });
 
     let WORLD_SEED = 4201;
+    const WORLD_ENTITY_SCALE = 0.48;
+    const MOUNTAIN_PEAKS = [
+      [-112.0, -96.0, 10.8, 16.0],
+      [-158.0, -134.0, 11.6, 18.0],
+      [122.0, -98.0, 12.8, 19.0],
+      [168.0, -132.0, 13.4, 20.0],
+      [-14.0, 126.0, 10.2, 16.0],
+      [36.0, 162.0, 11.4, 18.0],
+      [-22.0, -14.0, 11.2, 17.0],
+      [28.0, 18.0, 10.6, 16.0]
+    ];
+
     function terrainHeight(x, z) {
       const s = (WORLD_SEED % 997) * 0.013;
-      const riverCenter = Math.sin(z * 0.075 + s) * 9.5 - 6.0;
+      const riverCenter = Math.sin(z * 0.026 + s) * 28.0 - 14.0;
       const distRiver = Math.abs(x - riverCenter);
-      const riverCarve = -1.35 * Math.exp(-(distRiver * distRiver) / 12.0);
-      const seaStrait = -1.25 * Math.exp(-Math.pow(z - Math.sin(x * 0.06) * 8.0 + 10.0, 2) / 14.0);
-      const continents = Math.sin(x * 0.038 + s) * Math.cos(z * 0.038 - s) * 1.15;
-      const hills = Math.sin(x * 0.085 + s) * Math.cos(z * 0.085 - s) * 0.85
-                  + Math.sin((x * 0.16 - z * 0.13) + s * 2.0) * 0.36;
-      const ridgeBelt = Math.max(0.0, Math.sin(x * 0.055 - z * 0.045 + 0.8) - 0.52) * 3.1;
-      return 0.55 + continents + hills + ridgeBelt + riverCarve + seaStrait * 0.55;
+      const riverCarve = -1.55 * Math.exp(-(distRiver * distRiver) / 38.0);
+      const seaStrait = -1.45 * Math.exp(-Math.pow(z - Math.sin(x * 0.022) * 24.0 + 28.0, 2) / 52.0);
+      const continents = Math.sin(x * 0.013 + s) * Math.cos(z * 0.013 - s) * 1.45;
+      const hills = Math.sin(x * 0.036 + s) * Math.cos(z * 0.036 - s) * 0.92
+                  + Math.sin((x * 0.075 - z * 0.065) + s * 2.0) * 0.38;
+      const ridgeBelt = Math.max(0.0, Math.sin(x * 0.024 - z * 0.021 + 0.8) - 0.56) * 4.8;
+      let mtnBoost = 0.0;
+      for (const [mx, mz, mh, mr] of MOUNTAIN_PEAKS) {
+        const d2 = (x - mx) * (x - mx) + (z - mz) * (z - mz);
+        if (d2 < (mr * 2.6) * (mr * 2.6)) mtnBoost += mh * Math.exp(-d2 / (mr * mr));
+      }
+      return 0.62 + continents + hills + ridgeBelt + mtnBoost + riverCarve + seaStrait * 0.65;
     }
 
     function shortestAngleLerp(current, target, alpha) {
@@ -741,18 +863,18 @@
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb);
-    scene.fog = new THREE.FogExp2(0x93c5fd, 0.0050);
+    scene.fog = new THREE.FogExp2(0x93c5fd, 0.0018);
 
-    const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.5, 650);
-    camera.position.set(8, 42, 54);
+    const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.35, 1400);
+    camera.position.set(-130, 19, -92);
 
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(4, 0.5, 8);
+    controls.target.set(-135, 1.2, -115);
     controls.enableDamping = true;
     controls.dampingFactor = 0.07;
-    controls.maxPolarAngle = Math.PI * 0.48;
-    controls.minDistance = 1.8;
-    controls.maxDistance = 250;
+    controls.maxPolarAngle = Math.PI * 0.485;
+    controls.minDistance = 0.7;
+    controls.maxDistance = 420;
     controls.enablePan = true;
     controls.screenSpacePanning = false;
     controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
@@ -910,18 +1032,18 @@
     surfaceWorld.add(precipPoints);
 
     let terrainMesh = null;
-    const waterGeo = new THREE.PlaneGeometry(260, 260, 48, 48);
+    const waterGeo = new THREE.PlaneGeometry(740, 740, 48, 48);
     waterGeo.rotateX(-Math.PI / 2);
     const waterMesh = new THREE.Mesh(
       waterGeo,
       new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.15, metalness: 0.35, transparent: true, opacity: 0.84 })
     );
-    waterMesh.position.set(4, -0.04, 4);
+    waterMesh.position.set(0, -0.04, 0);
     surfaceWorld.add(waterMesh);
 
     function buildContinuousTerrain(isWinter = false) {
       if (terrainMesh) { terrainMesh.geometry.dispose(); surfaceWorld.remove(terrainMesh); }
-      const geo = new THREE.PlaneGeometry(220, 220, 180, 180);
+      const geo = new THREE.PlaneGeometry(620, 620, 220, 220);
       geo.rotateX(-Math.PI / 2);
       const pos = geo.attributes.position;
       const colors = new Float32Array(pos.count * 3);
@@ -929,18 +1051,18 @@
       const s = (WORLD_SEED % 997) * 0.013;
 
       for (let i = 0; i < pos.count; i++) {
-        const vx = pos.getX(i) + 4;
-        const vz = pos.getZ(i) + 4;
+        const vx = pos.getX(i);
+        const vz = pos.getZ(i);
         const h = terrainHeight(vx, vz);
         pos.setX(i, vx); pos.setY(i, h); pos.setZ(i, vz);
 
-        const moist = Math.sin(vx * 0.09 - s) + Math.cos(vz * 0.10 + s);
-        const isBoreal = vz < -20 && vx >= 8;
-        const isSavanna = vz > 22;
+        const moist = Math.sin(vx * 0.04 - s) + Math.cos(vz * 0.045 + s);
+        const isBoreal = vz < -55 && vx >= 20;
+        const isSavanna = vz > 60;
         if (h < 0.02) c.setHex(0xd97706);
-        else if (h < 0.24) c.setHex(0xfde68a);
-        else if (h > 2.45 || isBoreal && h > 1.15 || (isWinter && h > 1.25)) c.setHex(0xf1f5f9);
-        else if (h > 1.75) c.setHex(0x64748b);
+        else if (h < 0.25) c.setHex(0xfde68a);
+        else if (h > 6.8 || (isBoreal && h > 3.2) || (isWinter && h > 2.8)) c.setHex(0xf8fafc); // Snow-capped mountain peaks!
+        else if (h > 2.6) c.setHex(0x64748b); // Rocky mountain cliffs!
         else if (isBoreal) c.setHex(0x0f766e);
         else if (isSavanna && moist < 0.35) c.setHex(0xa3e635);
         else if (moist > 0.48) c.setHex(isWinter ? 0x3f6212 : 0x15803d);
@@ -1032,16 +1154,16 @@
             g.add(bo);
           }
           g.position.set(p.x, y, p.y);
-          g.scale.setScalar(p.scale || 1.0);
+          g.scale.setScalar((p.scale || 1.0) * 0.62);
           propsGroup.add(g);
         }
         for (const [vx, vy] of (data.thermal_vents || [])) {
           const vent = new THREE.Mesh(
-            new THREE.TorusGeometry(0.65, 0.12, 10, 24),
+            new THREE.TorusGeometry(0.42, 0.08, 10, 24),
             new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xea580c, emissiveIntensity: 0.9 })
           );
           vent.rotation.x = Math.PI / 2;
-          vent.position.set(vx, terrainHeight(vx, vy) + 0.08, vy);
+          vent.position.set(vx, terrainHeight(vx, vy) + 0.06, vy);
           propsGroup.add(vent);
         }
         syncCaves(data.caves || DEFAULT_CAVES);
@@ -1049,14 +1171,14 @@
     }
 
     const DEFAULT_CAVES = [
-      { id: 'CAVE-1', x: -32, y: -28, zone: 'temperate_archipelago', depth: 36 },
-      { id: 'CAVE-2', x: -44, y: -39, zone: 'temperate_archipelago', depth: 50 },
-      { id: 'CAVE-3', x: 36, y: -30, zone: 'boreal_highland', depth: 64 },
-      { id: 'CAVE-4', x: 47, y: -38, zone: 'boreal_highland', depth: 22 },
-      { id: 'CAVE-5', x: -2, y: 34, zone: 'equatorial_savanna', depth: 36 },
-      { id: 'CAVE-6', x: 11, y: 42, zone: 'equatorial_savanna', depth: 50 },
-      { id: 'CAVE-7', x: -8, y: -4, zone: 'mediterranean_crossroads', depth: 64 },
-      { id: 'CAVE-8', x: 14, y: 8, zone: 'mediterranean_crossroads', depth: 22 }
+      { id: 'CAVE-1', x: -112, y: -86, zone: 'temperate_archipelago', depth: 50 },
+      { id: 'CAVE-2', x: -158, y: -122, zone: 'temperate_archipelago', depth: 66 },
+      { id: 'CAVE-3', x: 122, y: -86, zone: 'boreal_highland', depth: 82 },
+      { id: 'CAVE-4', x: 168, y: -119, zone: 'boreal_highland', depth: 34 },
+      { id: 'CAVE-5', x: -14, y: 136, zone: 'equatorial_savanna', depth: 50 },
+      { id: 'CAVE-6', x: 36, y: 173, zone: 'equatorial_savanna', depth: 66 },
+      { id: 'CAVE-7', x: -22, y: -3, zone: 'mediterranean_crossroads', depth: 82 },
+      { id: 'CAVE-8', x: 28, y: 28, zone: 'mediterranean_crossroads', depth: 34 }
     ];
 
     const agentRigs = new Map();
@@ -1068,28 +1190,64 @@
 
     function createCaveMesh(cv) {
       const g = new THREE.Group();
-      const rockMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.92 });
-      const arch = new THREE.Mesh(new THREE.DodecahedronGeometry(1.35, 1), rockMat);
-      arch.scale.set(1.25, 0.88, 1.1); arch.position.y = 0.55; arch.castShadow = true;
-      const portal = new THREE.Mesh(
-        new THREE.CircleGeometry(0.62, 14),
-        new THREE.MeshBasicMaterial({ color: 0x020617, side: THREE.DoubleSide })
+      // Cutaway 3D Mountain Cavern: Translucent X-Ray Rock Dome + Visible Lit Interior!
+      const roofMat = new THREE.MeshStandardMaterial({
+        color: 0x475569, roughness: 0.88, transparent: true, opacity: 0.72, depthWrite: false
+      });
+      const domeRoof = new THREE.Mesh(
+        new THREE.SphereGeometry(2.35, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.52),
+        roofMat
       );
-      portal.position.set(0, 0.45, 0.88);
-      const crystal = new THREE.Mesh(
-        new THREE.OctahedronGeometry(0.22, 0),
-        new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.85 })
+      domeRoof.scale.set(1.15, 0.78, 1.15);
+
+      const floorDisk = new THREE.Mesh(
+        new THREE.CylinderGeometry(2.35, 2.45, 0.08, 20),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.95 })
       );
-      crystal.position.set(0.55, 0.32, 0.72);
-      const halo = new THREE.Mesh(new THREE.RingGeometry(1.45, 1.65, 28), new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide }));
+      floorDisk.position.y = 0.03;
+
+      const archRim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.88, 0.18, 8, 16, Math.PI),
+        new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.9 })
+      );
+      archRim.position.set(0, 0.05, 2.25);
+
+      // Subterranean Freshwater Spring Pool inside Cavern
+      const springPool = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.68, 0.68, 0.05, 16),
+        new THREE.MeshStandardMaterial({ color: 0x0ea5e9, emissive: 0x0284c7, emissiveIntensity: 0.55, roughness: 0.15 })
+      );
+      springPool.position.set(-0.75, 0.06, -0.45);
+
+      // Interior Stalagmites & Glowing Mineral Veins (Copper, Pyrite, Quartz)
+      const stalMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.85 });
+      for (const [sx, sz, sh] of [[-1.35, 0.65, 0.85], [1.25, -0.75, 1.05], [0.25, -1.45, 0.72]]) {
+        const st = new THREE.Mesh(new THREE.ConeGeometry(0.18, sh, 7), stalMat);
+        st.position.set(sx, sh * 0.5, sz);
+        g.add(st);
+      }
+      for (const [vx, vz, col] of [[0.95, 0.55, 0x10b981], [-0.35, -1.15, 0xfacc15], [1.05, -0.15, 0x38bdf8]]) {
+        const vein = new THREE.Mesh(
+          new THREE.OctahedronGeometry(0.24, 0),
+          new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.95 })
+        );
+        vein.position.set(vx, 0.26, vz);
+        g.add(vein);
+      }
+
+      const caveLight = new THREE.PointLight(0x38bdf8, 2.2, 6.5);
+      caveLight.position.set(0, 1.25, 0);
+
+      const halo = new THREE.Mesh(new THREE.RingGeometry(2.55, 2.78, 32), new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide }));
       halo.rotation.x = Math.PI / 2; halo.position.y = 0.06; halo.visible = false;
       const tag = document.createElement('div');
       tag.className = 'floating-tag'; tag.style.display = 'none';
       labelsLayer.appendChild(tag);
-      g.add(arch, portal, crystal, halo);
+
+      g.add(floorDisk, springPool, archRim, domeRoof, caveLight, halo);
       const y0 = Math.max(0.05, terrainHeight(cv.x, cv.y));
       g.position.set(cv.x, y0, cv.y);
-      g.userData = { id: cv.id, entityType: 'cave', data: cv, halo, tag };
+      g.userData = { id: cv.id, entityType: 'cave', data: cv, roofMat, halo, tag };
       surfaceWorld.add(g);
       return g;
     }
@@ -1099,7 +1257,9 @@
         if (!caveMeshes.has(cv.id)) {
           caveMeshes.set(cv.id, createCaveMesh(cv));
         } else {
-          caveMeshes.get(cv.id).userData.data = cv;
+          const cm = caveMeshes.get(cv.id);
+          cm.userData.data = cv;
+          cm.position.set(cv.x, Math.max(0.05, terrainHeight(cv.x, cv.y)), cv.y);
         }
       }
     }
@@ -1108,7 +1268,7 @@
 
     const MAX_RES = 600;
     const resInstanced = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(0.13, 8, 8),
+      new THREE.SphereGeometry(0.075, 8, 8),
       new THREE.MeshStandardMaterial({ roughness: 0.3, metalness: 0.1 }),
       MAX_RES
     );
@@ -1135,13 +1295,13 @@
     function pickNaturalWaypoint(ax, az, span, domain = 'land') {
       for (let attempt = 0; attempt < 10; attempt++) {
         const ang = Math.random() * Math.PI * 2;
-        const dist = 2.2 + Math.random() * span;
-        const nx = Math.max(-68, Math.min(72, ax + Math.cos(ang) * dist));
-        const nz = Math.max(-68, Math.min(72, az + Math.sin(ang) * dist));
+        const dist = 1.6 + Math.random() * span;
+        const nx = Math.max(-250, Math.min(250, ax + Math.cos(ang) * dist));
+        const nz = Math.max(-250, Math.min(250, az + Math.sin(ang) * dist));
         const h = terrainHeight(nx, nz);
         if (domain === 'water' && h < -0.05) return { x: nx, z: nz, y: -0.06 };
         if (domain === 'air') return { x: nx, z: nz, y: Math.max(0, h) };
-        if (domain === 'land' && h > 0.08 && h < 3.2) return { x: nx, z: nz, y: h };
+        if (domain === 'land' && h > 0.08 && h < 7.5) return { x: nx, z: nz, y: h };
       }
       const h0 = terrainHeight(ax, az);
       return { x: ax, z: az, y: domain === 'water' ? -0.06 : Math.max(0.02, h0) };
@@ -1385,6 +1545,7 @@
         halo,
         tag
       });
+      g.scale.setScalar(WORLD_ENTITY_SCALE);
       surfaceWorld.add(g);
       return g;
     }
@@ -1407,12 +1568,14 @@
       g.add(fl);
       g.userData = { offeringDot: fl };
       g.position.set(cp.x, terrainHeight(cp.x, cp.y), cp.y);
+      g.scale.setScalar(WORLD_ENTITY_SCALE);
       surfaceWorld.add(g);
       return g;
     }
 
     function createStructureMesh(st) {
       const g = new THREE.Group();
+      g.scale.setScalar(0.58);
       const halo = new THREE.Mesh(new THREE.RingGeometry(0.75, 0.90, 28), new THREE.MeshBasicMaterial({ color: 0xfbbf24, side: THREE.DoubleSide }));
       halo.rotation.x = Math.PI / 2; halo.position.y = 0.05; halo.visible = false;
       g.add(halo);
@@ -1637,7 +1800,8 @@
     });
 
     let snapCloseup = true;
-    const DEFAULT_ENCLAVES = { Sylphid: [-38, -34], Lithokin: [42, -34], Vespera: [4, 38] };
+    let hasInitialFramed = false;
+    const DEFAULT_ENCLAVES = { Sylphid: [-135, -115], Lithokin: [145, -115], Vespera: [12, 145] };
 
     function setCamMode(mode) {
       camMode = mode;
@@ -1657,11 +1821,14 @@
         surfaceWorld.visible = true;
         globeGroup.visible = false;
         scene.background.setHex(0x87ceeb);
-        scene.fog.density = 0.0032;
-        controls.maxPolarAngle = Math.PI * 0.48;
-        if (mode === 'topdown' && camera.position.length() > 140) {
-          camera.position.set(8, 36, 48);
-          controls.target.set(4, 0.5, 10);
+        scene.fog.density = 0.0018;
+        controls.maxPolarAngle = Math.PI * 0.485;
+        if (mode === 'topdown' && camera.position.distanceTo(controls.target) > 340) {
+          const spAg = latestState?.agents?.[0];
+          const fx = spAg ? spAg.x : -135, fz = spAg ? spAg.y : -115;
+          const fy = terrainHeight(fx, fz);
+          controls.target.set(fx, fy + 0.5, fz);
+          camera.position.set(fx + 3, fy + 16, fz + 20);
         } else if (mode === 'closeup') {
           snapCloseup = true;
         }
@@ -1680,12 +1847,12 @@
         tz = members.reduce((s, a) => s + (agentRigs.get(a.id)?.position.z ?? a.y), 0) / members.length;
         showLeftTab('focus');
       } else {
-        const enc = (latestState?.enclaves && latestState.enclaves[lin]) || DEFAULT_ENCLAVES[lin] || [4, 10];
+        const enc = (latestState?.enclaves && latestState.enclaves[lin]) || DEFAULT_ENCLAVES[lin] || [-135, -115];
         tx = enc[0]; tz = enc[1];
       }
       const ty = terrainHeight(tx, tz);
       controls.target.set(tx, ty + 0.5, tz);
-      camera.position.set(tx + 2, ty + 24, tz + 28);
+      camera.position.set(tx + 3, ty + 14, tz + 18);
     }
 
     document.querySelectorAll('[data-jump-lineage]').forEach(pill => {
@@ -2261,7 +2428,7 @@
           rig = createSentientRig(ag);
           agentRigs.set(ag.id, rig);
         }
-        rig.scale.setScalar(ag.scale || 1.0);
+        rig.scale.setScalar((ag.scale || 1.0) * WORLD_ENTITY_SCALE);
         if (!isCloudMode || isNewServerTick) {
           rig.userData.serverAnchor = { x: ag.x, z: ag.y };
           rig.userData.targetPos.set(ag.x, terrainHeight(ag.x, ag.y), ag.y);
@@ -2440,8 +2607,8 @@
             const sm = structMeshes.get(st.id);
             const px = sm ? sm.position.x : st.x, pz = sm ? sm.position.z : st.y;
             const py = sm ? sm.position.y : terrainHeight(st.x, st.y);
-            controls.target.set(px, py + 0.4, pz);
-            camera.position.set(px + 2.5, py + 11.0, pz + 13.0);
+            controls.target.set(px, py + 0.3, pz);
+            camera.position.set(px + 1.8, py + 6.5, pz + 8.0);
           }
         });
       });
@@ -2453,10 +2620,18 @@
           renderSelectedInspector();
           showLeftTab('focus');
           setCamMode('topdown');
-          controls.target.set(cm.position.x, cm.position.y + 0.5, cm.position.z);
-          camera.position.set(cm.position.x + 2.5, cm.position.y + 10.5, cm.position.z + 12.5);
+          controls.target.set(cm.position.x, cm.position.y + 0.4, cm.position.z);
+          camera.position.set(cm.position.x + 1.2, cm.position.y + 4.5, cm.position.z + 6.2);
         });
       });
+
+      if (!hasInitialFramed && state.agents.length > 0 && camMode === 'topdown') {
+        hasInitialFramed = true;
+        const fAg = state.agents.find(a => a.id === selectedSubjectId) || state.agents[0];
+        const fy = terrainHeight(fAg.x, fAg.y);
+        controls.target.set(fAg.x, fy + 0.4, fAg.y);
+        camera.position.set(fAg.x + 2.5, fy + 11.5, fAg.y + 14.5);
+      }
 
       renderSelectedInspector();
 
@@ -2589,9 +2764,9 @@
         controls.target.x += dx; controls.target.z += dz;
       }
 
-      // Seamless zoom-out transition to Round 3D Planet (> 175m) and zoom-in back to Continent (< 42m in Globe)
+      // Seamless zoom-out transition to Round 3D Planet (> 340m) and zoom-in back to Continent (< 42m in Globe)
       const camDist = camera.position.distanceTo(controls.target);
-      if (camMode === 'topdown' && camDist > 175) {
+      if (camMode === 'topdown' && camDist > 340) {
         setCamMode('globe');
       } else if (camMode === 'globe') {
         globeGroup.rotation.y += 0.0018;
@@ -2601,6 +2776,16 @@
           gs.lookAt(0, 0, 0);
         }
         if (camDist < 42) setCamMode('topdown');
+      }
+
+      // Automatic X-Ray Cutaway Roof on 3D Mountain Caverns when zoomed close or selected!
+      for (const [cid, cm] of caveMeshes.entries()) {
+        if (cm.userData.roofMat) {
+          const isSel = (selectedEntity.type === 'cave' && selectedEntity.id === cid);
+          const nearCam = camera.position.distanceTo(cm.position) < 28.0;
+          const targetOp = (isSel || nearCam) ? 0.16 : 0.78;
+          cm.userData.roofMat.opacity += (targetOp - cm.userData.roofMat.opacity) * 0.14;
+        }
       }
 
       // Gentle wind sway on cereal gardens + Comm Relay waves + 60 FPS Vehicle & Satellite Motion!
@@ -2670,15 +2855,23 @@
         if (isCloudMode && !ud.isSleeping && distSq <= 0.06 && t >= (ud.pauseUntil || 0)) {
           const anchor = ud.serverAnchor || { x: rig.position.x, z: rig.position.z };
           let wp = null;
-          if (Math.random() < 0.28 && latestState?.structures?.length) {
+          if (Math.random() < 0.24 && latestState?.caves?.length) {
+            const nearCave = latestState.caves.find(cv => Math.hypot(cv.x - anchor.x, cv.y - anchor.z) < 26.0);
+            if (nearCave) {
+              const ang = Math.random() * Math.PI * 2, rIn = Math.random() * 1.3;
+              wp = { x: nearCave.x + Math.cos(ang) * rIn, z: nearCave.y + Math.sin(ang) * rIn };
+              wp.y = Math.max(0.06, terrainHeight(nearCave.x, nearCave.y) + 0.05);
+            }
+          }
+          if (!wp && Math.random() < 0.28 && latestState?.structures?.length) {
             const nearbyFarm = latestState.structures.find(s => s.kind === 'crop_plot' && Math.hypot(s.x - anchor.x, s.y - anchor.z) < 12.0);
             if (nearbyFarm) {
               const ang = Math.random() * Math.PI * 2;
-              wp = { x: nearbyFarm.x + Math.cos(ang) * 0.95, z: nearbyFarm.y + Math.sin(ang) * 0.95 };
+              wp = { x: nearbyFarm.x + Math.cos(ang) * 0.65, z: nearbyFarm.y + Math.sin(ang) * 0.65 };
               wp.y = terrainHeight(wp.x, wp.z);
             }
           }
-          if (!wp) wp = pickNaturalWaypoint(anchor.x, anchor.z, 6.8, 'land');
+          if (!wp) wp = pickNaturalWaypoint(anchor.x, anchor.z, 5.2, 'land');
           ud.targetPos.set(wp.x, wp.y, wp.z);
           ud.targetHeading = Math.atan2(wp.x - rig.position.x, wp.z - rig.position.z);
           ud.pauseUntil = t + 0.7 + Math.random() * 1.8;

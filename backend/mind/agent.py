@@ -168,6 +168,7 @@ class KobAgent:
 
     # Homeostasis & Psychology (0..100)
     energy: float = 84.0
+    hydration: float = 90.0
     warmth: float = 88.0
     rest: float = 88.0
     integrity: float = 100.0
@@ -325,7 +326,7 @@ class KobAgent:
         prompt = (
             "Raw sensory impressions:\n"
             f"- Sky: {light_feel} ({weather_feel}). Air: {temp_feel}.{cave_note}\n"
-            f"- Body: nourishment={self.energy:.0f}/100, warmth={self.warmth:.0f}/100, "
+            f"- Body: nourishment={self.energy:.0f}/100, hydration={self.hydration:.0f}/100, warmth={self.warmth:.0f}/100, "
             f"tension={self.stress:.0f}/100, health={self.integrity:.0f}/100.\n"
             f"- Inner drives: curiosity={self.genome.curiosity}, empathy={self.genome.empathy}, "
             f"fierceness={self.genome.aggression}, hive_collectivism={self.genome.collectivism}.\n"
@@ -335,11 +336,11 @@ class KobAgent:
             f"- Other beings: {others_desc}.\n"
             f"- Memories: {recent_mem}.\n\n"
             "Nothing is forbidden or commanded—follow your own drives freely: "
-            "forage, warm_up, socialize, share, barter (exchange held items), plant_seed (sow seeds in soil), "
-            "pool_nest, confront, tinker, excavate (dig subsoil or rock), hunt, migrate, rest, vigil, leave_offering, or bury_cairn.\n"
+            "forage, warm_up, socialize, share, barter, plant_seed, "
+            "pool_nest, confront, tinker, hunt, migrate, rest, vigil, leave_offering, or bury_cairn.\n"
             "Use zero modern, mechanical, or artificial concepts. Reply ONLY with valid JSON:\n"
             '{"thought": "brief first-person inner thought (max 20 words)", '
-            '"intent": "forage|warm_up|socialize|share|barter|plant_seed|pool_nest|confront|tinker|excavate|hunt|migrate|rest|vigil|leave_offering|bury_cairn", '
+            '"intent": "forage|warm_up|socialize|share|barter|plant_seed|pool_nest|confront|tinker|hunt|migrate|rest|vigil|leave_offering|bury_cairn", '
             '"utterance": "1 or 2 invented syllables like ka-ru or lu-ma", '
             '"referent": "food|cold|warmth|kin|stranger|hive|beast|craft|death|wonder", '
             '"wonder": true or false if questioning stars, death, nature, or existence itself}'
