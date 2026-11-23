@@ -1794,6 +1794,62 @@
     const caveMeshes = new Map();
     const globeSatMeshes = new Map();
 
+    // Real-Time 3D Live-Action FX Engine (Attack ⚔️, Fire 🔥, Plant 🌱, Eat 🍎, Court ❤️, Birth 👶, Death 💀, Grave Vigil 🕯️, Heal 🌿, Disasters 🌋)
+    const activeFXParticles = [];
+    const seenFXKeys = new Set();
+    const fxSparkGeo = new THREE.SphereGeometry(0.065, 6, 6);
+    const FX_PALETTE = {
+      attack: 0xf43f5e, fire: 0xf97316, plant: 0x22c55e, eat: 0x84cc16,
+      court: 0xf472b6, birth: 0xfef08a, death: 0x94a3b8, vigil: 0xfbbf24,
+      bury: 0xe2e8f0, heal: 0x2dd4bf, volcanic_eruption: 0xef4444, wildfire: 0xf97316,
+      river_flood: 0x0ea5e9, earthquake: 0xd97706
+    };
+
+    function spawnActionFX(kind, x, z, count = 12) {
+      const col = FX_PALETTE[kind] || 0x38bdf8;
+      const y0 = Math.max(0.05, terrainHeight(x, z)) + 0.55;
+      const isBig = ['birth', 'volcanic_eruption', 'wildfire', 'earthquake'].includes(kind);
+      const n = isBig ? count * 2 : count;
+      for (let i = 0; i < n; i++) {
+        const mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.92 });
+        const m = new THREE.Mesh(fxSparkGeo, mat);
+        m.scale.setScalar(isBig ? 1.8 : 1.0);
+        m.position.set(x + (Math.random() - 0.5) * 0.4, y0, z + (Math.random() - 0.5) * 0.4);
+        const ang = Math.random() * Math.PI * 2;
+        const spd = (isBig ? 2.4 : 1.2) * (0.4 + Math.random() * 0.8);
+        const vy = (kind === 'death' || kind === 'court' || kind === 'fire' || kind === 'vigil') ? (1.4 + Math.random() * 1.4) : (0.9 + Math.random() * 1.6);
+        surfaceWorld.add(m);
+        activeFXParticles.push({
+          mesh: m,
+          vx: Math.cos(ang) * spd,
+          vy,
+          vz: Math.sin(ang) * spd,
+          gravity: (kind === 'death' || kind === 'court' || kind === 'fire' || kind === 'vigil') ? -0.15 : 2.8,
+          life: 0,
+          maxLife: isBig ? 2.4 : 1.35
+        });
+      }
+    }
+
+    function inferActionFX(ag) {
+      if (ag.action_fx) return ag.action_fx;
+      const act = (ag.action || '').toLowerCase();
+      if (act.includes('hunt') || act.includes('attack') || act.includes('clash') || act.includes('repel')) return 'attack';
+      if (act.includes('fire') || act.includes('hearth') || act.includes('roast') || act.includes('tinker') || act.includes('craft')) return 'fire';
+      if (act.includes('plant') || act.includes('garden') || act.includes('crop') || act.includes('sow')) return 'plant';
+      if (act.includes('eat') || act.includes('feed') || act.includes('forag') || act.includes('fruit')) return 'eat';
+      if (act.includes('court') || act.includes('bonded')) return 'court';
+      if (act.includes('vigil') || act.includes('offering') || act.includes('mourn')) return 'vigil';
+      if (act.includes('bury') || act.includes('cairn')) return 'bury';
+      if (act.includes('heal') || act.includes('treat') || act.includes('cure') || act.includes('medicine')) return 'heal';
+      return '';
+    }
+
+    const FX_ICON = {
+      attack: '⚔️', fire: '🔥', plant: '🌱', eat: '🍎', court: '❤️',
+      birth: '👶', death: '💀', vigil: '🕯️', bury: '🪨', heal: '🌿'
+    };
+
     function createCaveMesh(cv) {
       const g = new THREE.Group();
       // Cutaway 3D Mountain Cavern: Translucent X-Ray Rock Dome + Visible Lit Interior!
@@ -2401,9 +2457,14 @@
         }
       } else if (st.kind === 'cairn') {
         for (const [sy, sr] of [[0.14, 0.42], [0.38, 0.30], [0.58, 0.18]]) {
-          const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(sr, 0), new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.85 }));
+          const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(sr, 0), new THREE.MeshStandardMaterial({ color: 0xcbd5e1, bumpMap: stoneBumpTex, bumpScale: 0.08, roughness: 0.85 }));
           rock.position.y = sy; rock.castShadow = true; g.add(rock);
         }
+        const memRing = new THREE.Mesh(new THREE.RingGeometry(0.48, 0.60, 24), new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
+        memRing.rotation.x = Math.PI / 2; memRing.position.y = 0.04;
+        const flower = new THREE.Mesh(new THREE.SphereGeometry(0.10, 8, 8), new THREE.MeshStandardMaterial({ color: 0xf472b6, emissive: 0xdb2777, emissiveIntensity: 0.5 }));
+        flower.position.set(0.32, 0.16, 0.28);
+        g.add(memRing, flower);
       } else {
         const stele = new THREE.Mesh(new THREE.BoxGeometry(0.38, 1.65, 0.24), new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.45 }));
         stele.position.y = 0.82; stele.castShadow = true; g.add(stele);
@@ -3042,7 +3103,19 @@
       const localHrs = Math.floor(localPhase * 24);
       const localMins = Math.floor((localPhase * 24 - localHrs) * 60);
       const clockStr = `${String(localHrs).padStart(2, '0')}:${String(localMins).padStart(2, '0')}`;
-      if (astroEl) astroEl.textContent = `${wLabel} · 🕒 ${clockStr} · ${moonIcon} ${w.lunar_name || 'Moon'} · ${sAu.toFixed(2)} AU`;
+      const disIcons = { earthquake: '🌋 Terremoto', volcanic_eruption: '🌋 Erupción Volcánica', river_flood: '🌊 Crecida Fluvial', wildfire: '🔥 Incendio Natural' };
+      const disBanner = w.active_disaster ? ` · ⚠️ ${disIcons[w.active_disaster] || w.active_disaster}` : '';
+      if (astroEl) astroEl.textContent = `${wLabel} · 🕒 ${clockStr} · ${moonIcon} ${w.lunar_name || 'Moon'} · ${sAu.toFixed(2)} AU${disBanner}`;
+
+      // Trigger Live 3D Action FX Particle Bursts from server recent_fx cues!
+      for (const fx of (state.recent_fx || [])) {
+        const key = `${fx.tick}_${fx.kind}_${fx.actor}`;
+        if (!seenFXKeys.has(key)) {
+          seenFXKeys.add(key);
+          if (seenFXKeys.size > 160) seenFXKeys.clear();
+          spawnActionFX(fx.kind, fx.x, fx.y);
+        }
+      }
 
       precipPoints.visible = ['rain', 'storm', 'snow'].includes(wState);
       if (precipPoints.visible) {
@@ -3154,8 +3227,14 @@
           rig.userData.heldMesh.visible = false;
         }
 
+        const actFx = inferActionFX(ag);
+        rig.userData.currentActionFx = actFx;
+        if (actFx && Math.random() < 0.35) {
+          spawnActionFX(actFx, rig.position.x, rig.position.z, 5);
+        }
+        const fxBadge = actFx ? ` ${FX_ICON[actFx] || ''}` : '';
         const sexBadge = ag.sex === 'M' ? '<span style="color:#38bdf8">♂</span>' : '<span style="color:#f472b6">♀</span>';
-        const famBadge = `${ag.partner_id ? ' ❤️' : ''}${ag.pregnant ? ` 🤰${ag.gestation_pct || ''}%` : ''}`;
+        const famBadge = `${ag.partner_id ? ' ❤️' : ''}${ag.pregnant ? ` 🤰${ag.gestation_pct || ''}%` : ''}${fxBadge}`;
         const isSelAgent = (selectedEntity.type === 'agent' && ag.id === selectedEntity.id);
         if (isSelAgent) {
           rig.userData.tagPriority = 3;
@@ -3163,6 +3242,10 @@
           rig.userData.tag.innerHTML = ag.utterance
             ? `<strong>${ag.id} ${sexBadge}${famBadge}</strong>: <span class="phoneme">«${ag.utterance}»</span> (${ag.referent})`
             : `<strong>${ag.id} ${sexBadge}${famBadge}</strong> · ${ag.sleeping ? '💤 Sleeping' : ag.action}`;
+        } else if (actFx && ['attack', 'fire', 'plant', 'birth', 'vigil', 'bury', 'court', 'heal'].includes(actFx)) {
+          rig.userData.tagPriority = 2.5;
+          rig.userData.tag.className = 'floating-tag';
+          rig.userData.tag.innerHTML = `${FX_ICON[actFx]} <strong>${ag.id}</strong> ${sexBadge}`;
         } else if (ag.pregnant) {
           rig.userData.tagPriority = 2;
           rig.userData.tag.className = 'floating-tag';
@@ -3462,6 +3545,33 @@
         if (cg.position.x > 280) cg.position.x = -280;
       }
 
+      // Animate Live 3D Action FX Particles (Attack sparks, Fire embers, Planting sprouts, Birth nova, Grave candles!)
+      for (let i = activeFXParticles.length - 1; i >= 0; i--) {
+        const p = activeFXParticles[i];
+        p.life += dt;
+        if (p.life >= p.maxLife) {
+          surfaceWorld.remove(p.mesh);
+          p.mesh.material.dispose();
+          activeFXParticles.splice(i, 1);
+          continue;
+        }
+        p.vy -= p.gravity * dt;
+        p.mesh.position.x += p.vx * dt;
+        p.mesh.position.y += p.vy * dt;
+        p.mesh.position.z += p.vz * dt;
+        p.mesh.material.opacity = Math.max(0, 1.0 - p.life / p.maxLife);
+      }
+
+      // Live Campfire Flame Flicker + Rising Sparks on Every Lit Hearth!
+      for (const sm of structMeshes.values()) {
+        if (sm.userData.flame && sm.userData.flame.visible) {
+          const flk = 0.85 + Math.sin(t * 14.0 + sm.position.x) * 0.22;
+          sm.userData.flame.scale.set(1.0, flk, 1.0);
+          if (sm.userData.light) sm.userData.light.intensity = 3.8 + flk * 1.2;
+          if (Math.random() < 0.04) spawnActionFX('fire', sm.position.x, sm.position.z, 1);
+        }
+      }
+
       // 3D Rain / Storm / Snow Precipitation Fall
       if (precipPoints.visible) {
         const isSnow = latestState?.world?.weather === 'snow';
@@ -3657,6 +3767,22 @@
         }
         if (ud.illnessMesh && ud.illnessMesh.visible) {
           ud.illnessMesh.rotation.z = t * 1.8;
+        }
+        // Expressive Live Action Gestures (Attack lunge, Planting/Vigil bow, Eating/Crafting arm motion!)
+        if (!ud.isSleeping && ud.currentActionFx) {
+          if (ud.currentActionFx === 'attack') {
+            ud.rightArm.rotation.x = -1.1 + Math.sin(t * 16.0) * 0.65;
+          } else if (ud.currentActionFx === 'plant' || ud.currentActionFx === 'vigil' || ud.currentActionFx === 'bury') {
+            ud.headGroup.rotation.x = 0.35;
+            ud.leftArm.rotation.x = -0.65; ud.rightArm.rotation.x = -0.65;
+          } else if (ud.currentActionFx === 'eat' || ud.currentActionFx === 'fire' || ud.currentActionFx === 'heal') {
+            ud.rightArm.rotation.x = -0.85 + Math.sin(t * 10.0) * 0.25;
+            ud.headGroup.rotation.x = 0.15;
+          } else {
+            ud.headGroup.rotation.x = 0;
+          }
+        } else {
+          ud.headGroup.rotation.x = 0;
         }
 
         if (ud.tagPriority > 0) {

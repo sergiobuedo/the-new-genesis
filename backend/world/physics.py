@@ -622,10 +622,15 @@ class CosmosWorld:
         self.evolved_fauna: Dict[str, Dict[str, Any]] = {}  # Newly speciated wild species!
         self.thermal_vents: List[Tuple[float, float]] = []
         self.caves: Dict[str, CaveSite] = {}
-        # Stochastic Weather & Solar Anomaly State
+        # Stochastic Weather, Solar Anomaly & Earth Geophysics / Natural Disasters State
         self.weather: str = "clear"  # "clear" | "rain" | "storm" | "fog" | "snow" | "drought"
         self.weather_ticks_left: int = 90
         self.solar_anomaly_c: float = 0.0
+        self.soil_fertility: Dict[Tuple[int, int], float] = {}  # 0.35..1.50 per chunk (Nile-like silt & depletion!)
+        self.active_disaster: str = ""  # "" | "earthquake" | "volcanic_eruption" | "river_flood" | "wildfire"
+        self.disaster_xy: Tuple[float, float] = (0.0, 0.0)
+        self.disaster_ticks: int = 0
+        self.newly_triggered_disaster: Optional[Dict[str, Any]] = None
 
         # Generate the Central Crossroads + all 3 distant Continental Homelands!
         seed_centers = [(0, 0), (-8, -7), (9, -7), (1, 9)]
@@ -1044,8 +1049,54 @@ class CosmosWorld:
                 temp += (4.8 - d) * (3.0 + st.stories * 0.4)
         return round(temp, 2)
 
+    def soil_fertility_at(self, x: float, y: float) -> float:
+        ck = self.tile_to_chunk(int(round(x)), int(round(y)))
+        return round(self.soil_fertility.get(ck, 1.0), 2)
+
+    def deplete_soil_at(self, x: float, y: float, amount: float = 0.03) -> None:
+        ck = self.tile_to_chunk(int(round(x)), int(round(y)))
+        self.soil_fertility[ck] = max(0.35, round(self.soil_fertility.get(ck, 1.0) - amount, 3))
+
     def step_environment(self) -> None:
         self.tick_count += 1
+        self.newly_triggered_disaster = None
+        if self.disaster_ticks > 0:
+            self.disaster_ticks -= 1
+            if self.disaster_ticks == 0:
+                self.active_disaster = ""
+
+        # Natural Earth Geophysics (Plate Tectonics, Volcanic Ash, Nile-Style River Floods & Lightning Wildfires)
+        if not self.active_disaster and self.tick_count % 240 == 0 and self.rng.random() < 0.14:
+            r_d = self.rng.random()
+            if self.weather == "drought" and r_d < 0.45:
+                self.active_disaster = "wildfire"
+                self.disaster_xy = (self.rng.uniform(-45, 45), self.rng.uniform(70, 155))
+                self.disaster_ticks = 65
+            elif self.weather in ("rain", "storm") and r_d < 0.50:
+                self.active_disaster = "river_flood"
+                self.disaster_xy = (-12.0, self.rng.uniform(-120, 120))
+                self.disaster_ticks = 75
+                for ck in list(self.chunks.keys()):
+                    self.soil_fertility[ck] = min(1.50, round(self.soil_fertility.get(ck, 1.0) + 0.18, 2))
+            elif r_d < 0.78:
+                self.active_disaster = "volcanic_eruption"
+                self.disaster_xy = self.thermal_vents[0] if self.thermal_vents else (145.0, -115.0)
+                self.disaster_ticks = 85
+                self.solar_anomaly_c = max(-3.2, self.solar_anomaly_c - 1.4)  # Volcanic winter cooling!
+                for ck in list(self.chunks.keys()):
+                    self.soil_fertility[ck] = min(1.50, round(self.soil_fertility.get(ck, 1.0) + 0.22, 2))
+            else:
+                self.active_disaster = "earthquake"
+                self.disaster_xy = (self.rng.uniform(-150, 150), self.rng.uniform(-130, 130))
+                self.disaster_ticks = 35
+                for st in self.structures.values():
+                    if math.hypot(st.x - self.disaster_xy[0], st.y - self.disaster_xy[1]) < 45.0:
+                        st.durability = max(20.0, st.durability - 35.0)
+            self.newly_triggered_disaster = {
+                "kind": self.active_disaster,
+                "x": round(self.disaster_xy[0], 1),
+                "y": round(self.disaster_xy[1], 1),
+            }
         # Stochastic Weather & Solar Flux Evolution
         self.weather_ticks_left -= 1
         if self.weather_ticks_left <= 0:

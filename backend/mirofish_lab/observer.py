@@ -79,6 +79,7 @@ class PopulationSimulation:
         self.couples_formed: int = 0
         self.disease_cases: int = 0
         self.cures_applied: int = 0
+        self.recent_fx: List[Dict[str, Any]] = []  # Live 3D Action FX cues (attack, fire, plant, eat, birth, death, bury...)
         self.discoveries: Dict[str, int] = {}
         self.max_generation: int = 1
         self.rebiogenesis_cycle: int = 1
@@ -179,8 +180,38 @@ class PopulationSimulation:
         self.clashes_today = 0
         self.gifts_today = 0
 
+    def _emit_fx(self, kind: str, x: float, y: float, actor: str = "", label: str = "") -> None:
+        """Records an observable live physical action cue for crisp 3D visual FX rendering."""
+        self.recent_fx.append({
+            "tick": self.world.tick_count,
+            "kind": kind,
+            "x": round(x, 2),
+            "y": round(y, 2),
+            "actor": actor,
+            "label": label,
+        })
+        if len(self.recent_fx) > 24:
+            self.recent_fx.pop(0)
+
     def step_tick(self) -> List[Tuple[KobAgent, str]]:
         self.world.step_environment()
+        if self.world.newly_triggered_disaster and self.enable_culture:
+            d_info = self.world.newly_triggered_disaster
+            d_names = {
+                "earthquake": "Tectonic Earthquake shook the mountain belt!",
+                "volcanic_eruption": "Volcanic Eruption sent cooling ash & fertile minerals across the planet!",
+                "river_flood": "Seasonal River Flood enriched the valley floodplains with fertile silt!",
+                "wildfire": "Lightning sparked a natural summer wildfire across dry grasslands!",
+            }
+            self._emit_fx(d_info["kind"], d_info["x"], d_info["y"], "PLANET", d_info["kind"])
+            self._record_event(
+                "conflict",
+                f"GEOPHYSICS! {d_names.get(d_info['kind'], d_info['kind'])}",
+                [],
+                d_info["x"],
+                d_info["y"],
+                importance=5,
+            )
         living = self.living_agents
 
         # Autonomous Re-Biogenesis ONLY if total planetary extinction occurs (0% human intervention)
@@ -436,6 +467,10 @@ class PopulationSimulation:
 
         burn = 0.024 if agent.is_sleeping else 0.055
         agent.energy = max(0.0, agent.energy - burn)
+        agent.protein_balance = max(10.0, agent.protein_balance - (0.012 if agent.is_sleeping else 0.026))
+        agent.action_fx = ""
+        if agent.grief_ticks > 0:
+            agent.grief_ticks -= 1
         # Freshwater Hydrology & Thirst Homeostasis
         thirst_burn = 0.088 if self.world.weather == "drought" else (0.018 if agent.is_sleeping else 0.044)
         agent.hydration = max(0.0, agent.hydration - thirst_burn)
@@ -504,6 +539,12 @@ class PopulationSimulation:
             elif agent.hydration < 26.0 and self.world.weather == "drought" and "toxin_sickness" not in agent.antibodies:
                 if self.world.rng.random() < 0.04:
                     contracted = "toxin_sickness"
+            elif self.world.elevation_at(agent.x, agent.y) < 0.35 and effective_temp > 21.0 and "vector_fever" not in agent.antibodies:
+                if self.world.rng.random() < 0.018:
+                    contracted = "vector_fever"
+            elif any(an.alive and an.tamed_by and math.hypot(an.x - agent.x, an.y - agent.y) <= 4.5 for an in self.world.animals.values()) and "zoonotic_flu" not in agent.antibodies:
+                if self.world.rng.random() < 0.014:
+                    contracted = "zoonotic_flu"
             if contracted:
                 agent.illness = contracted
                 agent.illness_severity = 22.0
@@ -606,8 +647,10 @@ class PopulationSimulation:
                     other.x - agent.x, other.y - agent.y
                 ) <= 8.0:
                     other.mood = "grieving"
+                    other.grief_ticks = 260
                     other.stress = min(100.0, other.stress + 15.0)
                     other.add_memory(f"Saw the lifeless body of {agent.id}.", self.world.day)
+            self._emit_fx("death", agent.x, agent.y, agent.id, agent.cause_of_death)
 
     def _act_step(
         self,
@@ -671,6 +714,8 @@ class PopulationSimulation:
                         importance=5,
                     )
             agent.pause_ticks = 4
+            agent.action_fx = "heal"
+            self._emit_fx("heal", agent.x, agent.y, agent.id, "Medicine")
             agent.add_memory(f"Used {BLIND_MATERIALS[held_remedy].sensory_name} to ease pain.", self.world.day)
             return
 
@@ -844,6 +889,8 @@ class PopulationSimulation:
                     agent.current_intent = "forage"
                     agent.mood = "grieving"
                     agent.pause_ticks = 6
+                    agent.action_fx = "bury"
+                    self._emit_fx("bury", corpse.x, corpse.y, agent.id, f"Buried {corpse.fallen_id}")
                     agent.action_label = f"Raising burial cairn over {corpse.fallen_id}"
                     if "first_burial_rite" not in self.discoveries:
                         self.discoveries["first_burial_rite"] = self.world.day
@@ -872,6 +919,8 @@ class PopulationSimulation:
                     agent.current_intent = "forage"
                     agent.mood = "grieving"
                     agent.pause_ticks = 5
+                    agent.action_fx = "vigil"
+                    self._emit_fx("vigil", corpse.x, corpse.y, agent.id, f"Offering for {corpse.fallen_id}")
                     agent.action_label = f"Leaving {BLIND_MATERIALS[gift_code].observer_label} for fallen {corpse.fallen_id}"
                     if "first_grave_offering" not in self.discoveries:
                         self.discoveries["first_grave_offering"] = self.world.day
@@ -968,6 +1017,8 @@ class PopulationSimulation:
                 agent.prestige = round(agent.prestige + 1.2, 1)
                 agent.current_intent = "forage"
                 agent.pause_ticks = 5
+                agent.action_fx = "plant"
+                self._emit_fx("plant", sx, sy, agent.id, "Planted crop")
                 agent.action_label = "Tending cultivated cereal garden"
                 if "first_agriculture" not in self.discoveries:
                     self.discoveries["first_agriculture"] = self.world.day
@@ -1059,6 +1110,8 @@ class PopulationSimulation:
                 pspec = FAUNA_CATALOG[prey.species]
                 if math.hypot(prey.x - agent.x, prey.y - agent.y) <= 2.1:
                     prey.health -= 62.0 if agent.has_tool else 28.0
+                    agent.action_fx = "attack"
+                    self._emit_fx("attack", prey.x, prey.y, agent.id, f"Hunt {prey.species}")
                     agent.action_label = f"Hunting wild {prey.species} {prey.id}"
                     agent.pause_ticks = 3
                     # Dangerous megafauna / boars counter-charge if hunted solo without spears!
@@ -1570,11 +1623,12 @@ class PopulationSimulation:
             a
             for a in living_all
             if a.sex == "F"
+            and (self.world.day - a.born_day) >= 7
+            and a.age_years <= 48.0
             and not a.is_pregnant
             and a.energy > 52.0
             and a.warmth > 46.0
             and a.stress < 76.0
-            and (self.world.day - a.born_day) >= 7
         ]
         males = [
             b
@@ -1627,6 +1681,9 @@ class PopulationSimulation:
                     fem.pregnancy_father_genome = mal.genome
                     fem.mood = "affectionate"
                     mal.mood = "affectionate"
+                    fem.action_fx = "court"
+                    mal.action_fx = "court"
+                    self._emit_fx("court", fem.x, fem.y, fem.id, f"{fem.id} ❤️ {mal.id}")
                     fem.action_label = f"Conceived child with mate {mal.id} (♂) · 🤰 Gestating"
                     mal.action_label = f"Bonded with mate {fem.id} (♀)"
                     # Spousal Cultural & Linguistic Sharing (Couples share words & discoveries!)
@@ -1666,6 +1723,14 @@ class PopulationSimulation:
             self._agent_seq += 1
             self.births_today += 1
             child_genome = KobGenome.crossover(mother.genome, father_genome, self.world.rng)
+            # Inbreeding depression if bottleneck forced close-kin union + 4% spontaneous evolutionary mutations!
+            if father_ag and self._are_close_kin(mother, father_ag):
+                child_genome.vitality = max(0.10, round(child_genome.vitality - 0.14, 3))
+            child_traits: List[str] = list(mother.genetic_traits[:2])
+            if self.world.rng.random() < 0.04:
+                mut = self.world.rng.choice(["cold_adapted", "strong_immunity", "keen_mind"])
+                if mut not in child_traits:
+                    child_traits.append(mut)
             c_lin = child_genome.lineage
             prefix = LINEAGE_SPECS[c_lin]["prefix"]
             cid = f"{prefix}-{self._agent_seq:03d}"
@@ -1706,7 +1771,10 @@ class PopulationSimulation:
                 insight_map=inherited_insights,
                 personal_lexicon=inherited_lexicon,
                 cultural_lore=inherited_lore[-6:],
+                genetic_traits=child_traits,
             )
+            mother.action_fx = "birth"
+            self._emit_fx("birth", cx, cy, mother.id, f"Born {cid}")
             child.trust_bonds[mother.id] = 0.95
             mother.trust_bonds[cid] = 0.95
             mother.children_ids.append(cid)
@@ -2785,6 +2853,8 @@ class MiroFishObservatory:
                 "lunar_name": self.live.world.lunar_phase_name,
                 "lunar_illum": self.live.world.lunar_illumination,
                 "tidal_offset": self.live.world.tidal_offset,
+                "active_disaster": self.live.world.active_disaster,
+                "disaster_xy": list(self.live.world.disaster_xy),
                 "speed": self.speed_multiplier,
                 "cortex_active": self.cortex.available,
                 "cortex_label": self.cortex.provider_label,
@@ -2815,6 +2885,7 @@ class MiroFishObservatory:
                     "y": a.y,
                     "heading": round(a.heading, 3),
                     "energy": round(a.energy, 1),
+                    "protein_balance": round(a.protein_balance, 1),
                     "hydration": round(a.hydration, 1),
                     "warmth": round(a.warmth, 1),
                     "rest": round(a.rest, 1),
@@ -2824,6 +2895,8 @@ class MiroFishObservatory:
                     "sleeping": a.is_sleeping,
                     "intent": a.current_intent,
                     "action": a.action_label,
+                    "action_fx": a.action_fx,
+                    "genetic_traits": a.genetic_traits,
                     "bio": a.live_biography_summary(),
                     "thought": a.inner_thought,
                     "utterance": a.last_utterance,
@@ -2902,6 +2975,7 @@ class MiroFishObservatory:
                 if items
             ],
             "metrics": metrics,
+            "recent_fx": self.live.recent_fx[-12:],
             "current_briefing": self.build_daily_briefing(metrics),
             "daily_logs": self.daily_logs[:25],
             "timeline": self.live.timeline[-45:],

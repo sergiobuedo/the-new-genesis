@@ -176,17 +176,21 @@ class KobAgent:
     pregnancy_father_genome: Optional[KobGenome] = None
     children_ids: List[str] = field(default_factory=list)
 
-    # Homeostasis, Pathology & Psychology (0..100)
+    # Homeostasis, Nutrition, Pathology & Psychology (0..100)
     energy: float = 84.0
+    protein_balance: float = 78.0  # Macronutrient protein/diet balance (boosted by cooked meat/fish/nuts!)
     hydration: float = 90.0
     warmth: float = 88.0
     rest: float = 88.0
     integrity: float = 100.0
     stress: float = 10.0
     age_days: float = 0.0
-    illness: str = ""  # "" | "cold_fever" | "wound_sepsis" | "toxin_sickness" | "camp_plague"
+    grief_ticks: int = 0  # Multi-day human-like bereavement after losing a mate or close kin
+    illness: str = ""  # "" | "cold_fever" | "wound_sepsis" | "toxin_sickness" | "camp_plague" | "vector_fever" | "zoonotic_flu"
     illness_severity: float = 0.0  # 0..100
     antibodies: List[str] = field(default_factory=list)  # Acquired immunity after natural recovery!
+    genetic_traits: List[str] = field(default_factory=list)  # Spontaneous evolutionary mutations (e.g. cold_adapted, strong_immunity)
+    action_fx: str = ""  # Live visual action cue for 3D FX: "" | "eat" | "fire" | "plant" | "attack" | "court" | "birth" | "vigil" | "bury" | "music" | "play" | "heal"
 
     # Smooth Locomotion Steering State (Eliminates 100% of spinning/jitter!)
     heading: float = 0.0
@@ -224,6 +228,15 @@ class KobAgent:
     @property
     def age_years(self) -> float:
         return round(self.age_days / 40.0, 1)
+
+    @property
+    def is_fertile(self) -> bool:
+        """Human-like reproductive window: females enter menopause around 48 planetary years (Grandmother Hypothesis!)."""
+        if self.age_days < 7.0:
+            return False
+        if self.sex == "F" and self.age_years > 48.0:
+            return False
+        return True
 
     @property
     def life_stage(self) -> str:
