@@ -378,6 +378,8 @@
         <button id="btn-autodir" title="Follow Active Creature">🎥 Follow</button>
         <button id="btn-closeup" title="Close-Up Emotional Face">🔍 Face</button>
         <button id="btn-toggle-hud" title="Show or Hide All Side Panels">👁️ Menus</button>
+        <button id="btn-advances" style="border-color:var(--emerald);background:rgba(52,211,153,0.16);color:#ecfdf5;font-weight:700;" title="Ver todos los Avances y Hitos de la Civilización / View All Civilizational Advances">🏛️ Avances</button>
+        <button id="btn-wizard" style="border-color:var(--accent);background:rgba(56,189,248,0.16);color:#e0f2fe;font-weight:700;" title="Guía Rápida Interactiva / Quick Interactive Tour">❓ Guía</button>
         <button id="btn-papers" class="btn-papers" title="APA 7th Scientific Monographs (Dr. Sergio Buedo Martínez)">📄 APA Papers</button>
         <button id="btn-snap" title="Save HD Photo">📸</button>
         <button id="btn-rec" title="Record 8s Video">🎬</button>
@@ -543,6 +545,47 @@
     </div>
   </div>
 
+  <!-- Dedicated Civilizational Advances & Progress Showcase Modal -->
+  <div id="advances-modal" style="position:fixed;inset:0;z-index:86;display:none;align-items:center;justify-content:center;background:rgba(6,10,19,0.84);backdrop-filter:blur(10px);padding:18px;">
+    <div class="modal-box" style="max-width:960px;max-height:88vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div>
+          <h2 id="adv-modal-title" style="font-size:16px;color:var(--emerald);">🏛️ Avances de la Civilización · Cronología Completa</h2>
+          <div id="adv-modal-sub" style="font-size:11px;color:var(--muted);">Todo lo que han descubierto y creado por sí mismos con 0% intervención humana</div>
+        </div>
+        <button id="btn-close-advances" style="background:rgba(244,63,94,0.2);border:1px solid var(--rose);color:#fff;border-radius:7px;padding:5px 12px;cursor:pointer;font-weight:700;">✕</button>
+      </div>
+      <div id="adv-modal-body" style="display:flex;flex-direction:column;gap:13px;margin-top:8px;font-size:12px;line-height:1.5;"></div>
+    </div>
+  </div>
+
+  <!-- First-Time Visitor Interactive Onboarding Wizard -->
+  <div id="wizard-modal" style="position:fixed;inset:0;z-index:95;display:none;align-items:center;justify-content:center;background:rgba(4,8,18,0.86);backdrop-filter:blur(12px);padding:16px;">
+    <div class="modal-box" style="max-width:740px;max-height:90vh;overflow-y:auto;border-color:rgba(56,189,248,0.45);box-shadow:0 24px 60px rgba(0,0,0,0.65);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:10px;">
+        <div>
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--accent);font-weight:700;">THE NEW GENESIS · GOD'S WINDOW</div>
+          <h2 id="wiz-title" style="font-size:17px;color:#fff;margin-top:2px;">🌍 Bienvenido al Observatorio Planetario</h2>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button id="wiz-lang-toggle" style="background:rgba(56,189,248,0.16);border:1px solid var(--accent);color:#e0f2fe;border-radius:7px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:700;">ES / EN</button>
+          <button id="wiz-close-x" style="background:rgba(148,163,184,0.15);border:1px solid var(--border);color:#cbd5e1;border-radius:7px;padding:4px 10px;cursor:pointer;font-weight:700;">✕</button>
+        </div>
+      </div>
+
+      <div id="wiz-body" style="margin-top:12px;font-size:12.5px;line-height:1.58;color:#e2e8f0;min-height:240px;"></div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px;padding-top:10px;border-top:1px solid var(--border);flex-wrap:wrap;">
+        <div id="wiz-dots" style="display:flex;gap:6px;align-items:center;"></div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button id="wiz-skip" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:7px 12px;cursor:pointer;font-size:11.5px;">Saltar</button>
+          <button id="wiz-prev" style="background:rgba(30,41,59,0.9);border:1px solid var(--border);color:#fff;border-radius:8px;padding:7px 13px;cursor:pointer;font-size:11.5px;font-weight:600;">← Anterior</button>
+          <button id="wiz-next" style="background:linear-gradient(135deg,#0284c7,#10b981);border:none;color:#fff;border-radius:8px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:700;">Siguiente →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -551,7 +594,7 @@
     if (params.get('clean') === '1') document.body.classList.add('clean-shot');
     const API_ORIGIN = params.get('api') || location.origin;
 
-    let currentLang = 'en';
+    let currentLang = (params.get('lang') === 'en') ? 'en' : ((params.get('lang') === 'es' || (navigator.language || '').toLowerCase().startsWith('es')) ? 'es' : 'en');
     const UI_STRINGS = {
       en: {
         subjCardTitle: '🔬 Creature Needs & Daily Diary',
@@ -740,8 +783,322 @@
     document.getElementById('pill-day-briefing').addEventListener('click', openDailyBriefingModal);
     document.getElementById('btn-close-daily').addEventListener('click', () => { dailyModal.style.display = 'none'; });
     dailyModal.addEventListener('click', (ev) => { if (ev.target === dailyModal) dailyModal.style.display = 'none'; });
+
+    // Dedicated Civilizational Advances & Progress Showcase Modal
+    const advancesModal = document.getElementById('advances-modal');
+    const advBody = document.getElementById('adv-modal-body');
+
+    function renderAdvancesModal() {
+      if (!latestState) return;
+      const es = currentLang === 'es';
+      const w = latestState.world || {};
+      const m = latestState.metrics || {};
+      const disc = m.discoveries || {};
+      const msList = es ? (m.milestone_list_es || []) : (m.milestone_list_en || []);
+      const discKeys = Object.keys(disc);
+
+      document.getElementById('adv-modal-title').textContent = es
+        ? `🏛️ Avances de la Civilización · Año ${w.year || 1} (Día ${w.day || 1})`
+        : `🏛️ Civilizational Advances · Year ${w.year || 1} (Day ${w.day || 1})`;
+      document.getElementById('adv-modal-sub').textContent = es
+        ? `Todo lo que han descubierto y creado por sí mismos con 0% intervención · ${msList.length} hitos registrados`
+        : `Everything discovered and built entirely on their own (0% interference) · ${msList.length} milestones recorded`;
+
+      const eras = [
+        { id: 'paleo', icon: '🪨', nameEs: 'Paleolítico', nameEn: 'Paleolithic', unlocked: true },
+        { id: 'neo', icon: '🌾', nameEs: 'Neolítico / Agrario', nameEn: 'Neolithic / Agrarian', unlocked: !!(disc.first_agriculture || disc.struct_hearth || disc.struct_shelter || disc.first_barter_trade) },
+        { id: 'bronze', icon: '⚒️', nameEs: 'Edad del Bronce', nameEn: 'Bronze & Craft Age', unlocked: !!(disc.craft_bronze_tool || disc.craft_wheeled_cart || disc.struct_watercraft || disc.struct_edifice) },
+        { id: 'ind', icon: '📡', nameEs: 'Era Técnica / Señales', nameEn: 'Tech & Signal Era', unlocked: !!(disc.struct_comm_relay || disc.struct_land_vehicle || disc.craft_copper_coil || disc.craft_clinical_cure) },
+        { id: 'space', icon: '🛰️', nameEs: 'Era Espacial', nameEn: 'Spacefaring Era', unlocked: !!(disc.struct_air_craft || disc.struct_orbital_satellite) }
+      ];
+
+      const eraBarHtml = `
+        <div style="background:rgba(15,23,42,0.88);border:1px solid var(--border);border-radius:11px;padding:12px;">
+          <div style="font-weight:700;color:var(--amber);margin-bottom:8px;">📈 ${es ? 'PROGRESO HISTÓRICO ALCANZADO POR LIBRE ALBEDRÍO' : 'HISTORICAL ERA REACHED BY FREE WILL'}</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px;">
+            ${eras.map(er => `
+              <div style="padding:8px;border-radius:8px;text-align:center;border:1px solid ${er.unlocked ? 'var(--emerald)' : 'rgba(148,163,184,0.2)'};background:${er.unlocked ? 'rgba(16,185,129,0.16)' : 'rgba(15,23,42,0.5)'};opacity:${er.unlocked ? '1' : '0.52'};">
+                <div style="font-size:18px;">${er.icon}</div>
+                <div style="font-weight:700;font-size:11px;color:${er.unlocked ? '#ecfdf5' : 'var(--muted)'};">${es ? er.nameEs : er.nameEn}</div>
+                <div style="font-size:10px;color:${er.unlocked ? 'var(--emerald)' : 'var(--muted)'};">${er.unlocked ? (es ? '✓ Alcanzada' : '✓ Reached') : (es ? 'Por descubrir' : 'Undiscovered')}</div>
+              </div>
+            `).join('')}
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11.5px;color:#e2e8f0;">
+            <span>⏳ ${es ? 'Esperanza de vida' : 'Life expectancy'}: <strong style="color:var(--emerald)">~${Math.round(m.era_life_expectancy_yrs || 36)} ${es ? 'años' : 'yrs'}</strong></span>
+            <span>🗣️ ${es ? 'Vocabulario propio' : 'Invented words'}: <strong style="color:var(--amber)">${m.shared_words_count || 0}</strong></span>
+            <span>❤️ ${es ? 'Parejas activas' : 'Bonded couples'}: <strong style="color:#f472b6">${m.bonded_couples || 0}</strong></span>
+            <span>🤝 ${es ? 'Trueques' : 'Barter trades'}: <strong>${m.trade_count || 0}</strong></span>
+            <span>🌾 ${es ? 'Cultivos' : 'Farms'}: <strong>${m.crops_planted || 0}</strong></span>
+            <span>🧪 ${es ? 'Ensayos empíricos' : 'Experiments'}: <strong>${m.experiment_trials || 0}</strong></span>
+          </div>
+        </div>`;
+
+      const cats = [
+        { titleEs: '🧠 Lenguaje, Cultura y Ritos Funerarios', titleEn: '🧠 Language, Culture & Funerary Rites', color: '#c084fc', keys: ['first_shared_word','first_interspecies_pidgin','first_philosophy','first_mourning_vigil','first_grave_offering','first_burial_rite','struct_monolith','craft_crafted_ornament'] },
+        { titleEs: '❤️ Biología, Parejas y Nuevas Especies', titleEn: '❤️ Biology, Families & Speciation', color: '#f472b6', keys: ['first_pair_bond','gen_2_born','first_sentient_speciation','first_fauna_speciation','first_interspecies_peace','first_altruism'] },
+        { titleEs: '🌾 Caza, Pesca, Agricultura y Comercio', titleEn: '🌾 Hunting, Fishing, Farming & Trade', color: '#34d399', keys: ['first_hunt','first_fishing','first_domestication','first_agriculture','first_cooked_meal','first_barter_trade','first_frontier_expansion'] },
+        { titleEs: '🔥 Tecnología, Medicina y Arquitectura', titleEn: '🔥 Technology, Medicine & Architecture', color: '#38bdf8', keys: ['struct_hearth','craft_composite_tool','craft_warm_cloak','struct_shelter','struct_granary','struct_palisade','first_herbal_medicine','first_herbal_remedy','craft_herbal_remedy','craft_antiseptic_balm','craft_clinical_cure','craft_bronze_tool','craft_compass_stone','struct_watercraft','craft_wheeled_cart','struct_burrow_network','struct_edifice','struct_comm_relay','struct_land_vehicle','struct_air_craft','struct_orbital_satellite','struct_open_creation'] }
+      ];
+
+      const rawMap = {};
+      for (const line of msList) {
+        const dMatch = line.match(/(\d+)/);
+        if (dMatch) rawMap[line] = parseInt(dMatch[1], 10);
+      }
+      const catCardsHtml = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:10px;">
+          ${cats.map(cat => {
+            const unlockedKeys = cat.keys.filter(k => disc[k] !== undefined);
+            const itemsHtml = unlockedKeys.length > 0
+              ? unlockedKeys.map(k => {
+                  const day = disc[k];
+                  const matchLine = msList.find(l => l.startsWith(`Día ${day}:`) || l.startsWith(`Day ${day}:`)) || `${es ? 'Día' : 'Day'} ${day}: ${k.replace(/_/g, ' ')}`;
+                  return `<div style="padding:5px 7px;background:rgba(30,41,59,0.75);border-left:3px solid ${cat.color};border-radius:5px;font-size:11.5px;">✓ ${matchLine}</div>`;
+                }).join('')
+              : `<div style="color:var(--muted);font-size:11px;font-style:italic;">${es ? 'Aún no han alcanzado hitos en esta categoría.' : 'No milestones achieved in this category yet.'}</div>`;
+            return `
+              <div style="background:rgba(15,23,42,0.82);border:1px solid var(--border);border-radius:10px;padding:10px;">
+                <div style="font-weight:700;color:${cat.color};margin-bottom:7px;">${es ? cat.titleEs : cat.titleEn} (${unlockedKeys.length})</div>
+                <div style="display:flex;flex-direction:column;gap:5px;">${itemsHtml}</div>
+              </div>`;
+          }).join('')}
+        </div>`;
+
+      const fullTimelineHtml = msList.length > 0 ? `
+        <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:11px;">
+          <div style="font-weight:700;color:var(--amber);margin-bottom:6px;">📜 ${es ? 'CRONOLOGÍA COMPLETA DE HITOS Y EVENTOS EVOLUTIVOS' : 'COMPLETE TIMELINE OF EVOLUTIONARY MILESTONES'} (${msList.length})</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:6px;">
+            ${msList.slice().reverse().map(l => `<div style="padding:5px 8px;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.25);border-radius:7px;font-size:11px;">✓ ${l}</div>`).join('')}
+          </div>
+        </div>` : '';
+
+      advBody.innerHTML = eraBarHtml + catCardsHtml + fullTimelineHtml;
+    }
+
+    function openAdvancesModal() {
+      advancesModal.style.display = 'flex';
+      renderAdvancesModal();
+    }
+    document.getElementById('btn-advances').addEventListener('click', openAdvancesModal);
+    document.getElementById('btn-close-advances').addEventListener('click', () => { advancesModal.style.display = 'none'; });
+    advancesModal.addEventListener('click', (ev) => { if (ev.target === advancesModal) advancesModal.style.display = 'none'; });
+
+    // First-Time Visitor Interactive Onboarding Wizard (4 Clear, Live-Data Steps!)
+    const wizardModal = document.getElementById('wizard-modal');
+    const wizTitle = document.getElementById('wiz-title');
+    const wizBody = document.getElementById('wiz-body');
+    const wizDots = document.getElementById('wiz-dots');
+    const wizPrev = document.getElementById('wiz-prev');
+    const wizNext = document.getElementById('wiz-next');
+    const wizSkip = document.getElementById('wiz-skip');
+    let wizStep = 0;
+
+    function closeWizard() {
+      wizardModal.style.display = 'none';
+      try { localStorage.setItem('tng_wizard_v1', 'seen'); } catch (_) {}
+    }
+
+    function renderWizardStep() {
+      const es = currentLang === 'es';
+      const w = latestState?.world || { year: 13, day: 492, season: 'Summer', ambient_temp: 19, weather: 'clear' };
+      const m = latestState?.metrics || { live_population: 21, males_count: 10, females_count: 11, bonded_couples: 3, pregnant_count: 3, shared_words_count: 10, era_life_expectancy_yrs: 56, species_counts: {}, archetype_es: 'Sociedad Emergente', archetype_en: 'Emergent Society' };
+      const msList = es ? (m.milestone_list_es || []) : (m.milestone_list_en || []);
+      const spEntries = Object.entries(m.species_counts || {});
+      const spHtml = spEntries.map(([k, v]) => `<span style="padding:3px 8px;border-radius:999px;background:rgba(56,189,248,0.14);border:1px solid rgba(56,189,248,0.35);font-size:11.5px;font-weight:700;">${k}${k.includes('-') ? ' ✨' : ''}: ${v}</span>`).join(' ');
+
+      const steps = [
+        {
+          title: es ? '🌍 1/4 · ¿Qué es The New Genesis (God’s Window)?' : '🌍 1/4 · What is The New Genesis (God’s Window)?',
+          html: es ? `
+            <p style="margin-bottom:10px;">Estás mirando en directo un <strong>experimento científico abierto de vida artificial y antropología computacional</strong> dirigido por el Dr. Sergio Buedo Martínez.</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:9px;">
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
+                <div style="font-weight:700;color:var(--accent);margin-bottom:4px;">🔒 0% Intervención Humana</div>
+                Nadie les dice qué hacer, qué construir ni qué palabras inventar. Actúan por libre albedrío según su hambre, frío, miedo, curiosidad y empatía.
+              </div>
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
+                <div style="font-weight:700;color:var(--emerald);margin-bottom:4px;">🧬 Biología y Ecosistema Real</div>
+                Viven en una Supertierra (10× la Tierra) con 24 especies animales, estaciones, clima, enfermedades, reproducción sexual (♂+♀), embarazos y familias.
+              </div>
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
+                <div style="font-weight:700;color:var(--amber);margin-bottom:4px;">📜 Todo Queda Documentado</div>
+                El planeta sigue vivo 24/7 en la nube. Cada invento, palabra, trueque, parto o rito funerario queda registrado y sellado con SHA-256.
+              </div>
+            </div>` : `
+            <p style="margin-bottom:10px;">You are watching a live <strong>open computational anthropology & artificial life experiment</strong> led by Dr. Sergio Buedo Martínez.</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:9px;">
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
+                <div style="font-weight:700;color:var(--accent);margin-bottom:4px;">🔒 Strict 0% Interference</div>
+                Nobody tells these beings what to build, say, or believe. Every action emerges from their own hunger, warmth, curiosity, and empathy.
+              </div>
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
+                <div style="font-weight:700;color:var(--emerald);margin-bottom:4px;">🧬 Living Biosphere & Families</div>
+                A 10× Earth planet with 24 wild species, seasons, weather, natural diseases, male-female reproduction (♂+♀), pregnancy, and cultural inheritance.
+              </div>
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
+                <div style="font-weight:700;color:var(--amber);margin-bottom:4px;">📜 24/7 Scientific Record</div>
+                The planet evolves continuously in the cloud, logging every word, trade, birth, and discovery into a SHA-256 verified archive.
+              </div>
+            </div>`
+        },
+        {
+          title: es ? `⏳ 2/4 · Situación Actual · Año ${w.year} (Día ${w.day})` : `⏳ 2/4 · Live Status Today · Year ${w.year} (Day ${w.day})`,
+          html: es ? `
+            <div style="background:rgba(16,185,129,0.12);border:1px solid var(--emerald);border-radius:10px;padding:11px;margin-bottom:10px;">
+              <div style="font-size:13.5px;font-weight:700;color:#ecfdf5;">📅 Tiempo transcurrido: <strong>Año ${w.year}, Día ${w.day}</strong> · ${w.season} (${w.ambient_temp}°C)</div>
+              <div style="margin-top:4px;color:#cbd5e1;">Forma de sociedad emergente hoy: <strong style="color:var(--amber)">${m.archetype_es || ''}</strong></div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:10px;">
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:9px;padding:9px;text-align:center;">
+                <div style="font-size:19px;font-weight:800;color:var(--accent);">${m.live_population}</div>
+                <div style="font-size:11px;color:var(--muted);">Seres vivos (${m.males_count || 0}♂ · ${m.females_count || 0}♀)</div>
+              </div>
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:9px;padding:9px;text-align:center;">
+                <div style="font-size:19px;font-weight:800;color:#f472b6;">❤️ ${m.bonded_couples || 0} · 🤰 ${m.pregnant_count || 0}</div>
+                <div style="font-size:11px;color:var(--muted);">Parejas y madres gestando</div>
+              </div>
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:9px;padding:9px;text-align:center;">
+                <div style="font-size:19px;font-weight:800;color:var(--emerald);">~${Math.round(m.era_life_expectancy_yrs || 36)} años</div>
+                <div style="font-size:11px;color:var(--muted);">Esperanza de vida actual</div>
+              </div>
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:9px;padding:9px;text-align:center;">
+                <div style="font-size:19px;font-weight:800;color:var(--amber);">${m.shared_words_count || 0}</div>
+                <div style="font-size:11px;color:var(--muted);">Palabras inventadas</div>
+              </div>
+            </div>
+            <div><strong>🧬 Razas vivas ahora (incluidos híbridos espontáneos ✨):</strong><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${spHtml || 'Cargando…'}</div></div>` : `
+            <div style="background:rgba(16,185,129,0.12);border:1px solid var(--emerald);border-radius:10px;padding:11px;margin-bottom:10px;">
+              <div style="font-size:13.5px;font-weight:700;color:#ecfdf5;">📅 Elapsed Time: <strong>Year ${w.year}, Day ${w.day}</strong> · ${w.season} (${w.ambient_temp}°C)</div>
+              <div style="margin-top:4px;color:#cbd5e1;">Current emergent society: <strong style="color:var(--amber)">${m.archetype_en || ''}</strong></div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:10px;">
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:9px;padding:9px;text-align:center;">
+                <div style="font-size:19px;font-weight:800;color:var(--accent);">${m.live_population}</div>
+                <div style="font-size:11px;color:var(--muted);">Living beings (${m.males_count || 0}♂ · ${m.females_count || 0}♀)</div>
+              </div>
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:9px;padding:9px;text-align:center;">
+                <div style="font-size:19px;font-weight:800;color:#f472b6;">❤️ ${m.bonded_couples || 0} · 🤰 ${m.pregnant_count || 0}</div>
+                <div style="font-size:11px;color:var(--muted);">Couples & pregnant mothers</div>
+              </div>
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:9px;padding:9px;text-align:center;">
+                <div style="font-size:19px;font-weight:800;color:var(--emerald);">~${Math.round(m.era_life_expectancy_yrs || 36)} yrs</div>
+                <div style="font-size:11px;color:var(--muted);">Current era life expectancy</div>
+              </div>
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:9px;padding:9px;text-align:center;">
+                <div style="font-size:19px;font-weight:800;color:var(--amber);">${m.shared_words_count || 0}</div>
+                <div style="font-size:11px;color:var(--muted);">Shared invented words</div>
+              </div>
+            </div>
+            <div><strong>🧬 Living Races Today (including spontaneous hybrids ✨):</strong><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${spHtml || 'Loading…'}</div></div>`
+        },
+        {
+          title: es ? '🏛️ 3/4 · Grandes Avances Logrados Hasta Hoy' : '🏛️ 3/4 · Major Breakthroughs Achieved So Far',
+          html: `
+            <p style="margin-bottom:8px;">${es ? `Estos son los últimos logros descubiertos de forma 100% autónoma (${msList.length} hitos totales):` : `Here are their latest unscripted discoveries (${msList.length} total milestones):`}</p>
+            <div style="display:flex;flex-direction:column;gap:5px;max-height:175px;overflow-y:auto;margin-bottom:10px;">
+              ${msList.slice().reverse().slice(0, 8).map(l => `<div style="padding:6px 9px;background:rgba(52,211,153,0.10);border-left:3px solid var(--emerald);border-radius:6px;font-size:11.5px;">✓ ${l}</div>`).join('') || `<div style="color:var(--muted)">${es ? 'Observando los primeros hitos...' : 'Observing first milestones...'}</div>`}
+            </div>
+            <button id="wiz-open-advances" style="width:100%;padding:9px;border-radius:8px;border:1px solid var(--emerald);background:rgba(16,185,129,0.18);color:#ecfdf5;font-weight:700;cursor:pointer;">🏛️ ${es ? 'Abrir Panel Completo de Todos los Avances' : 'Open Full Civilizational Advances Panel'}</button>`
+        },
+        {
+          title: es ? '🎮 4/4 · Cómo Moverte y Entenderlo Todo Fácil' : '🎮 4/4 · How to Navigate & Explore Easily',
+          html: es ? `
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px;">
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
+                <div style="font-weight:700;color:var(--accent);margin-bottom:4px;">🖱️ Cámara y Planeta 3D</div>
+                Arrastra para girar, haz zoom con rueda o pellizco. Si alejas mucho, verás el <strong>planeta 3D redondo</strong>. En PC usa <strong>flechas / WASD</strong>; en móvil mantén pulsado 1 dedo para desplazarte.
+              </div>
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
+                <div style="font-weight:700;color:var(--emerald);margin-bottom:4px;">👆 Haz Clic en Cualquier Cosa</div>
+                Toca cualquier <strong>ser, animal, huerto, cueva o edificio</strong> para ver qué es, qué piensa, quién es su pareja y su historia.
+              </div>
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
+                <div style="font-weight:700;color:var(--amber);margin-bottom:4px;">🧭 Botones Clave Arriba</div>
+                • <strong>📋 Año/Día</strong>: Parte Diario por continentes y razas.<br/>
+                • <strong>🏛️ Avances</strong>: Todos sus hitos y era histórica.<br/>
+                • <strong>👁️ Menus</strong>: Oculta paneles para ver el mundo 3D limpio.<br/>
+                • <strong>Píldoras de Razas</strong>: Vuela directo a su continente.
+              </div>
+            </div>` : `
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px;">
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
+                <div style="font-weight:700;color:var(--accent);margin-bottom:4px;">🖱️ Camera & Round 3D Planet</div>
+                Drag to rotate, scroll or pinch to zoom. Zoom far out to see the <strong>spherical 3D planet</strong>. Use <strong>Arrow keys / WASD</strong> on PC or 1-finger hold on mobile to glide.
+              </div>
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
+                <div style="font-weight:700;color:var(--emerald);margin-bottom:4px;">👆 Click Anything in 3D</div>
+                Tap any <strong>being, animal, farm, cave, or structure</strong> to inspect what it is, its thoughts, mate, pregnancy, and memories.
+              </div>
+              <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
+                <div style="font-weight:700;color:var(--amber);margin-bottom:4px;">🧭 Key Topbar Buttons</div>
+                • <strong>📋 Year/Day</strong>: Full Daily Planetary Briefing.<br/>
+                • <strong>🏛️ Avances</strong>: Complete civilizational progress showcase.<br/>
+                • <strong>👁️ Menus</strong>: Hide side panels for a clean 3D view.<br/>
+                • <strong>Race Pills</strong>: Fly straight to each continent.
+              </div>
+            </div>`
+        }
+      ];
+
+      const cur = steps[wizStep] || steps[0];
+      wizTitle.textContent = cur.title;
+      wizBody.innerHTML = cur.html;
+      wizDots.innerHTML = steps.map((_, i) => `<span style="width:${i === wizStep ? '22px' : '8px'};height:8px;border-radius:999px;background:${i === wizStep ? 'var(--accent)' : 'rgba(148,163,184,0.35)'};transition:all 0.2s;"></span>`).join('');
+      wizPrev.style.display = wizStep === 0 ? 'none' : 'inline-block';
+      wizPrev.textContent = es ? '← Anterior' : '← Back';
+      wizSkip.textContent = es ? 'Saltar' : 'Skip';
+      wizNext.textContent = wizStep === steps.length - 1
+        ? (es ? '🚀 Empezar a Observar' : '🚀 Start Observing')
+        : (es ? 'Siguiente →' : 'Next →');
+
+      const btnAdvInWiz = document.getElementById('wiz-open-advances');
+      if (btnAdvInWiz) {
+        btnAdvInWiz.addEventListener('click', () => { closeWizard(); openAdvancesModal(); });
+      }
+    }
+
+    function openWizard(step = 0) {
+      wizStep = step;
+      wizardModal.style.display = 'flex';
+      renderWizardStep();
+    }
+
+    document.getElementById('btn-wizard').addEventListener('click', () => openWizard(0));
+    document.getElementById('wiz-close-x').addEventListener('click', closeWizard);
+    wizSkip.addEventListener('click', closeWizard);
+    wizPrev.addEventListener('click', () => { if (wizStep > 0) { wizStep--; renderWizardStep(); } });
+    wizNext.addEventListener('click', () => {
+      if (wizStep < 3) { wizStep++; renderWizardStep(); }
+      else closeWizard();
+    });
+    document.getElementById('wiz-lang-toggle').addEventListener('click', () => {
+      currentLang = currentLang === 'es' ? 'en' : 'es';
+      document.getElementById('lang-select').value = currentLang;
+      document.getElementById('lang-select').dispatchEvent(new Event('change'));
+      renderWizardStep();
+    });
+    wizardModal.addEventListener('click', (ev) => { if (ev.target === wizardModal) closeWizard(); });
+
+    // Auto-open Wizard on a visitor's first visit (or when ?tour=1 is passed), skipping in clean screenshot mode!
+    let wizardAutoOpened = false;
+    function maybeAutoOpenWizard() {
+      if (wizardAutoOpened || params.get('clean') === '1') return;
+      let seen = false;
+      try { seen = localStorage.getItem('tng_wizard_v1') === 'seen'; } catch (_) {}
+      if (!seen || params.get('tour') === '1') {
+        wizardAutoOpened = true;
+        openWizard(0);
+      }
+    }
+
     window.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Escape') { papersModal.style.display = 'none'; dailyModal.style.display = 'none'; }
+      if (ev.key === 'Escape') {
+        papersModal.style.display = 'none';
+        dailyModal.style.display = 'none';
+        advancesModal.style.display = 'none';
+        closeWizard();
+      }
     });
 
     let WORLD_SEED = 4201;
@@ -2061,16 +2418,28 @@
       });
     });
 
-    document.getElementById('lang-select').addEventListener('change', (e) => {
-      currentLang = e.target.value;
+    function applyUiLanguage() {
       const dict = UI_STRINGS[currentLang] || UI_STRINGS.en;
+      document.getElementById('lang-select').value = currentLang;
       document.querySelectorAll('[data-i18n]').forEach(el => {
         const k = el.getAttribute('data-i18n');
         if (dict[k]) el.textContent = dict[k];
       });
+      const bAdv = document.getElementById('btn-advances');
+      const bWiz = document.getElementById('btn-wizard');
+      if (bAdv) bAdv.textContent = currentLang === 'es' ? '🏛️ Avances' : '🏛️ Progress';
+      if (bWiz) bWiz.textContent = currentLang === 'es' ? '❓ Guía' : '❓ Guide';
+    }
+    applyUiLanguage();
+
+    document.getElementById('lang-select').addEventListener('change', (e) => {
+      currentLang = e.target.value;
+      applyUiLanguage();
       if (latestState) {
         applyState(latestState);
       }
+      if (advancesModal.style.display === 'flex') renderAdvancesModal();
+      if (wizardModal.style.display === 'flex') renderWizardStep();
     });
 
     let snapCloseup = true;
@@ -2971,9 +3340,12 @@
 
       const msList = currentLang === 'es' ? (m.milestone_list_es || []) : (m.milestone_list_en || []);
       if (msList.length > 0) {
-        document.getElementById('milestones-box').innerHTML = msList.slice().reverse().map(line =>
-          `<div class="m-tag" style="width:100%">✓ ${line}</div>`
-        ).join('');
+        document.getElementById('milestones-box').innerHTML =
+          `<button id="btn-inline-adv" style="width:100%;margin-bottom:5px;padding:4px 8px;border-radius:6px;border:1px solid var(--emerald);background:rgba(16,185,129,0.16);color:#ecfdf5;font-size:10.5px;font-weight:700;cursor:pointer;">🏛️ ${currentLang === 'es' ? `Ver todos los ${msList.length} avances en pantalla grande ↗` : `View all ${msList.length} breakthroughs full-screen ↗`}</button>` +
+          msList.slice().reverse().map(line =>
+            `<div class="m-tag" style="width:100%">✓ ${line}</div>`
+          ).join('');
+        document.getElementById('btn-inline-adv')?.addEventListener('click', openAdvancesModal);
       } else {
         const mKeys = Object.entries(m.discoveries || {});
         if (mKeys.length > 0) {
@@ -2982,6 +3354,10 @@
           ).join('');
         }
       }
+
+      maybeAutoOpenWizard();
+      if (wizardModal.style.display === 'flex') renderWizardStep();
+      if (advancesModal.style.display === 'flex') renderAdvancesModal();
     }
 
     const CLOUD_API_URL = 'https://api.github.com/repos/sergiobuedo/the-new-genesis/contents/chronicles/latest_public_state.json?ref=live-telemetry';
