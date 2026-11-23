@@ -193,12 +193,15 @@ class KobAgent:
     steer_side: float = 1.0  # Persistent obstacle-avoidance side (+1 or -1)
     pause_ticks: int = 0
 
-    # Cognitive & Social State
+    # Cognitive, Cultural & Emergent Social State (0% scripted — earned purely through lived actions!)
     inventory: List[str] = field(default_factory=list)
     trust_bonds: Dict[str, float] = field(default_factory=dict)
     personal_lexicon: Dict[str, str] = field(default_factory=dict)
     insight_map: Dict[str, int] = field(default_factory=dict)
     memories: List[str] = field(default_factory=list)
+    cultural_lore: List[str] = field(default_factory=list)  # Oral traditions, myths & clan history passed down!
+    skill_xp: Dict[str, float] = field(default_factory=dict)  # Earned organically: hunting, healing, crafting, trading, farming, building
+    prestige: float = 0.0  # Emergent social respect earned through altruism, survival, defense, or invention!
 
     mood: str = "curious"
     current_intent: str = "forage"
@@ -263,6 +266,24 @@ class KobAgent:
     def has_cart(self) -> bool:
         return "wheeled_cart" in self.inventory
 
+    @property
+    def emergent_vocation(self) -> str:
+        """Purely descriptive vocation earned from what the being actually chose to practice (never pre-assigned!)."""
+        if not self.skill_xp:
+            return "Forager"
+        top_skill, val = max(self.skill_xp.items(), key=lambda kv: kv[1])
+        if val < 2.0:
+            return "Forager"
+        return {
+            "hunting": "Hunter",
+            "healing": "Healer",
+            "crafting": "Artisan",
+            "trading": "Trader",
+            "farming": "Farmer",
+            "building": "Builder",
+            "teaching": "Elder Sage",
+        }.get(top_skill, "Forager")
+
     def live_biography_summary(self) -> str:
         held = BLIND_MATERIALS[self.held_item].observer_label if self.held_item else "empty hands"
         allies = sum(1 for v in self.trust_bonds.values() if v >= 0.25)
@@ -272,8 +293,9 @@ class KobAgent:
         preg_info = f" · 🤰 Pregnant ({min(100, int(self.gestation_ticks * 100 / 220))}%)" if self.is_pregnant else ""
         kids_info = f" · 👶 Offspring: {len(self.children_ids)}" if self.children_ids else ""
         sick_info = f" · 🤒 Ill ({self.illness.replace('_', ' ')}, {self.illness_severity:.0f}%)" if self.illness else ""
+        voc_info = f" · 🛠️ {self.emergent_vocation}" if self.emergent_vocation != "Forager" else ""
         return (
-            f"{self.id} ({sex_sym}) · {self.life_stage} {self.lineage} (Gen {self.generation}, {self.age_years:.1f} yrs / {self.age_days:.0f}d){mate_info}{preg_info}{kids_info}{sick_info} — "
+            f"{self.id} ({sex_sym}) · {self.life_stage} {self.lineage} (Gen {self.generation}, {self.age_years:.1f} yrs / {self.age_days:.0f}d){voc_info}{mate_info}{preg_info}{kids_info}{sick_info} — "
             f"{self.action_label}. Holding: {held}. "
             f"Emotion: {self.mood}. Allies: {allies}, Rivals: {rivals}."
         )
@@ -298,7 +320,8 @@ class KobAgent:
             if local_temp < 25
             else "dry heat"
         )
-        if world.is_night:
+        local_night = world.is_night_at(self.x, self.y)
+        if local_night:
             light_feel = (
                 "bright silver full-moon night"
                 if world.lunar_illumination > 0.78

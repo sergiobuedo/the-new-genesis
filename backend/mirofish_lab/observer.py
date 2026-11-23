@@ -458,8 +458,9 @@ class PopulationSimulation:
                 agent.is_sleeping = False
         else:
             agent.rest = max(0.0, agent.rest - 0.058)
+            local_night = self.world.is_night_at(agent.x, agent.y)
             if agent.rest < 22.0 or (
-                self.world.is_night and agent.rest < 58.0 and agent.energy > 38.0 and agent.warmth > 42.0
+                local_night and agent.rest < 58.0 and agent.energy > 38.0 and agent.warmth > 42.0
             ):
                 agent.is_sleeping = True
                 agent.action_label = "Sleeping deeply to restore strength"
@@ -468,7 +469,7 @@ class PopulationSimulation:
         sheltered_now = self.world.is_sheltered_at(agent.x, agent.y)
         if not sheltered_now and self.world.weather in ("storm", "snow"):
             stress_delta += 0.16
-        elif self.world.is_night and self.world.lunar_illumination > 0.82 and self.world.weather == "clear":
+        elif self.world.is_night_at(agent.x, agent.y) and self.world.lunar_illumination > 0.82 and self.world.weather == "clear":
             stress_delta -= 0.06  # Calm silver full-moon illumination reduces nocturnal dread
         if local_crowd >= 6:
             stress_delta += (local_crowd - 5) * 0.18
@@ -686,6 +687,8 @@ class PopulationSimulation:
                 sick_peer.integrity = min(100.0, sick_peer.integrity + 24.0)
                 self.cures_applied += 1
                 self.sharing_count += 1
+                agent.skill_xp["healing"] = agent.skill_xp.get("healing", 0.0) + 1.5
+                agent.prestige = round(agent.prestige + 1.8, 1)
                 agent.trust_bonds[sick_peer.id] = min(2.0, agent.trust_bonds.get(sick_peer.id, 0.0) + 0.45)
                 sick_peer.trust_bonds[agent.id] = min(2.0, sick_peer.trust_bonds.get(agent.id, 0.0) + 0.45)
                 if sick_peer.illness_severity <= 2.0:
@@ -961,6 +964,8 @@ class PopulationSimulation:
                 )
                 self.world.structures[crop.id] = crop
                 self.crops_planted += 1
+                agent.skill_xp["farming"] = agent.skill_xp.get("farming", 0.0) + 1.4
+                agent.prestige = round(agent.prestige + 1.2, 1)
                 agent.current_intent = "forage"
                 agent.pause_ticks = 5
                 agent.action_label = "Tending cultivated cereal garden"
@@ -997,6 +1002,8 @@ class PopulationSimulation:
                         if catch.species == "pearlclam" and len(agent.inventory) < 7:
                             agent.inventory.append("nacre_shell")
                         self.fishing_count += 1
+                        agent.skill_xp["hunting"] = agent.skill_xp.get("hunting", 0.0) + 1.0
+                        agent.prestige = round(agent.prestige + 0.6, 1)
                         agent.current_intent = "forage"
                         if "first_fishing" not in self.discoveries:
                             self.discoveries["first_fishing"] = self.world.day
@@ -1668,14 +1675,20 @@ class PopulationSimulation:
             cx, cy = self.world.find_nearest_dry_spot(mother.x + self.world.rng.uniform(-0.8, 0.8), mother.y + self.world.rng.uniform(-0.8, 0.8))
             child_sex = "M" if self.world.rng.random() < 0.5 else "F"
 
-            # Cumulative Family Cultural & Linguistic Inheritance (Children inherit parents' insights & lexicon!)
+            # Cumulative Family Cultural, Oral Tradition & Linguistic Inheritance!
             inherited_insights: Dict[str, int] = dict(mother.insight_map)
             inherited_lexicon: Dict[str, str] = dict(mother.personal_lexicon)
+            inherited_lore: List[str] = list(mother.cultural_lore[-4:])
             if father_ag:
                 for k_lore, lvl in father_ag.insight_map.items():
                     inherited_insights[k_lore] = max(inherited_insights.get(k_lore, 0), lvl)
                 for rk, wv in father_ag.personal_lexicon.items():
                     inherited_lexicon.setdefault(rk, wv)
+                for story in father_ag.cultural_lore[-3:]:
+                    if story not in inherited_lore:
+                        inherited_lore.append(story)
+            if not inherited_lore and mother.memories:
+                inherited_lore.append(f"Oral memory of {mother.id}: {mother.memories[-1]}")
 
             child = KobAgent(
                 id=cid,
@@ -1692,6 +1705,7 @@ class PopulationSimulation:
                 heading=mother.heading,
                 insight_map=inherited_insights,
                 personal_lexicon=inherited_lexicon,
+                cultural_lore=inherited_lore[-6:],
             )
             child.trust_bonds[mother.id] = 0.95
             mother.trust_bonds[cid] = 0.95
@@ -1754,7 +1768,7 @@ class MiroFishObservatory:
             warehouse=None,
         )
 
-        self.speed_multiplier: int = 5  # Default x5!
+        self.speed_multiplier: int = 10  # Default x10 background pace!
         self.last_hash: str = "0" * 64
         self.history_series: List[Dict[str, Any]] = []
         self.daily_logs: List[Dict[str, Any]] = []
@@ -1873,6 +1887,9 @@ class MiroFishObservatory:
                     illness=str(ad.get("illness", "")),
                     illness_severity=float(ad.get("illness_severity", 0.0)),
                     antibodies=list(ad.get("antibodies", [])),
+                    cultural_lore=list(ad.get("cultural_lore", [])),
+                    skill_xp=dict(ad.get("skill_xp", {})),
+                    prestige=float(ad.get("prestige", 0.0)),
                     heading=float(ad.get("heading", 0.0)),
                     inventory=inv,
                     personal_lexicon=dict(lex_by_lineage.get(lin, {})),
@@ -2377,6 +2394,40 @@ class MiroFishObservatory:
         bonded_couples = sum(1 for a in living if a.partner_id) // 2
         sick_count = sum(1 for a in living if a.illness)
         era_life_exp = self.live.compute_era_lifespan_years(0.5)
+        vocations_cnt = Counter(a.emergent_vocation for a in living)
+        oral_traditions_count = sum(len(a.cultural_lore) for a in living)
+        # Emergent Clan Leaders (highest-prestige adult per lineage, never assigned!)
+        clan_leaders: Dict[str, Dict[str, Any]] = {}
+        for lin_name in species_counts.keys():
+            cands = [a for a in living if a.lineage == lin_name and a.age_days >= 14.0]
+            if cands:
+                top_l = max(cands, key=lambda x: (x.prestige, x.age_days, len(x.trust_bonds)))
+                clan_leaders[lin_name] = {
+                    "id": top_l.id,
+                    "sex": top_l.sex,
+                    "vocation": top_l.emergent_vocation,
+                    "prestige": round(top_l.prestige, 1),
+                    "age_years": top_l.age_years,
+                }
+        # Emergent Inter-Clan Diplomacy derived purely from real peace/trade vs clashes
+        if self.live.inter_species_peace + self.live.trade_count > self.live.conflict_count * 2 + 5:
+            diplomacy_en = "Peaceful Trade & Inter-Species Diplomacy"
+            diplomacy_es = "Comercio Pacífico y Diplomacia Inter-Especie"
+        elif self.live.conflict_count > self.live.inter_species_peace + 6:
+            diplomacy_en = "Territorial Rivalry & Frontier Friction"
+            diplomacy_es = "Rivalidad Territorial y Fricción Fronteriza"
+        else:
+            diplomacy_en = "Cautious Coexistence & First Contact"
+            diplomacy_es = "Coexistencia Cautelosa y Primer Contacto"
+        # Macro-Demographic Civilization Scale (visible focus individuals + thriving settlement hinterland estimate)
+        settlement_bonus = (
+            struct_counts.get("shelter", 0) * 6
+            + struct_counts.get("crop_plot", 0) * 4
+            + struct_counts.get("granary", 0) * 10
+            + struct_counts.get("burrow_network", 0) * 14
+            + struct_counts.get("edifice", 0) * 35
+        )
+        macro_population = len(living) + (settlement_bonus if len(living) >= 12 else 0)
         rare_held = sum(
             1 for a in living for c in a.inventory if c in BLIND_MATERIALS and BLIND_MATERIALS[c].luster >= 0.80
         )
@@ -2416,6 +2467,9 @@ class MiroFishObservatory:
             "craft_herbal_remedy": "Compounded botanical herbal poultice remedy",
             "craft_antiseptic_balm": "Distilled antimicrobial resin-mineral antiseptic balm",
             "craft_clinical_cure": "Purified clinical-grade antimicrobial serum in glass",
+            "craft_clay_tablet": "Invented permanent proto-writing on kiln-fired clay tablets",
+            "first_proto_currency": "Adopted portable precious tokens as proto-currency",
+            "first_leadership_council": "Emergent respected elder/guide leadership formed naturally",
             "struct_palisade": "Built fortified timber palisade walls against predators",
             "first_cooked_meal": "Roasted food over fire for higher nutrition",
             "first_agriculture": "Planted cereal seeds into cultivated farm plots",
@@ -2468,6 +2522,9 @@ class MiroFishObservatory:
             "craft_herbal_remedy": "Preparación empírica de remedio herbal medicinal",
             "craft_antiseptic_balm": "Destilación de bálsamo antiséptico antimicrobiano",
             "craft_clinical_cure": "Síntesis de cura clínica purificada en vial de vidrio",
+            "craft_clay_tablet": "Invención de la proto-escritura en tablillas de arcilla cocida",
+            "first_proto_currency": "Adopción espontánea de proto-moneda para el intercambio",
+            "first_leadership_council": "Surgimiento natural de liderazgo respetado / consejo de ancianos",
             "struct_palisade": "Murallas/empalizadas de madera frente a grandes depredadores",
             "first_cooked_meal": "Cocinado de alimentos al fuego (+nutrición)",
             "first_agriculture": "Nacimiento de la agricultura sembrando cereal",
@@ -2621,6 +2678,12 @@ class MiroFishObservatory:
             "sick_count": sick_count,
             "disease_cases": self.live.disease_cases,
             "cures_applied": self.live.cures_applied,
+            "macro_population": macro_population,
+            "clan_leaders": clan_leaders,
+            "vocations": dict(vocations_cnt),
+            "oral_traditions_count": oral_traditions_count,
+            "diplomacy_en": diplomacy_en,
+            "diplomacy_es": diplomacy_es,
             "species_counts": dict(species_counts),
             "max_generation": self.live.max_generation,
             "rebiogenesis_cycle": self.live.rebiogenesis_cycle,
@@ -2744,6 +2807,10 @@ class MiroFishObservatory:
                     "illness": a.illness,
                     "illness_severity": round(a.illness_severity, 1),
                     "antibodies": a.antibodies[:6],
+                    "vocation": a.emergent_vocation,
+                    "prestige": round(a.prestige, 1),
+                    "cultural_lore": a.cultural_lore[-4:],
+                    "skill_xp": {k: round(v, 1) for k, v in a.skill_xp.items()},
                     "x": a.x,
                     "y": a.y,
                     "heading": round(a.heading, 3),

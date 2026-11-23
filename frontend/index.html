@@ -366,11 +366,11 @@
       </div>
 
       <div class="controls">
-        <div class="speed-group" title="Observation Speed (Default x5)">
+        <div class="speed-group" title="Observation Speed (Default x10 Background Pace)">
           <button data-spd="1">x1</button>
           <button data-spd="2">x2</button>
-          <button data-spd="5" class="active">x5</button>
-          <button data-spd="10">x10</button>
+          <button data-spd="5">x5</button>
+          <button data-spd="10" class="active">x10</button>
           <button data-spd="20">x20</button>
         </div>
         <button id="btn-globe" title="Round 3D Super-Earth Planet View">🌍 Globe</button>
@@ -873,7 +873,25 @@
           </div>
         </div>` : '';
 
-      advBody.innerHTML = eraBarHtml + catCardsHtml + fullTimelineHtml;
+      const dSrc = (es && m.disciplines_es) ? m.disciplines_es : (m.disciplines || {});
+      const leadersHtml = Object.entries(m.clan_leaders || {}).map(([lin, l]) =>
+        `<span style="padding:3px 8px;border-radius:7px;background:rgba(251,191,36,0.14);border:1px solid rgba(251,191,36,0.35);font-size:11px;">⭐ <strong>${lin}</strong>: ${l.id} (${l.sex === 'M' ? '♂' : '♀'}, ${l.vocation}, ${l.age_years}a)</span>`
+      ).join(' ');
+      const vocHtml = Object.entries(m.vocations || {}).map(([v, c]) => `${v}: <strong>${c}</strong>`).join(' · ') || 'Forager';
+      const dimCardsHtml = `
+        <div style="background:rgba(15,23,42,0.88);border:1px solid rgba(56,189,248,0.35);border-radius:11px;padding:12px;">
+          <div style="font-weight:700;color:var(--accent);margin-bottom:8px;">🔬 ${es ? 'ESTUDIO MULTIDISCIPLINAR EN VIVO (6 DIMENSIONES HUMANAS)' : 'LIVE MULTIDISCIPLINARY STUDY (6 HUMAN DIMENSIONS)'}</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:8px;font-size:11.5px;">
+            <div style="background:rgba(30,41,59,0.65);border-radius:8px;padding:8px;"><strong style="color:#38bdf8;">🧠 ${es ? 'Psicología, Salud y Longevidad' : 'Psychology, Health & Longevity'}</strong><div style="margin-top:3px;color:#cbd5e1;">${dSrc.psychology || ''}</div></div>
+            <div style="background:rgba(30,41,59,0.65);border-radius:8px;padding:8px;"><strong style="color:#f472b6;">👥 ${es ? 'Sociología y Familias (♂+♀)' : 'Sociology & Families (♂+♀)'}</strong><div style="margin-top:3px;color:#cbd5e1;">${dSrc.sociology || ''}</div></div>
+            <div style="background:rgba(30,41,59,0.65);border-radius:8px;padding:8px;"><strong style="color:#c084fc;">🏛️ ${es ? 'Antropología, Idioma y Tradición Oral' : 'Anthropology, Language & Oral Lore'}</strong><div style="margin-top:3px;color:#cbd5e1;">${dSrc.anthropology || ''}</div></div>
+            <div style="background:rgba(30,41,59,0.65);border-radius:8px;padding:8px;"><strong style="color:#34d399;">💰 ${es ? 'Economía, Oficios y Biosfera' : 'Economics, Vocations & Biosphere'}</strong><div style="margin-top:3px;color:#cbd5e1;">${dSrc.economics || ''}<div style="margin-top:4px;color:var(--amber);">🛠️ ${es ? 'Oficios emergentes' : 'Emergent vocations'}: ${vocHtml}</div></div></div>
+            <div style="background:rgba(30,41,59,0.65);border-radius:8px;padding:8px;"><strong style="color:#fbbf24;">🤝 ${es ? 'Política, Liderazgo y Demografía Macro' : 'Politics, Leadership & Macro Demography'}</strong><div style="margin-top:3px;color:#cbd5e1;">${es ? 'Diplomacia' : 'Diplomacy'}: <strong>${es ? (m.diplomacy_es || '') : (m.diplomacy_en || '')}</strong> · ${es ? 'Escala poblacional (enfoque + asentamientos)' : 'Population scale (tracked + settlements)'}: <strong>${m.live_population} / ~${m.macro_population || m.live_population}</strong></div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;">${leadersHtml}</div></div>
+            <div style="background:rgba(30,41,59,0.65);border-radius:8px;padding:8px;"><strong style="color:#a78bfa;">✨ ${es ? 'Filosofía, Muerte y Ritos' : 'Philosophy, Mortality & Rites'}</strong><div style="margin-top:3px;color:#cbd5e1;">${dSrc.philosophy || ''}</div></div>
+          </div>
+        </div>`;
+
+      advBody.innerHTML = eraBarHtml + dimCardsHtml + catCardsHtml + fullTimelineHtml;
     }
 
     function openAdvancesModal() {
@@ -2403,7 +2421,7 @@
     let timelineFilter = 'all';
     let activeDisc = 'psychology';
     let lastWinterState = false;
-    let viewSpeed = 5;
+    let viewSpeed = 10;
 
     document.querySelectorAll('.speed-group button').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -2874,6 +2892,8 @@
           subj.pregnant ? `🤰 ${es ? 'Embarazada' : 'Pregnant'}: ${subj.gestation_pct || 1}%` : null,
           subj.children_count ? `👶 ${es ? 'Hijos' : 'Kids'}: ${subj.children_count}` : null,
           subj.illness ? `🤒 ${es ? 'Enfermedad' : 'Illness'}: ${subj.illness.replace('_', ' ')} (${Math.round(subj.illness_severity || 0)}%)` : `💚 ${es ? 'Sano' : 'Healthy'}`,
+          (subj.vocation && subj.vocation !== 'Forager') ? `🛠️ ${es ? 'Oficio' : 'Vocation'}: ${subj.vocation}` : null,
+          subj.prestige > 0 ? `⭐ ${es ? 'Prestigio' : 'Prestige'}: ${subj.prestige}` : null,
           (subj.antibodies && subj.antibodies.length) ? `🛡️ ${es ? 'Inmune' : 'Immune'}: ${subj.antibodies.join(', ')}` : null
         ].filter(Boolean);
         document.getElementById('subj-bio').textContent = subj.bio;
@@ -3018,7 +3038,11 @@
       const moonIcon = (lPhase < 0.08 || lPhase >= 0.92) ? '🌑' : (lPhase < 0.36 ? '🌓' : (lPhase < 0.62 ? '🌕' : '🌗'));
       const sAu = w.solar_au || 1.0;
       const astroEl = document.getElementById('ui-astro');
-      if (astroEl) astroEl.textContent = `${wLabel} · ${moonIcon} ${w.lunar_name || 'Moon'} · ${sAu.toFixed(2)} AU`;
+      const localPhase = ((w.day_phase || 0.35) + (controls.target.x / 310.0) * 0.5 + 10.0) % 1.0;
+      const localHrs = Math.floor(localPhase * 24);
+      const localMins = Math.floor((localPhase * 24 - localHrs) * 60);
+      const clockStr = `${String(localHrs).padStart(2, '0')}:${String(localMins).padStart(2, '0')}`;
+      if (astroEl) astroEl.textContent = `${wLabel} · 🕒 ${clockStr} · ${moonIcon} ${w.lunar_name || 'Moon'} · ${sAu.toFixed(2)} AU`;
 
       precipPoints.visible = ['rain', 'storm', 'snow'].includes(wState);
       if (precipPoints.visible) {
@@ -3056,11 +3080,17 @@
       }
       if (!globeGroup.visible) {
         const lIllum = w.lunar_illum !== undefined ? w.lunar_illum : 0.5;
-        const dPhase = w.day_phase !== undefined ? w.day_phase : 0.35;
-        const sunAng = dPhase * Math.PI * 2;
-        skySunMesh.position.set(Math.cos(sunAng) * 260, Math.sin(sunAng) * 210 + 45, -180);
-        skySunMesh.visible = !w.is_night;
-        if (w.is_night) {
+        // Real Earth-like regional longitude & 23.4° axial tilt daylight at camera location!
+        const dPhase = ((w.day_phase !== undefined ? w.day_phase : 0.35) + (controls.target.x / 310.0) * 0.5 + 10.0) % 1.0;
+        const latNorm = Math.max(-1, Math.min(1, -controls.target.z / 220.0));
+        const seasonDecl = Math.sin(((w.day || 1) / 40.0) * Math.PI * 2);
+        const halfDayHrs = Math.max(7.5, Math.min(16.5, 12.0 + latNorm * seasonDecl * 3.6)) * 0.5;
+        const locHr = dPhase * 24.0;
+        const localIsNight = !(locHr >= (12.0 - halfDayHrs) && locHr <= (12.0 + halfDayHrs));
+        const sunAng = (dPhase - 0.25) * Math.PI * 2;
+        skySunMesh.position.set(Math.cos(sunAng) * 260, Math.sin(sunAng) * 210 + 25, -180);
+        skySunMesh.visible = !localIsNight;
+        if (localIsNight) {
           skyUniforms.topColor.value.setHex(lIllum > 0.75 ? 0x0f172a : 0x030712);
           skyUniforms.horizonColor.value.setHex(lIllum > 0.75 ? 0x1e293b : 0x0f172a);
           skyUniforms.bottomColor.value.setHex(0x020617);

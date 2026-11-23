@@ -448,6 +448,15 @@ BLIND_MATERIALS: Dict[str, BlindMaterial] = {
         healing=1.0,
         luster=0.90,
     ),
+    "clay_tablet": BlindMaterial(
+        code="clay_tablet",
+        formula="Kiln-Fired Incised Kaolin Clay Tablet",
+        sensory_name="hard baked clay slab etched with repeating marks",
+        observer_label="Inscribed Clay Tablet (Proto-Writing!)",
+        color_hex="#d97706",
+        hardness=0.74,
+        luster=0.35,
+    ),
 }
 
 
@@ -668,9 +677,27 @@ class CosmosWorld:
     def day_phase(self) -> float:
         return (self.tick_count % TICKS_PER_DAY) / float(TICKS_PER_DAY)
 
+    def local_solar_phase_at(self, x: float, y: float) -> float:
+        """Real Earth-like planetary longitude solar time (0.0=midnight .. 0.5=solar noon .. 1.0=midnight)."""
+        lon_offset = (x / 310.0) * 0.5  # East-West continental time zones across the globe!
+        return (self.day_phase + lon_offset) % 1.0
+
+    def daylight_hours_at(self, x: float, y: float) -> float:
+        """Real Earth 23.4° axial tilt daylight duration (12h at equator, longer summer / shorter winter at boreal latitudes)."""
+        lat_norm = max(-1.0, min(1.0, -y / 220.0))  # +1 = Boreal North, 0 = Crossroads, -1 = Equatorial/South
+        season_decl = math.sin(((self.day - 1) / float(DAYS_PER_SEASON * 4)) * 2.0 * math.pi)
+        # Earth-like photoperiod variation: ~12h at equator, ~8.5h..15.5h at mid-high latitudes
+        return round(max(7.5, min(16.5, 12.0 + lat_norm * season_decl * 3.6)), 1)
+
+    def is_night_at(self, x: float, y: float) -> bool:
+        """True if local sun is below the horizon at longitude x & latitude y."""
+        local_hr = self.local_solar_phase_at(x, y) * 24.0
+        half_day = self.daylight_hours_at(x, y) * 0.5
+        return not ((12.0 - half_day) <= local_hr <= (12.0 + half_day))
+
     @property
     def is_night(self) -> bool:
-        return self.day_phase >= 0.64 or self.day_phase < 0.08
+        return self.is_night_at(0.0, 0.0)
 
     @property
     def solar_distance_au(self) -> float:
@@ -1425,6 +1452,24 @@ class CosmosWorld:
                 None,
                 "breakthrough",
                 "Wove cellulose fibers into an insulating textile cloak!",
+            )
+
+        # 5B. Proto-Writing: Pressing a reed/bone stylus into soft kaolin clay -> permanent Clay Tablet!
+        if "clay_gray" in (code_a, code_b) and ({code_a, code_b} & {"hollow_cane", "ivory_horn"}):
+            lvl = insight_map.get("writing_lore", 0) + 1
+            insight_map["writing_lore"] = lvl
+            if lvl < 2:
+                return (
+                    None,
+                    None,
+                    "partial_insight",
+                    "Pressed repeating geometric marks into soft clay with a pointed stylus.",
+                )
+            return (
+                "clay_tablet",
+                None,
+                "breakthrough",
+                "Incised repeating symbols into baked clay with a reed/bone stylus, inventing permanent proto-writing!",
             )
 
         has_adv_component = bool(
