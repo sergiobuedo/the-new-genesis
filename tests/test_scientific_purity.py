@@ -212,3 +212,45 @@ def test_human_like_sexual_reproduction_gestation_and_family_inheritance():
     assert child.personal_lexicon.get("food") == "nara" and child.personal_lexicon.get("kin") == "sola"
 
 
+def test_era_scaled_human_lifespan_diseases_and_emergent_cures():
+    """Verify Paleolithic-to-Modern era lifespan scaling, natural pathology, empirical cures, and acquired immunity."""
+    from backend.mirofish_lab.observer import PopulationSimulation
+    from backend.world.physics import CosmosWorld
+
+    sim = PopulationSimulation(seed=4201, founders_per_lineage=3, enable_culture=True)
+    paleo_yrs = sim.compute_era_lifespan_years(0.5)
+    assert 30.0 <= paleo_yrs <= 42.0
+
+    # Unlocking fire, shelter, farming, herbal, antiseptic & clinical medicine scales life expectancy to modern human range!
+    sim.discoveries.update({
+        "struct_hearth": 10,
+        "struct_shelter": 20,
+        "first_agriculture": 30,
+        "first_herbal_medicine": 40,
+        "craft_antiseptic_balm": 50,
+        "craft_clinical_cure": 60,
+    })
+    modern_yrs = sim.compute_era_lifespan_years(0.5)
+    assert modern_yrs >= 80.0
+
+    # Empirical compounding of herbal_remedy -> antiseptic_balm -> clinical_cure
+    world = CosmosWorld(seed=4201)
+    insights = {}
+    rem, _, k1, _ = world.attempt_empirical_experiment("medicinal_herb", "orb_sweet", ["medicinal_herb", "orb_sweet"], insights, 0.0, 0.0, "S-001")
+    assert k1 == "breakthrough" and rem == "herbal_remedy"
+    balm, _, k2, _ = world.attempt_empirical_experiment("herbal_remedy", "resin_gold", ["herbal_remedy", "resin_gold"], insights, 0.0, 0.0, "S-001")
+    assert k2 == "breakthrough" and balm == "antiseptic_balm"
+    serum, _, k3, _ = world.attempt_empirical_experiment("antiseptic_balm", "silica_glass", ["antiseptic_balm", "silica_glass"], insights, 0.0, 0.0, "S-001")
+    assert k3 == "breakthrough" and serum == "clinical_cure"
+
+    # Sick agent cures themselves with clinical_cure & gains acquired immunity
+    ag = sim.living_agents[0]
+    ag.illness = "camp_plague"
+    ag.illness_severity = 65.0
+    ag.inventory.append("clinical_cure")
+    sim._act_step(ag, [], [], [], [], [], int(ag.x), int(ag.y))
+    assert ag.illness == ""
+    assert "camp_plague" in ag.antibodies
+
+
+

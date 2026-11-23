@@ -77,6 +77,8 @@ class PopulationSimulation:
         self.gifts_today: int = 0
         self.courtships_count: int = 0
         self.couples_formed: int = 0
+        self.disease_cases: int = 0
+        self.cures_applied: int = 0
         self.discoveries: Dict[str, int] = {}
         self.max_generation: int = 1
         self.rebiogenesis_cycle: int = 1
@@ -244,7 +246,7 @@ class PopulationSimulation:
                     for other in agent_grid.get((bx + dx, by + dy), ()):
                         if other.id != agent.id and math.hypot(other.x - agent.x, other.y - agent.y) <= 5.5:
                             nearby_others.append(other)
-            self._update_physiology_and_psychology(agent, len(nearby_others))
+            self._update_physiology_and_psychology(agent, len(nearby_others), nearby_others)
             if not agent.alive:
                 continue
 
@@ -403,7 +405,29 @@ class PopulationSimulation:
                         importance=3,
                     )
 
-    def _update_physiology_and_psychology(self, agent: KobAgent, local_crowd: int) -> None:
+    def compute_era_lifespan_years(self, vitality: float = 0.5) -> float:
+        """Human-identical era-scaled biological life expectancy (Paleolithic ~32-42y -> Modern Medical ~78-92y)."""
+        base_yrs = 30.0 + vitality * 12.0  # Paleolithic foraging baseline: 30..42 planetary years
+        if not self.enable_culture:
+            return round(base_yrs, 1)
+        d = self.discoveries
+        structs = {s.kind for s in self.world.structures.values()}
+        bonus = 0.0
+        if "struct_hearth" in d or "first_cooked_meal" in d or "hearth" in structs:
+            bonus += 5.0  # Controlled fire & cooked nutrition
+        if "struct_shelter" in d or "struct_burrow_network" in d or "struct_edifice" in d or (structs & {"shelter", "burrow_network", "edifice"}):
+            bonus += 6.0  # Weatherproof shelter / architecture
+        if "first_agriculture" in d or "struct_granary" in d or (structs & {"crop_plot", "granary"}):
+            bonus += 5.0  # Reliable food surplus
+        if "first_herbal_medicine" in d or "craft_herbal_remedy" in d:
+            bonus += 10.0  # Herbal & botanical medicine
+        if "craft_antiseptic_balm" in d or "first_antiseptic_cure" in d:
+            bonus += 16.0  # Antiseptic & apothecary care
+        if "craft_clinical_cure" in d or "first_clinical_cure" in d:
+            bonus += 18.0  # Purified clinical therapeutics
+        return round(base_yrs + bonus, 1)
+
+    def _update_physiology_and_psychology(self, agent: KobAgent, local_crowd: int, nearby_others: Optional[List[KobAgent]] = None) -> None:
         agent.age_days = round((self.world.tick_count / float(TICKS_PER_DAY)) + (1 - agent.born_day), 2)
         cold_res = LINEAGE_SPECS[agent.lineage]["ColdBias"]
         cloak_bonus = 10.0 if (self.enable_culture and agent.has_cloak) else 0.0
@@ -452,14 +476,75 @@ class PopulationSimulation:
             stress_delta += 0.20
         agent.stress = round(min(100.0, max(2.0, agent.stress + stress_delta)), 1)
 
-        max_lifespan = 95.0 + agent.genome.vitality * 55.0
+        max_lifespan_days = self.compute_era_lifespan_years(agent.genome.vitality) * 40.0
         if agent.energy <= 1.0 or agent.hydration <= 1.0 or agent.warmth <= 1.0:
             agent.integrity -= 0.50
-        elif agent.energy > 55.0 and agent.hydration > 45.0 and agent.warmth > 50.0:
+        elif agent.energy > 55.0 and agent.hydration > 45.0 and agent.warmth > 50.0 and not agent.illness:
             agent.integrity = min(100.0, agent.integrity + 0.12)
 
-        if (self.world.day - agent.born_day) > max_lifespan:
-            agent.integrity -= 0.40
+        if agent.age_days > max_lifespan_days:
+            agent.integrity -= 0.35
+
+        # Natural Pathology, Contagious Epidemics & Acquired Immunity (Zero Interference!)
+        if not agent.illness and self.world.tick_count % 25 == 0:
+            contracted = ""
+            if effective_temp < 4.0 and agent.warmth < 36.0 and not sheltered_now and "cold_fever" not in agent.antibodies:
+                if self.world.rng.random() < 0.045:
+                    contracted = "cold_fever"
+            elif agent.integrity < 72.0 and "wound_sepsis" not in agent.antibodies:
+                if self.world.rng.random() < 0.055:
+                    contracted = "wound_sepsis"
+            elif (
+                (local_crowd >= 6 or any(math.hypot(cp.x - agent.x, cp.y - agent.y) <= 5.5 for cp in self.world.corpses.values()))
+                and "camp_plague" not in agent.antibodies
+            ):
+                if self.world.rng.random() < 0.032:
+                    contracted = "camp_plague"
+            elif agent.hydration < 26.0 and self.world.weather == "drought" and "toxin_sickness" not in agent.antibodies:
+                if self.world.rng.random() < 0.04:
+                    contracted = "toxin_sickness"
+            if contracted:
+                agent.illness = contracted
+                agent.illness_severity = 22.0
+                self.disease_cases += 1
+                agent.add_memory(f"Fell ill with aching chills ({contracted.replace('_', ' ')}).", self.world.day)
+                if "first_disease_outbreak" not in self.discoveries and self.enable_culture:
+                    self.discoveries["first_disease_outbreak"] = self.world.day
+                    self._record_event(
+                        "conflict",
+                        f"NATURAL PATHOGEN! {agent.lineage} {agent.id} contracted {contracted.replace('_', ' ')}!",
+                        [agent.id],
+                        agent.x,
+                        agent.y,
+                        importance=4,
+                    )
+
+        if agent.illness:
+            # Contagion spread to close non-immune peers (cold_fever & camp_plague)
+            if agent.illness in ("cold_fever", "camp_plague") and nearby_others and self.world.tick_count % 20 == 0:
+                for peer in nearby_others:
+                    if not peer.illness and agent.illness not in peer.antibodies and math.hypot(peer.x - agent.x, peer.y - agent.y) <= 3.2:
+                        if self.world.rng.random() < (0.045 if agent.illness == "camp_plague" else 0.025):
+                            peer.illness = agent.illness
+                            peer.illness_severity = 18.0
+                            self.disease_cases += 1
+                            peer.add_memory(f"Caught contagious {agent.illness.replace('_', ' ')} from {agent.id}.", self.world.day)
+            # Immune progression vs severity
+            immune_fight = (0.14 + agent.genome.vitality * 0.16) * (1.5 if agent.is_sleeping else 1.0) * (1.25 if agent.warmth > 58.0 and agent.energy > 50.0 else 0.55)
+            pathogen_push = 0.24 if agent.illness in ("camp_plague", "wound_sepsis") else 0.18
+            agent.illness_severity = max(0.0, min(100.0, agent.illness_severity + pathogen_push - immune_fight))
+            if agent.illness_severity >= 48.0:
+                agent.integrity -= 0.14 if agent.illness == "camp_plague" else 0.09
+                agent.stress = min(100.0, agent.stress + 0.15)
+            if agent.illness_severity >= 98.0:
+                agent.integrity -= 0.45
+            if agent.illness_severity <= 0.5:
+                cured_name = agent.illness
+                if cured_name not in agent.antibodies:
+                    agent.antibodies.append(cured_name)
+                agent.illness = ""
+                agent.illness_severity = 0.0
+                agent.add_memory(f"Recovered naturally from {cured_name.replace('_', ' ')} (acquired immunity).", self.world.day)
 
         # Mammalian / Human-Identical Pregnancy Gestation -> Live Childbirth!
         if agent.is_pregnant and agent.alive:
@@ -467,7 +552,9 @@ class PopulationSimulation:
             if agent.gestation_ticks >= 220:
                 self._deliver_live_birth(agent)
 
-        if agent.warmth < 38.0:
+        if agent.illness:
+            agent.mood = "tense" if agent.illness_severity > 55.0 else "sleepy"
+        elif agent.warmth < 38.0:
             agent.mood = "cold"
         elif agent.energy < 35.0:
             agent.mood = "hungry"
@@ -483,10 +570,14 @@ class PopulationSimulation:
             agent.death_day = self.world.day
             self.deaths_today += 1
             if not agent.cause_of_death:
-                if agent.warmth <= 2.0:
+                if agent.illness:
+                    agent.cause_of_death = f"untreated {agent.illness.replace('_', ' ')}"
+                elif agent.warmth <= 2.0:
                     agent.cause_of_death = "winter hypothermia"
                 elif agent.energy <= 2.0:
                     agent.cause_of_death = "starvation"
+                elif agent.hydration <= 2.0:
+                    agent.cause_of_death = "dehydration"
                 else:
                     agent.cause_of_death = "natural old age"
             # Leave physical remains on the ground so we can observe whether peers mourn, leave offerings, bury, or ignore!
@@ -503,7 +594,7 @@ class PopulationSimulation:
                 )
             self._record_event(
                 "death",
-                f"{agent.lineage} {agent.id} perished from {agent.cause_of_death} (age {max(1, self.world.day - agent.born_day)}d).",
+                f"{agent.lineage} {agent.id} perished from {agent.cause_of_death} (age {agent.age_years:.1f} yrs / {agent.age_days:.0f}d).",
                 [agent.id],
                 agent.x,
                 agent.y,
@@ -535,24 +626,76 @@ class PopulationSimulation:
             agent.action_label = "Sleeping deeply to restore strength"
             return
 
-        # 1A. Herbal Self-Medication when injured/envenomed!
-        if self.enable_culture and agent.integrity < 76.0 and "medicinal_herb" in agent.inventory:
-            agent.inventory.remove("medicinal_herb")
-            agent.integrity = min(100.0, agent.integrity + BLIND_MATERIALS["medicinal_herb"].healing)
-            agent.action_label = "Chewing medicinal Sootheleaf to heal wounds"
+        # 1A. Self-Medication & Empathetic Caregiving when injured or sick!
+        remedy_codes = ("clinical_cure", "antiseptic_balm", "herbal_remedy", "medicinal_herb")
+        held_remedy = next((c for c in remedy_codes if c in agent.inventory), None)
+        if self.enable_culture and held_remedy and (agent.integrity < 78.0 or agent.illness):
+            agent.inventory.remove(held_remedy)
+            heal_val = BLIND_MATERIALS[held_remedy].healing
+            agent.integrity = min(100.0, agent.integrity + (heal_val * 45.0 if heal_val <= 1.0 else heal_val))
+            if agent.illness:
+                sev_drop = 100.0 if held_remedy == "clinical_cure" else (85.0 if held_remedy == "antiseptic_balm" else (62.0 if held_remedy == "herbal_remedy" else 38.0))
+                agent.illness_severity = max(0.0, agent.illness_severity - sev_drop)
+                self.cures_applied += 1
+                if agent.illness_severity <= 2.0:
+                    cured = agent.illness
+                    if cured not in agent.antibodies:
+                        agent.antibodies.append(cured)
+                    agent.illness = ""
+                    agent.illness_severity = 0.0
+                    agent.action_label = f"Cured {cured.replace('_', ' ')} with {BLIND_MATERIALS[held_remedy].observer_label}"
+                    m_key = f"first_{held_remedy.replace('medicinal_herb', 'herbal_medicine')}"
+                    if m_key not in self.discoveries:
+                        self.discoveries[m_key] = self.world.day
+                        self._record_event(
+                            "invention",
+                            f"MEDICAL CURE! {agent.lineage} {agent.id} cured {cured.replace('_', ' ')} using {BLIND_MATERIALS[held_remedy].observer_label}!",
+                            [agent.id],
+                            agent.x,
+                            agent.y,
+                            importance=5,
+                        )
+                else:
+                    agent.action_label = f"Treating {agent.illness.replace('_', ' ')} with {BLIND_MATERIALS[held_remedy].observer_label}"
+            else:
+                agent.action_label = f"Applying {BLIND_MATERIALS[held_remedy].observer_label} to heal wounds"
+                if "first_herbal_medicine" not in self.discoveries:
+                    self.discoveries["first_herbal_medicine"] = self.world.day
+                    self._record_event(
+                        "invention",
+                        f"NATURAL MEDICINE! {agent.lineage} {agent.id} healed wounds using wild Sootheleaf!",
+                        [agent.id],
+                        agent.x,
+                        agent.y,
+                        importance=5,
+                    )
             agent.pause_ticks = 4
-            agent.add_memory("Healed pain with fragrant silver-veined leaf.", self.world.day)
-            if "first_herbal_medicine" not in self.discoveries:
-                self.discoveries["first_herbal_medicine"] = self.world.day
-                self._record_event(
-                    "invention",
-                    f"NATURAL MEDICINE! {agent.lineage} {agent.id} healed wounds using wild Sootheleaf!",
-                    [agent.id],
-                    agent.x,
-                    agent.y,
-                    importance=5,
-                )
+            agent.add_memory(f"Used {BLIND_MATERIALS[held_remedy].sensory_name} to ease pain.", self.world.day)
             return
+
+        # Empathetic Caregiving: treat a sick mate or clanmate nearby!
+        if self.enable_culture and held_remedy and nearby_others:
+            sick_peer = next(
+                (o for o in nearby_others if o.illness and (o.id == agent.partner_id or agent.genome.empathy > 0.55) and math.hypot(o.x - agent.x, o.y - agent.y) <= 3.0),
+                None,
+            )
+            if sick_peer is not None:
+                agent.inventory.remove(held_remedy)
+                sev_drop = 100.0 if held_remedy == "clinical_cure" else (85.0 if held_remedy == "antiseptic_balm" else (62.0 if held_remedy == "herbal_remedy" else 42.0))
+                sick_peer.illness_severity = max(0.0, sick_peer.illness_severity - sev_drop)
+                sick_peer.integrity = min(100.0, sick_peer.integrity + 24.0)
+                self.cures_applied += 1
+                self.sharing_count += 1
+                agent.trust_bonds[sick_peer.id] = min(2.0, agent.trust_bonds.get(sick_peer.id, 0.0) + 0.45)
+                sick_peer.trust_bonds[agent.id] = min(2.0, sick_peer.trust_bonds.get(agent.id, 0.0) + 0.45)
+                if sick_peer.illness_severity <= 2.0:
+                    if sick_peer.illness not in sick_peer.antibodies:
+                        sick_peer.antibodies.append(sick_peer.illness)
+                    sick_peer.illness = ""
+                    sick_peer.illness_severity = 0.0
+                agent.action_label = f"Treating sick peer {sick_peer.id} with {BLIND_MATERIALS[held_remedy].observer_label}"
+                agent.pause_ticks = 4
+                return
 
         # 1B. Eat carried food (avoiding toxic_nightshade once learned!) or draw from granary
         if agent.energy < 62.0:
@@ -1727,6 +1870,9 @@ class MiroFishObservatory:
                     integrity=float(ad.get("integrity", 100.0)),
                     stress=float(ad.get("stress", 10.0)),
                     age_days=age_d,
+                    illness=str(ad.get("illness", "")),
+                    illness_severity=float(ad.get("illness_severity", 0.0)),
+                    antibodies=list(ad.get("antibodies", [])),
                     heading=float(ad.get("heading", 0.0)),
                     inventory=inv,
                     personal_lexicon=dict(lex_by_lineage.get(lin, {})),
@@ -1765,6 +1911,8 @@ class MiroFishObservatory:
             self.live.corpse_avoidance = int(m.get("corpse_avoidance", 0))
             self.live.courtships_count = int(m.get("courtships_count", 0))
             self.live.couples_formed = int(m.get("bonded_couples", 0))
+            self.live.disease_cases = int(m.get("disease_cases", 0))
+            self.live.cures_applied = int(m.get("cures_applied", 0))
             self.live.world.extinct_fauna = dict(m.get("extinct_fauna", {}))
 
             # If upgrading from a legacy save without pair-bonds, naturally bond co-located adult ♀+♂ peers
@@ -2095,6 +2243,10 @@ class MiroFishObservatory:
             "archetype_es": m["archetype_es"],
             "live_pop": m["live_population"],
             "null_pop": m["control_population"],
+            "era_life_expectancy_yrs": m.get("era_life_expectancy_yrs", 36.0),
+            "sick_count": m.get("sick_count", 0),
+            "disease_cases": m.get("disease_cases", 0),
+            "cures_applied": m.get("cures_applied", 0),
             "births_today": self.live.births_today,
             "deaths_today": self.live.deaths_today,
             "gifts_today": self.live.gifts_today,
@@ -2223,6 +2375,8 @@ class MiroFishObservatory:
         females_count = sum(1 for a in living if a.sex == "F")
         pregnant_count = sum(1 for a in living if a.is_pregnant)
         bonded_couples = sum(1 for a in living if a.partner_id) // 2
+        sick_count = sum(1 for a in living if a.illness)
+        era_life_exp = self.live.compute_era_lifespan_years(0.5)
         rare_held = sum(
             1 for a in living for c in a.inventory if c in BLIND_MATERIALS and BLIND_MATERIALS[c].luster >= 0.80
         )
@@ -2255,6 +2409,13 @@ class MiroFishObservatory:
             "first_grave_offering": "Placed grave offerings beside the dead",
             "first_burial_rite": "Built permanent stone burial cairns for the dead",
             "first_herbal_medicine": "Discovered natural wound-healing with medicinal herbs",
+            "first_disease_outbreak": "First natural pathogen illness recorded in population",
+            "first_herbal_remedy": "Compounded botanical herbal remedy to cure illness",
+            "first_antiseptic_balm": "Distilled antiseptic apothecary balm against infections",
+            "first_clinical_cure": "Synthesized purified glass-vial clinical cure",
+            "craft_herbal_remedy": "Compounded botanical herbal poultice remedy",
+            "craft_antiseptic_balm": "Distilled antimicrobial resin-mineral antiseptic balm",
+            "craft_clinical_cure": "Purified clinical-grade antimicrobial serum in glass",
             "struct_palisade": "Built fortified timber palisade walls against predators",
             "first_cooked_meal": "Roasted food over fire for higher nutrition",
             "first_agriculture": "Planted cereal seeds into cultivated farm plots",
@@ -2300,6 +2461,13 @@ class MiroFishObservatory:
             "first_grave_offering": "Primeras ofrendas depositadas junto a sus muertos",
             "first_burial_rite": "Primer rito funerario: túmulos de piedra sobre los difuntos",
             "first_herbal_medicine": "Descubrimiento de hierbas medicinales curativas",
+            "first_disease_outbreak": "Primer brote de enfermedad natural registrado en la población",
+            "first_herbal_remedy": "Primera curación de enfermedad con infusión/cataplasma herbal",
+            "first_antiseptic_balm": "Primer bálsamo antiséptico de boticario contra infecciones",
+            "first_clinical_cure": "Medicina moderna: primer suero clínico purificado en vidrio",
+            "craft_herbal_remedy": "Preparación empírica de remedio herbal medicinal",
+            "craft_antiseptic_balm": "Destilación de bálsamo antiséptico antimicrobiano",
+            "craft_clinical_cure": "Síntesis de cura clínica purificada en vial de vidrio",
             "struct_palisade": "Murallas/empalizadas de madera frente a grandes depredadores",
             "first_cooked_meal": "Cocinado de alimentos al fuego (+nutrición)",
             "first_agriculture": "Nacimiento de la agricultura sembrando cereal",
@@ -2368,8 +2536,9 @@ class MiroFishObservatory:
         disciplines = {
             "psychology": (
                 f"HOW THEY FEEL TODAY: {'Emotional calm and healthy routine' if mean_stress < 35 else 'Noticeable survival tension from hunger, predators, or crowding'} "
-                f"(average tension {mean_stress}%). Right now {sleeping_now} beings are curled up sleeping, "
-                f"and {hungry_now} are actively searching for food. They huddle together on cold nights to share body warmth."
+                f"(average tension {mean_stress}%). Era life expectancy: ~{era_life_exp:.0f} planetary years. "
+                f"Health: {sick_count} currently ill ({self.live.disease_cases} historical cases, {self.live.cures_applied} remedies applied). "
+                f"Right now {sleeping_now} are sleeping and {hungry_now} are foraging."
             ),
             "sociology": (
                 f"HOW THEY ORGANIZE ({arch_en}): Sexual demography: {males_count}♂ males & {females_count}♀ females, "
@@ -2401,9 +2570,10 @@ class MiroFishObservatory:
 
         disciplines_es = {
             "psychology": (
-                f"CÓMO SE ENCUENTRAN HOY: {'Calma emocional y rutina saludable' if mean_stress < 35 else 'Tensión elevada por depredadores, hambre o espacio'} "
-                f"(estrés medio del {mean_stress}%). Ahora mismo hay {sleeping_now} individuos durmiendo para recuperar fuerzas "
-                f"y {hungry_now} buscando comida con hambre. Por las noches se agrupan para darse calor."
+                f"SALUD, LONGEVIDAD Y ÁNIMO HOY: {'Calma emocional y rutina saludable' if mean_stress < 35 else 'Tensión elevada por depredadores, enfermedad o clima'} "
+                f"(estrés medio del {mean_stress}%). Esperanza de vida en su era actual: ~{era_life_exp:.0f} años planetarios. "
+                f"Enfermedades: {sick_count} enfermos ahora ({self.live.disease_cases} casos históricos, {self.live.cures_applied} curas/remedios aplicados). "
+                f"Ahora mismo hay {sleeping_now} durmiendo y {hungry_now} buscando alimento."
             ),
             "sociology": (
                 f"FAMILIAS, PAREJAS (♂+♀) Y ORGANIZACIÓN ({arch_es}): Demografía sexual: {males_count}♂ machos y {females_count}♀ hembras, "
@@ -2447,6 +2617,10 @@ class MiroFishObservatory:
             "pregnant_count": pregnant_count,
             "bonded_couples": bonded_couples,
             "courtships_count": self.live.courtships_count,
+            "era_life_expectancy_yrs": era_life_exp,
+            "sick_count": sick_count,
+            "disease_cases": self.live.disease_cases,
+            "cures_applied": self.live.cures_applied,
             "species_counts": dict(species_counts),
             "max_generation": self.live.max_generation,
             "rebiogenesis_cycle": self.live.rebiogenesis_cycle,
@@ -2566,6 +2740,10 @@ class MiroFishObservatory:
                     "scale": a.body_scale,
                     "gen": a.generation,
                     "age": round(a.age_days, 1),
+                    "age_years": a.age_years,
+                    "illness": a.illness,
+                    "illness_severity": round(a.illness_severity, 1),
+                    "antibodies": a.antibodies[:6],
                     "x": a.x,
                     "y": a.y,
                     "heading": round(a.heading, 3),

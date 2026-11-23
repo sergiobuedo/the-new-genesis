@@ -176,7 +176,7 @@ class KobAgent:
     pregnancy_father_genome: Optional[KobGenome] = None
     children_ids: List[str] = field(default_factory=list)
 
-    # Homeostasis & Psychology (0..100)
+    # Homeostasis, Pathology & Psychology (0..100)
     energy: float = 84.0
     hydration: float = 90.0
     warmth: float = 88.0
@@ -184,6 +184,9 @@ class KobAgent:
     integrity: float = 100.0
     stress: float = 10.0
     age_days: float = 0.0
+    illness: str = ""  # "" | "cold_fever" | "wound_sepsis" | "toxin_sickness" | "camp_plague"
+    illness_severity: float = 0.0  # 0..100
+    antibodies: List[str] = field(default_factory=list)  # Acquired immunity after natural recovery!
 
     # Smooth Locomotion Steering State (Eliminates 100% of spinning/jitter!)
     heading: float = 0.0
@@ -216,21 +219,25 @@ class KobAgent:
         return self.genome.lineage
 
     @property
+    def age_years(self) -> float:
+        return round(self.age_days / 40.0, 1)
+
+    @property
     def life_stage(self) -> str:
-        if self.age_days < 4.0:
+        if self.age_days < 6.0:
             return "Newborn"
-        if self.age_days < 11.0:
+        if self.age_days < 14.0:
             return "Juvenile"
-        if self.age_days < 70.0:
+        if self.age_days < 1000.0:
             return "Adult"
         return "Elder"
 
     @property
     def body_scale(self) -> float:
-        if self.age_days < 11.0:
-            return round(0.52 + (self.age_days / 11.0) * 0.48, 2)
-        if self.age_days > 70.0:
-            return 1.07
+        if self.age_days < 14.0:
+            return round(0.52 + (self.age_days / 14.0) * 0.48, 2)
+        if self.age_days >= 1000.0:
+            return 1.04
         return 1.0
 
     def add_memory(self, text: str, day: int) -> None:
@@ -262,10 +269,11 @@ class KobAgent:
         rivals = sum(1 for v in self.trust_bonds.values() if v <= -0.35)
         sex_sym = "♂ Male" if self.sex == "M" else "♀ Female"
         mate_info = f" · ❤️ Mate: {self.partner_id}" if self.partner_id else ""
-        preg_info = f" · 🤰 Pregnant ({min(100, int(self.gestation_ticks * 100 / 260))}%)" if self.is_pregnant else ""
+        preg_info = f" · 🤰 Pregnant ({min(100, int(self.gestation_ticks * 100 / 220))}%)" if self.is_pregnant else ""
         kids_info = f" · 👶 Offspring: {len(self.children_ids)}" if self.children_ids else ""
+        sick_info = f" · 🤒 Ill ({self.illness.replace('_', ' ')}, {self.illness_severity:.0f}%)" if self.illness else ""
         return (
-            f"{self.id} ({sex_sym}) · {self.life_stage} {self.lineage} (Gen {self.generation}, age {self.age_days:.0f}d){mate_info}{preg_info}{kids_info} — "
+            f"{self.id} ({sex_sym}) · {self.life_stage} {self.lineage} (Gen {self.generation}, {self.age_years:.1f} yrs / {self.age_days:.0f}d){mate_info}{preg_info}{kids_info}{sick_info} — "
             f"{self.action_label}. Holding: {held}. "
             f"Emotion: {self.mood}. Allies: {allies}, Rivals: {rivals}."
         )
@@ -338,11 +346,12 @@ class KobAgent:
         recent_mem = " | ".join(self.memories[-3:]) or "newly awakened"
         sex_word = "male" if self.sex == "M" else "female"
         preg_word = ", carrying an unborn child within" if self.is_pregnant else ""
+        sick_word = ", aching with burning chills and weak limbs" if self.illness else ""
 
         prompt = (
             "Raw sensory impressions:\n"
             f"- Sky: {light_feel} ({weather_feel}). Air: {temp_feel}.{cave_note}\n"
-            f"- Body ({sex_word}{preg_word}): nourishment={self.energy:.0f}/100, hydration={self.hydration:.0f}/100, warmth={self.warmth:.0f}/100, "
+            f"- Body ({sex_word}{preg_word}{sick_word}): nourishment={self.energy:.0f}/100, hydration={self.hydration:.0f}/100, warmth={self.warmth:.0f}/100, "
             f"tension={self.stress:.0f}/100, health={self.integrity:.0f}/100.\n"
             f"- Inner drives: curiosity={self.genome.curiosity}, empathy={self.genome.empathy}, "
             f"fierceness={self.genome.aggression}, hive_collectivism={self.genome.collectivism}.\n"

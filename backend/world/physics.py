@@ -422,6 +422,32 @@ BLIND_MATERIALS: Dict[str, BlindMaterial] = {
         flammability=1.0,
         spark_potential=0.98,
     ),
+    # Progressive Emergent Medicine & Cures (0% hints — discovered empirically from flora, resin & glass!)
+    "herbal_remedy": BlindMaterial(
+        code="herbal_remedy",
+        formula="Steeped Phytochemical Botanical Infusion",
+        sensory_name="soothing warm fragrant green-pulp poultice",
+        observer_label="Herbal Remedy Poultice (Early Medicine)",
+        color_hex="#2dd4bf",
+        healing=0.82,
+    ),
+    "antiseptic_balm": BlindMaterial(
+        code="antiseptic_balm",
+        formula="Distilled Terpene-Resin & Cu-Ion Antiseptic",
+        sensory_name="sharp cooling amber-teal salve",
+        observer_label="Antiseptic Apothecary Balm (Apothecary Medicine)",
+        color_hex="#14b8a6",
+        healing=0.95,
+    ),
+    "clinical_cure": BlindMaterial(
+        code="clinical_cure",
+        formula="Purified Glass-Sealed Antimicrobial Serum",
+        sensory_name="crystal-clear luminescent vial of tonic",
+        observer_label="Purified Clinical Cure (Modern Medicine!)",
+        color_hex="#38bdf8",
+        healing=1.0,
+        luster=0.90,
+    ),
 }
 
 
@@ -1658,7 +1684,23 @@ class CosmosWorld:
                 "Excavated a subterranean chamber & tunnel network sheltered beneath the earth!",
             )
 
-        # 12B. High-Temperature Silica Glass, Electromagnetic Coils & Energetic Propellant
+        # 12B. High-Temperature Silica Glass, Electromagnetic Coils, Energetic Propellant & Emergent Medicine!
+        if "medicinal_herb" in (code_a, code_b) and ({code_a, code_b} & {"orb_sweet", "fiber_dry", "clay_gray"}):
+            lvl = insight_map.get("medical_lore", 0) + 1
+            insight_map["medical_lore"] = lvl
+            if lvl >= 1:
+                return ("herbal_remedy", None, "breakthrough", "Steeped soothing leaves into a restorative herbal poultice!")
+        if "herbal_remedy" in (code_a, code_b) and ({code_a, code_b} & {"resin_gold", "copper_ore", "nodule_red"}):
+            lvl = insight_map.get("medical_lore", 0) + 1
+            insight_map["medical_lore"] = lvl
+            if lvl >= 2:
+                return ("antiseptic_balm", None, "breakthrough", "Compounded herbal pulp with antimicrobial resin/mineral into an antiseptic balm!")
+        if "antiseptic_balm" in (code_a, code_b) and "silica_glass" in (code_a, code_b):
+            lvl = insight_map.get("medical_lore", 0) + 1
+            insight_map["medical_lore"] = lvl
+            if lvl >= 3:
+                return ("clinical_cure", None, "breakthrough", "Purified and sealed a clinical-grade therapeutic serum in glass!")
+
         if near_hearth and {code_a, code_b} == {"shard_translucent", "clay_gray"}:
             lvl = insight_map.get("glass_lore", 0) + 1
             insight_map["glass_lore"] = lvl
