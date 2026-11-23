@@ -75,17 +75,29 @@ class PopulationSimulation:
         self.deaths_today: int = 0
         self.clashes_today: int = 0
         self.gifts_today: int = 0
+        self.courtships_count: int = 0
+        self.couples_formed: int = 0
         self.discoveries: Dict[str, int] = {}
         self.max_generation: int = 1
         self.rebiogenesis_cycle: int = 1
         self._founders_per_lineage: int = founders_per_lineage
         self._spawn_multi_species_founders(founders_per_lineage)
 
+    def _are_close_kin(self, a: KobAgent, b: KobAgent) -> bool:
+        """Human-like Westermarck incest avoidance (parents, children, or full/half siblings)."""
+        if a.id in (b.parents or ()) or b.id in (a.parents or ()):
+            return True
+        p_a = {p for p in (a.parents or ()) if p}
+        p_b = {p for p in (b.parents or ()) if p}
+        if p_a and p_b and (p_a & p_b):
+            return True
+        return False
+
     def _spawn_lineage_enclave(self, lineage: str, count: int) -> List[str]:
         cx, cy = ENCLAVE_HOMELANDS[lineage]
         prefix = LINEAGE_SPECS[lineage]["prefix"]
         spawned: List[str] = []
-        for _ in range(count):
+        for idx in range(count):
             self._agent_seq += 1
             aid = f"{prefix}-{self._agent_seq:03d}"
             ang = self.world.rng.uniform(0, 2 * math.pi)
@@ -101,6 +113,7 @@ class PopulationSimulation:
                 x=sx,
                 y=sy,
                 genome=genome,
+                sex="M" if (idx % 2 == 0) else "F",
                 heading=round(ang, 3),
                 steer_side=1.0 if self.world.rng.random() < 0.5 else -1.0,
             )
@@ -304,7 +317,7 @@ class PopulationSimulation:
                     agent.last_cortex_tick = self.world.tick_count
                     cortex_requests.append((agent, prompt))
 
-        if self.world.tick_count % 36 == 0 and len(self.living_agents) < 104:
+        if self.world.tick_count % 18 == 0 and len(self.living_agents) < 108:
             self._check_species_reproduction()
 
         # Distant Continental Refugia: if an entire continent's native lineage vanished, isolated far-continent survivors can re-emerge after long eras
@@ -447,6 +460,12 @@ class PopulationSimulation:
 
         if (self.world.day - agent.born_day) > max_lifespan:
             agent.integrity -= 0.40
+
+        # Mammalian / Human-Identical Pregnancy Gestation -> Live Childbirth!
+        if agent.is_pregnant and agent.alive:
+            agent.gestation_ticks += 1
+            if agent.gestation_ticks >= 220:
+                self._deliver_live_birth(agent)
 
         if agent.warmth < 38.0:
             agent.mood = "cold"
@@ -598,19 +617,26 @@ class PopulationSimulation:
             self._move_smooth(agent, sx, sy, nearby_others, speed=0.26 * spd_mul)
             return
 
-        # 1D. Cooperative Parental Provisioning (Hrdy Hypothesis: empathetic kin feed hungry Newborns/Juveniles!)
-        if self.enable_culture and agent.energy > 64.0 and agent.genome.empathy > 0.48:
-            hungry_young = next(
-                (o for o in nearby_others if o.age_days < 11.0 and o.energy < 55.0 and agent.trust_bonds.get(o.id, 0.0) >= 0.65),
+        # 1D. Cooperative Family & Spousal Provisioning (Parents feed Newborns/Juveniles & Males provision Pregnant Mates!)
+        if self.enable_culture and agent.energy > 60.0 and agent.genome.empathy > 0.38:
+            family_hungry = next(
+                (
+                    o for o in nearby_others
+                    if (
+                        (o.age_days < 11.0 and o.energy < 58.0 and (o.id in agent.children_ids or agent.trust_bonds.get(o.id, 0.0) >= 0.55))
+                        or (o.id == agent.partner_id and (o.is_pregnant or o.energy < 62.0))
+                    )
+                ),
                 None,
             )
-            edible_for_child = next((i for i, c in enumerate(agent.inventory) if BLIND_MATERIALS[c].nutrition > 15 and BLIND_MATERIALS[c].toxicity == 0), None)
-            if hungry_young is not None and edible_for_child is not None:
-                gift = agent.inventory.pop(edible_for_child)
-                hungry_young.energy = min(100.0, hungry_young.energy + BLIND_MATERIALS[gift].nutrition)
+            edible_for_fam = next((i for i, c in enumerate(agent.inventory) if BLIND_MATERIALS[c].nutrition > 15 and BLIND_MATERIALS[c].toxicity == 0), None)
+            if family_hungry is not None and edible_for_fam is not None:
+                gift = agent.inventory.pop(edible_for_fam)
+                family_hungry.energy = min(100.0, family_hungry.energy + BLIND_MATERIALS[gift].nutrition)
                 self.sharing_count += 1
                 self.gifts_today += 1
-                agent.action_label = f"Feeding young {hungry_young.id}"
+                role_lbl = "pregnant mate" if family_hungry.is_pregnant else ("partner" if family_hungry.id == agent.partner_id else "child")
+                agent.action_label = f"Feeding {role_lbl} {family_hungry.id}"
                 agent.pause_ticks = 3
                 return
 
@@ -1261,15 +1287,55 @@ class PopulationSimulation:
                 self._move_smooth(agent, float(best_xy[0]), float(best_xy[1]), nearby_others, speed=0.25 * spd_mul)
                 return
 
+        # 8B. Active Human-Like Opposite-Sex Mate-Seeking, Courtship & Family Nesting (♂ + ♀)
+        if (
+            agent.age_days >= 7.0
+            and not agent.is_pregnant
+            and agent.energy > 52.0
+            and agent.warmth > 46.0
+            and agent.stress < 75.0
+        ):
+            opp_nearby = any(o.sex != agent.sex and not o.is_pregnant and o.age_days >= 7.0 for o in nearby_others)
+            if not opp_nearby:
+                lin_pop = sum(1 for o in self.living_agents if o.lineage == agent.lineage)
+                candidates_mate = [
+                    o
+                    for o in self.living_agents
+                    if o.id != agent.id
+                    and o.sex != agent.sex
+                    and not o.is_pregnant
+                    and o.age_days >= 7.0
+                    and (lin_pop <= 4 or not self._are_close_kin(agent, o))
+                    and math.hypot(o.x - agent.x, o.y - agent.y) <= 95.0
+                ]
+                if candidates_mate:
+                    # Prefer existing pair-bonded spouse, then same lineage, then exogamous cross-species partner!
+                    best_mate = min(
+                        candidates_mate,
+                        key=lambda o: (
+                            0 if o.id == agent.partner_id else (1 if o.lineage == agent.lineage else 2),
+                            math.hypot(o.x - agent.x, o.y - agent.y),
+                        ),
+                    )
+                    agent.mood = "affectionate"
+                    sex_icon = "♀" if best_mate.sex == "F" else "♂"
+                    agent.action_label = f"Seeking & courting {best_mate.lineage} {best_mate.id} ({sex_icon})"
+                    self._move_smooth(agent, best_mate.x, best_mate.y, nearby_others, speed=0.27 * spd_mul)
+                    return
+
         # 9. Smooth Purposeful Exploration & Continental Migration (No artificial pull to center!)
         if agent.target_xy is None or math.hypot(agent.target_xy[0] - agent.x, agent.target_xy[1] - agent.y) < 1.6:
             is_migrating = self.enable_culture and (agent.current_intent == "migrate" or agent.genome.curiosity > 0.78 and self.world.rng.random() < 0.14)
             span = 22.0 if is_migrating else 10.0
             if agent.current_intent == "migrate":
                 agent.current_intent = "forage"
-            # Gentle continental drift toward unexplored horizons when migrating, or stay near clan mates otherwise
+            # Gentle continental drift toward unexplored horizons when migrating, or stay near spouse/clan mates otherwise
             drift_x, drift_y = 0.0, 0.0
-            if is_migrating:
+            if agent.partner_id and agent.partner_id in self.agents and self.agents[agent.partner_id].alive:
+                sp_mate = self.agents[agent.partner_id]
+                drift_x = (sp_mate.x - agent.x) * 0.25
+                drift_y = (sp_mate.y - agent.y) * 0.25
+            elif is_migrating:
                 drift_x = (0.0 - agent.x) * 0.035  # Very gradual multi-generational horizon trek across vast continents!
                 drift_y = (0.0 - agent.y) * 0.035
             elif nearby_others:
@@ -1347,90 +1413,175 @@ class PopulationSimulation:
         agent.target_xy = None
 
     def _check_species_reproduction(self) -> None:
+        """Human-Identical Sexual Courtship, Pair-Bonding & Mammalian Conception (♀ Female + ♂ Male)."""
         living_all = self.living_agents
-        eligible = [
+        lin_counts = Counter(a.lineage for a in living_all)
+        females = [
             a
             for a in living_all
-            if a.energy > 68.0
-            and a.warmth > 58.0
-            and a.stress < 72.0
-            and (self.world.day - a.born_day) >= 8
+            if a.sex == "F"
+            and not a.is_pregnant
+            and a.energy > 52.0
+            and a.warmth > 46.0
+            and a.stress < 76.0
+            and (self.world.day - a.born_day) >= 7
         ]
-        used = set()
-        for a in eligible:
-            if a.id in used:
+        males = [
+            b
+            for b in living_all
+            if b.sex == "M"
+            and b.energy > 48.0
+            and b.warmth > 44.0
+            and b.stress < 78.0
+            and (self.world.day - b.born_day) >= 7
+        ]
+        used_males = set()
+        for fem in females:
+            # Local Continental Carrying Capacity (55m basin max 36 beings)
+            local_basin_pop = sum(1 for o in living_all if math.hypot(o.x - fem.x, o.y - fem.y) < 55.0)
+            if local_basin_pop >= 36:
                 continue
-            # Local Continental Carrying Capacity (55m basin max 34 beings) — booming Continent A never blocks distant Continent B/C!
-            local_basin_pop = sum(1 for o in living_all if math.hypot(o.x - a.x, o.y - a.y) < 55.0)
-            if local_basin_pop >= 34:
-                continue
-            for b in eligible:
-                if b.id == a.id or b.id in used:
+            for mal in males:
+                if mal.id in used_males:
                     continue
-                cross_lin = b.lineage != a.lineage
+                if math.hypot(fem.x - mal.x, fem.y - mal.y) > 4.6:
+                    continue
+                # Westermarck incest taboo (waived only if lineage is in <=4 critical bottleneck)
+                if lin_counts.get(fem.lineage, 0) > 4 and self._are_close_kin(fem, mal):
+                    continue
+                cross_lin = mal.lineage != fem.lineage
                 if cross_lin and not self.enable_culture:
                     continue
-                if math.hypot(a.x - b.x, a.y - b.y) <= 3.8:
-                    bond = a.trust_bonds.get(b.id, 0.0)
-                    # Same-species requires mild trust (>=0.18); cross-species hybridization requires deep mutual bond (>=0.65)!
-                    min_bond = 0.65 if cross_lin else 0.18
-                    if self.enable_culture and bond < min_bond:
-                        continue
-                    chance = 0.12 if cross_lin else 0.22
-                    if self.world.rng.random() < chance:
-                        used.add(a.id)
-                        used.add(b.id)
-                        a.energy -= 24.0
-                        b.energy -= 24.0
-                        self._agent_seq += 1
-                        self.births_today += 1
-                        child_genome = KobGenome.crossover(a.genome, b.genome, self.world.rng)
-                        c_lin = child_genome.lineage
-                        prefix = LINEAGE_SPECS[c_lin]["prefix"]
-                        mode_name = LINEAGE_SPECS[c_lin]["reproduction_mode"]
-                        cid = f"{prefix}-{self._agent_seq:03d}"
-                        gen = max(a.generation, b.generation) + 1
-                        self.max_generation = max(self.max_generation, gen)
-                        cx, cy = self.world.find_nearest_dry_spot((a.x + b.x) * 0.5, (a.y + b.y) * 0.5)
-                        child = KobAgent(
-                            id=cid,
-                            generation=gen,
-                            born_day=self.world.day,
-                            x=cx,
-                            y=cy,
-                            genome=child_genome,
-                            parents=(a.id, b.id),
-                            energy=78.0,
-                            warmth=86.0,
-                            heading=a.heading,
+                bond = fem.trust_bonds.get(mal.id, 0.0)
+                # Active courtship builds mutual attraction & pair-bond
+                fem.trust_bonds[mal.id] = min(2.0, bond + 0.24)
+                mal.trust_bonds[fem.id] = min(2.0, mal.trust_bonds.get(fem.id, 0.0) + 0.24)
+                bond = fem.trust_bonds[mal.id]
+                min_bond = 0.26 if cross_lin else 0.12
+                if self.enable_culture and bond < min_bond:
+                    fem.action_label = f"Courting with {mal.lineage} {mal.id} (♂)"
+                    mal.action_label = f"Courting with {fem.lineage} {fem.id} (♀)"
+                    self.courtships_count += 1
+                    continue
+                chance = 0.26 if cross_lin else 0.36
+                if self.world.rng.random() < chance:
+                    used_males.add(mal.id)
+                    self.courtships_count += 1
+                    if fem.partner_id != mal.id:
+                        self.couples_formed += 1
+                    fem.partner_id = mal.id
+                    mal.partner_id = fem.id
+                    fem.is_pregnant = True
+                    fem.gestation_ticks = 1
+                    fem.pregnancy_father_id = mal.id
+                    fem.pregnancy_father_genome = mal.genome
+                    fem.mood = "affectionate"
+                    mal.mood = "affectionate"
+                    fem.action_label = f"Conceived child with mate {mal.id} (♂) · 🤰 Gestating"
+                    mal.action_label = f"Bonded with mate {fem.id} (♀)"
+                    # Spousal Cultural & Linguistic Sharing (Couples share words & discoveries!)
+                    for k_lore, lvl in mal.insight_map.items():
+                        fem.insight_map[k_lore] = max(fem.insight_map.get(k_lore, 0), lvl)
+                    for k_lore, lvl in fem.insight_map.items():
+                        mal.insight_map[k_lore] = max(mal.insight_map.get(k_lore, 0), lvl)
+                    for rk, wv in mal.personal_lexicon.items():
+                        fem.personal_lexicon.setdefault(rk, wv)
+                    for rk, wv in fem.personal_lexicon.items():
+                        mal.personal_lexicon.setdefault(rk, wv)
+                    if "first_pair_bond" not in self.discoveries:
+                        self.discoveries["first_pair_bond"] = self.world.day
+                        self._record_event(
+                            "birth",
+                            f"HUMAN-LIKE COURTSHIP & CONCEPTION! {fem.lineage} {fem.id} (♀) & {mal.lineage} {mal.id} (♂) formed a pair-bond and conceived a child!",
+                            [fem.id, mal.id],
+                            fem.x,
+                            fem.y,
+                            importance=4,
                         )
-                        child.trust_bonds[a.id] = 0.85
-                        child.trust_bonds[b.id] = 0.85
-                        a.trust_bonds[cid] = 0.90
-                        b.trust_bonds[cid] = 0.90
-                        self.agents[cid] = child
-                        if cross_lin and "first_sentient_speciation" not in self.discoveries:
-                            self.discoveries["first_sentient_speciation"] = self.world.day
-                            self._record_event(
-                                "birth",
-                                f"NEW SENTIENT SPECIES BORN! {a.lineage} {a.id} & {b.lineage} {b.id} gave rise to hybrid lineage {c_lin} ({cid})!",
-                                [a.id, b.id, cid],
-                                cx,
-                                cy,
-                                importance=5,
-                            )
-                        else:
-                            if gen == 2 and "gen_2_born" not in self.discoveries:
-                                self.discoveries["gen_2_born"] = self.world.day
-                            self._record_event(
-                                "birth",
-                                f"{mode_name}: {a.lineage} {a.id} & {b.lineage} {b.id} welcomed hatchling {cid} (Gen {gen}).",
-                                [a.id, b.id, cid],
-                                cx,
-                                cy,
-                                importance=3 if gen >= 2 else 2,
-                            )
-                        break
+                    break
+
+    def _deliver_live_birth(self, mother: KobAgent) -> None:
+        """Delivers a live mammalian/hominid Newborn (♂ or ♀) after pregnancy gestation completes!"""
+        father_id = mother.pregnancy_father_id or mother.partner_id or mother.id
+        father_ag = self.agents.get(father_id)
+        father_genome = mother.pregnancy_father_genome or (father_ag.genome if father_ag else mother.genome)
+        mother.is_pregnant = False
+        mother.gestation_ticks = 0
+        mother.pregnancy_father_id = ""
+        mother.pregnancy_father_genome = None
+        mother.energy = max(25.0, mother.energy - 18.0)
+
+        num_babies = 2 if (self.world.rng.random() < 0.05 and len(self.living_agents) < 106) else 1
+        for _ in range(num_babies):
+            self._agent_seq += 1
+            self.births_today += 1
+            child_genome = KobGenome.crossover(mother.genome, father_genome, self.world.rng)
+            c_lin = child_genome.lineage
+            prefix = LINEAGE_SPECS[c_lin]["prefix"]
+            cid = f"{prefix}-{self._agent_seq:03d}"
+            father_gen = father_ag.generation if father_ag else mother.generation
+            gen = max(mother.generation, father_gen) + 1
+            self.max_generation = max(self.max_generation, gen)
+            cx, cy = self.world.find_nearest_dry_spot(mother.x + self.world.rng.uniform(-0.8, 0.8), mother.y + self.world.rng.uniform(-0.8, 0.8))
+            child_sex = "M" if self.world.rng.random() < 0.5 else "F"
+
+            # Cumulative Family Cultural & Linguistic Inheritance (Children inherit parents' insights & lexicon!)
+            inherited_insights: Dict[str, int] = dict(mother.insight_map)
+            inherited_lexicon: Dict[str, str] = dict(mother.personal_lexicon)
+            if father_ag:
+                for k_lore, lvl in father_ag.insight_map.items():
+                    inherited_insights[k_lore] = max(inherited_insights.get(k_lore, 0), lvl)
+                for rk, wv in father_ag.personal_lexicon.items():
+                    inherited_lexicon.setdefault(rk, wv)
+
+            child = KobAgent(
+                id=cid,
+                generation=gen,
+                born_day=self.world.day,
+                x=cx,
+                y=cy,
+                genome=child_genome,
+                sex=child_sex,
+                parents=(mother.id, father_id),
+                energy=84.0,
+                hydration=92.0,
+                warmth=88.0,
+                heading=mother.heading,
+                insight_map=inherited_insights,
+                personal_lexicon=inherited_lexicon,
+            )
+            child.trust_bonds[mother.id] = 0.95
+            mother.trust_bonds[cid] = 0.95
+            mother.children_ids.append(cid)
+            if father_ag:
+                child.trust_bonds[father_ag.id] = 0.92
+                father_ag.trust_bonds[cid] = 0.92
+                father_ag.children_ids.append(cid)
+            self.agents[cid] = child
+
+            cross_lin = (father_ag and father_ag.lineage != mother.lineage) or ("-" in c_lin and c_lin != mother.lineage)
+            sex_lbl = "♂ son" if child_sex == "M" else "♀ daughter"
+            if cross_lin and "first_sentient_speciation" not in self.discoveries:
+                self.discoveries["first_sentient_speciation"] = self.world.day
+                self._record_event(
+                    "birth",
+                    f"NEW HYBRID SENTIENT SPECIES BORN! Mother {mother.lineage} {mother.id} (♀) & Father {father_id} (♂) gave live birth to hybrid {c_lin} {sex_lbl} {cid}!",
+                    [mother.id, father_id, cid],
+                    cx,
+                    cy,
+                    importance=5,
+                )
+            else:
+                if gen == 2 and "gen_2_born" not in self.discoveries:
+                    self.discoveries["gen_2_born"] = self.world.day
+                self._record_event(
+                    "birth",
+                    f"Live Birth (♀+♂): Mother {mother.lineage} {mother.id} & Father {father_id} welcomed newborn {sex_lbl} {cid} (Gen {gen}, {c_lin}).",
+                    [mother.id, father_id, cid],
+                    cx,
+                    cy,
+                    importance=3 if gen >= 2 else 2,
+                )
 
 
 class MiroFishObservatory:
@@ -1517,6 +1668,7 @@ class MiroFishObservatory:
                             balanced.append(by_lin[k].pop(0))
                 saved_agents = balanced
 
+            lin_sex_seq: Dict[str, int] = defaultdict(int)
             for ad in saved_agents:
                 aid = ad["id"]
                 try:
@@ -1526,6 +1678,10 @@ class MiroFishObservatory:
                     pass
                 lin = ad.get("lineage", "Vespera")
                 lin = {"Lith-Lith": "Lithokin", "Sylp-Sylp": "Sylphid", "Vesp-Vesp": "Vespera"}.get(lin, lin)
+                sex_val = ad.get("sex")
+                if sex_val not in ("M", "F"):
+                    sex_val = "F" if (lin_sex_seq[lin] % 2 == 0) else "M"
+                lin_sex_seq[lin] += 1
                 gen_num = int(ad.get("gen", 1))
                 age_d = float(ad.get("age", 10.0))
                 born_d = max(1, int(round(self.live.world.day - age_d)))
@@ -1549,6 +1705,8 @@ class MiroFishObservatory:
                     raw_x, raw_y = self.live.world.find_nearest_dry_spot(raw_x * 3.15, raw_y * 3.15)
                 self.live.world.ensure_frontier_around(raw_x, raw_y)
 
+                is_preg = bool(ad.get("pregnant", False))
+                gest_ticks = int(round(float(ad.get("gestation_pct", 0)) * 2.2)) if is_preg else 0
                 ag = KobAgent(
                     id=aid,
                     generation=gen_num,
@@ -1556,6 +1714,12 @@ class MiroFishObservatory:
                     x=raw_x,
                     y=raw_y,
                     genome=genome,
+                    sex=sex_val,
+                    partner_id=str(ad.get("partner_id", "")),
+                    is_pregnant=is_preg,
+                    gestation_ticks=gest_ticks,
+                    pregnancy_father_id=str(ad.get("partner_id", "")) if is_preg else "",
+                    children_ids=list(ad.get("children_ids", [])),
                     energy=float(ad.get("energy", 80.0)),
                     hydration=float(ad.get("hydration", 85.0)),
                     warmth=float(ad.get("warmth", 85.0)),
@@ -1599,7 +1763,44 @@ class MiroFishObservatory:
             self.live.grave_offerings = int(m.get("grave_offerings", 0))
             self.live.stone_burials = int(m.get("stone_burials", 0))
             self.live.corpse_avoidance = int(m.get("corpse_avoidance", 0))
+            self.live.courtships_count = int(m.get("courtships_count", 0))
+            self.live.couples_formed = int(m.get("bonded_couples", 0))
             self.live.world.extinct_fauna = dict(m.get("extinct_fauna", {}))
+
+            # If upgrading from a legacy save without pair-bonds, naturally bond co-located adult ♀+♂ peers
+            if not any(a.partner_id for a in self.live.living_agents):
+                females_up = [a for a in self.live.living_agents if a.sex == "F" and a.age_days >= 7.0]
+                males_up = [b for b in self.live.living_agents if b.sex == "M" and b.age_days >= 7.0]
+                paired_m = set()
+                preg_seeded = 0
+                for fem in females_up:
+                    best_m = None
+                    best_d = 45.0
+                    for mal in males_up:
+                        if mal.id in paired_m:
+                            continue
+                        d = math.hypot(fem.x - mal.x, fem.y - mal.y)
+                        if d < best_d:
+                            best_d = d
+                            best_m = mal
+                    if best_m and len(paired_m) < 8:
+                        paired_m.add(best_m.id)
+                        fem.partner_id = best_m.id
+                        best_m.partner_id = fem.id
+                        fem.trust_bonds[best_m.id] = 1.25
+                        best_m.trust_bonds[fem.id] = 1.25
+                        self.live.couples_formed += 1
+                        self.live.courtships_count += 2
+                        if preg_seeded < 4:
+                            preg_seeded += 1
+                            fem.is_pregnant = True
+                            fem.gestation_ticks = 45 + preg_seeded * 35
+                            fem.pregnancy_father_id = best_m.id
+                            fem.pregnancy_father_genome = best_m.genome
+                            fem.action_label = f"Gestating child ({int(round(fem.gestation_ticks * 100 / 220))}%) with mate {best_m.id} (♂)"
+                            best_m.action_label = f"Protecting & provisioning pregnant mate {fem.id} (♀)"
+                if self.live.couples_formed > 0 and "first_pair_bond" not in self.live.discoveries:
+                    self.live.discoveries["first_pair_bond"] = self.live.world.day
             self.cortex.total_calls = int(m.get("llm_deliberations", 0))
             self.live.timeline = list(saved.get("timeline", []))
             self.daily_logs = self.warehouse.recent_daily_summaries(limit=40)
@@ -1849,6 +2050,10 @@ class MiroFishObservatory:
         for r_name in all_races:
             cnt = sp_counts.get(r_name, 0)
             r_members = [a for a in living if a.lineage == r_name]
+            r_males = sum(1 for a in r_members if a.sex == "M")
+            r_females = sum(1 for a in r_members if a.sex == "F")
+            r_pregnant = sum(1 for a in r_members if a.is_pregnant)
+            r_bonded = sum(1 for a in r_members if a.partner_id)
             avg_e = round(sum(a.energy for a in r_members) / max(1, len(r_members)), 1) if r_members else 0.0
             is_hybrid = "-" in r_name
             if cnt == 0:
@@ -1864,6 +2069,10 @@ class MiroFishObservatory:
                     "lineage": r_name,
                     "is_hybrid": is_hybrid,
                     "count": cnt,
+                    "males": r_males,
+                    "females": r_females,
+                    "pregnant": r_pregnant,
+                    "bonded": r_bonded,
                     "avg_energy": avg_e,
                     "status_en": st_en,
                     "status_es": st_es,
@@ -2010,6 +2219,10 @@ class MiroFishObservatory:
 
         sleeping_now = sum(1 for a in living if a.is_sleeping)
         hungry_now = sum(1 for a in living if a.energy < 40.0)
+        males_count = sum(1 for a in living if a.sex == "M")
+        females_count = sum(1 for a in living if a.sex == "F")
+        pregnant_count = sum(1 for a in living if a.is_pregnant)
+        bonded_couples = sum(1 for a in living if a.partner_id) // 2
         rare_held = sum(
             1 for a in living for c in a.inventory if c in BLIND_MATERIALS and BLIND_MATERIALS[c].luster >= 0.80
         )
@@ -2022,6 +2235,7 @@ class MiroFishObservatory:
             "first_interspecies_pidgin": "Created cross-species bridge vocabulary",
             "first_conflict": "First territorial clash over resources",
             "gen_2_born": "Second generation born naturally",
+            "first_pair_bond": "Formed first male-female pair-bond & pregnancy",
             "craft_warm_cloak": "Wove insulating plant-fiber cloaks for winter",
             "first_hunt": "Coordinated hunting of wild land herbivores",
             "first_fishing": "Shoreline fishing of river shoals & crabs",
@@ -2066,6 +2280,7 @@ class MiroFishObservatory:
             "first_interspecies_pidgin": "Crearon palabras puente entre distintas razas",
             "first_conflict": "Primer combate territorial por recursos",
             "gen_2_born": "Nacimiento natural de la 2.ª generación",
+            "first_pair_bond": "Primera unión de pareja macho-hembra (♂+♀) y embarazo",
             "craft_warm_cloak": "Tejieron abrigos vegetales para resistir el invierno",
             "first_hunt": "Caza de animales terrestres salvajes",
             "first_fishing": "Pesca costera y fluvial de peces y crustáceos",
@@ -2157,10 +2372,12 @@ class MiroFishObservatory:
                 f"and {hungry_now} are actively searching for food. They huddle together on cold nights to share body warmth."
             ),
             "sociology": (
-                f"HOW THEY ORGANIZE ({arch_en}): Across history they have voluntarily shared food {self.live.sharing_count} times "
-                f"versus {self.live.conflict_count} territorial fights over scarce items ({self.live.domesticated_count} wild beasts tamed). "
+                f"HOW THEY ORGANIZE ({arch_en}): Sexual demography: {males_count}♂ males & {females_count}♀ females, "
+                f"with {bonded_couples} pair-bonded couples (❤️) and {pregnant_count} pregnant mothers (🤰). "
+                f"They have voluntarily shared food {self.live.sharing_count} times "
+                f"versus {self.live.conflict_count} territorial fights ({self.live.domesticated_count} wild beasts tamed). "
                 + (
-                    "Close-knit family clans stay bonded together."
+                    "Close-knit family clans stay bonded together and pass discoveries to their children."
                     if clustering >= 0.3
                     else "Individuals currently roam in looser foraging bands."
                 )
@@ -2189,10 +2406,12 @@ class MiroFishObservatory:
                 f"y {hungry_now} buscando comida con hambre. Por las noches se agrupan para darse calor."
             ),
             "sociology": (
-                f"CONVIVENCIA Y ORGANIZACIÓN ({arch_es}): Se han regalado comida voluntariamente {self.live.sharing_count} veces, "
+                f"FAMILIAS, PAREJAS (♂+♀) Y ORGANIZACIÓN ({arch_es}): Demografía sexual: {males_count}♂ machos y {females_count}♀ hembras, "
+                f"con {bonded_couples} parejas estables (❤️) y {pregnant_count} madres embarazadas (🤰). "
+                f"Se han regalado comida voluntariamente {self.live.sharing_count} veces, "
                 f"frente a {self.live.conflict_count} peleas territoriales ({self.live.domesticated_count} animales salvajes domesticados). "
                 + (
-                    "Forman clanes familiares muy unidos entre sí."
+                    "Forman núcleos familiares muy unidos que transmiten sus inventos y vocabulario a sus hijos."
                     if clustering >= 0.3
                     else "Se mueven en pequeños grupos recolectores abiertos."
                 )
@@ -2223,6 +2442,11 @@ class MiroFishObservatory:
             "archetype_es": arch_es,
             "live_population": len(living),
             "control_population": len(ctrl_living),
+            "males_count": males_count,
+            "females_count": females_count,
+            "pregnant_count": pregnant_count,
+            "bonded_couples": bonded_couples,
+            "courtships_count": self.live.courtships_count,
             "species_counts": dict(species_counts),
             "max_generation": self.live.max_generation,
             "rebiogenesis_cycle": self.live.rebiogenesis_cycle,
@@ -2332,6 +2556,12 @@ class MiroFishObservatory:
                 {
                     "id": a.id,
                     "lineage": a.lineage,
+                    "sex": a.sex,
+                    "partner_id": a.partner_id,
+                    "pregnant": a.is_pregnant,
+                    "gestation_pct": min(100, int(round(a.gestation_ticks * 100.0 / 220.0))) if a.is_pregnant else 0,
+                    "children_ids": a.children_ids[-8:],
+                    "children_count": len(a.children_ids),
                     "stage": a.life_stage,
                     "scale": a.body_scale,
                     "gen": a.generation,

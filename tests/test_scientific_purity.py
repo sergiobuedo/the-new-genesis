@@ -165,3 +165,50 @@ def test_astrophysics_caves_vehicles_relays_and_satellites() -> None:
     world.step_environment()
     assert (sat.x, sat.y) != pos_before
 
+
+def test_human_like_sexual_reproduction_gestation_and_family_inheritance():
+    """Verify chromosomal ♂/♀ sex, pair-bonding, pregnancy gestation, and cumulative parental cultural inheritance."""
+    from backend.mirofish_lab.observer import PopulationSimulation
+
+    sim = PopulationSimulation(seed=4201, founders_per_lineage=4, enable_culture=True)
+    males = [a for a in sim.living_agents if a.sex == "M"]
+    females = [a for a in sim.living_agents if a.sex == "F"]
+    assert len(males) >= 4 and len(females) >= 4
+
+    fem = females[0]
+    mal = next(m for m in males if m.lineage != fem.lineage)
+    fem.x, fem.y = -135.0, -115.0
+    mal.x, mal.y = -134.2, -115.0
+    fem.born_day = -15
+    mal.born_day = -15
+    fem.trust_bonds[mal.id] = 0.85
+    mal.trust_bonds[fem.id] = 0.85
+    fem.insight_map["fire_lore"] = 2
+    mal.insight_map["bronze_lore"] = 1
+    fem.personal_lexicon["food"] = "nara"
+    mal.personal_lexicon["kin"] = "sola"
+
+    # Trigger courtship & conception
+    for _ in range(15):
+        sim._check_species_reproduction()
+        if fem.is_pregnant:
+            break
+    assert fem.is_pregnant is True
+    assert fem.partner_id == mal.id and mal.partner_id == fem.id
+    # Spouses share insights & vocabulary upon pair-bonding
+    assert fem.insight_map.get("bronze_lore") == 1 and mal.insight_map.get("fire_lore") == 2
+
+    # Complete pregnancy gestation -> live birth
+    pop_before = len(sim.living_agents)
+    sim._deliver_live_birth(fem)
+    assert fem.is_pregnant is False
+    assert len(sim.living_agents) > pop_before
+    child_id = fem.children_ids[-1]
+    child = sim.agents[child_id]
+    assert child.sex in ("M", "F")
+    assert child.parents == (fem.id, mal.id)
+    assert sim._are_close_kin(fem, child) is True
+    assert child.insight_map.get("fire_lore") == 2 and child.insight_map.get("bronze_lore") == 1
+    assert child.personal_lexicon.get("food") == "nara" and child.personal_lexicon.get("kin") == "sola"
+
+

@@ -24,21 +24,21 @@ from backend.world.physics import BLIND_MATERIALS, CosmosWorld
 LINEAGE_SPECS = {
     "Sylphid": {
         "prefix": "S",
-        "reproduction_mode": "Harmonic Resonance Cocoon",
+        "reproduction_mode": "Viviparous Sexual Union (♂+♀)",
         "palettes": [("#38bdf8", "#bae6fd"), ("#2dd4bf", "#ccfbf1"), ("#818cf8", "#e0e7ff")],
         "ColdBias": 0.0,
         "SpeedMul": 1.04,
     },
     "Lithokin": {
         "prefix": "L",
-        "reproduction_mode": "Geothermal Spore-Clutch",
+        "reproduction_mode": "Viviparous Sexual Union (♂+♀)",
         "palettes": [("#f59e0b", "#fef3c7"), ("#f97316", "#ffedd5"), ("#eab308", "#fef9c3")],
         "ColdBias": 3.5,
         "SpeedMul": 0.90,
     },
     "Vespera": {
         "prefix": "V",
-        "reproduction_mode": "Kinship Fission-Bloom",
+        "reproduction_mode": "Viviparous Sexual Union (♂+♀)",
         "palettes": [("#c084fc", "#f3e8ff"), ("#fb7185", "#ffe4e6"), ("#34d399", "#d1fae5")],
         "ColdBias": 1.0,
         "SpeedMul": 1.10,
@@ -50,6 +50,7 @@ VALID_INTENTS = frozenset(
         "forage",
         "warm_up",
         "socialize",
+        "court",
         "share",
         "barter",
         "plant_seed",
@@ -87,7 +88,7 @@ class KobGenome:
         if lineage not in LINEAGE_SPECS:
             LINEAGE_SPECS[lineage] = {
                 "prefix": "H",
-                "reproduction_mode": "Symbiotic Hybrid Genesis",
+                "reproduction_mode": "Viviparous Sexual Union (♂+♀)",
                 "palettes": [("#34d399", "#fef3c7"), ("#38bdf8", "#f3e8ff")],
                 "ColdBias": 1.2,
                 "SpeedMul": 1.02,
@@ -165,6 +166,15 @@ class KobAgent:
     alive: bool = True
     death_day: Optional[int] = None
     cause_of_death: str = ""
+
+    # Biological Sex, Pair-Bonding, Gestation & Family Kinship (Human-Identical Reproductive Biology!)
+    sex: str = "F"  # "M" (♂ Macho/Male) or "F" (♀ Hembra/Female)
+    partner_id: str = ""
+    is_pregnant: bool = False
+    gestation_ticks: int = 0
+    pregnancy_father_id: str = ""
+    pregnancy_father_genome: Optional[KobGenome] = None
+    children_ids: List[str] = field(default_factory=list)
 
     # Homeostasis & Psychology (0..100)
     energy: float = 84.0
@@ -250,8 +260,12 @@ class KobAgent:
         held = BLIND_MATERIALS[self.held_item].observer_label if self.held_item else "empty hands"
         allies = sum(1 for v in self.trust_bonds.values() if v >= 0.25)
         rivals = sum(1 for v in self.trust_bonds.values() if v <= -0.35)
+        sex_sym = "♂ Male" if self.sex == "M" else "♀ Female"
+        mate_info = f" · ❤️ Mate: {self.partner_id}" if self.partner_id else ""
+        preg_info = f" · 🤰 Pregnant ({min(100, int(self.gestation_ticks * 100 / 260))}%)" if self.is_pregnant else ""
+        kids_info = f" · 👶 Offspring: {len(self.children_ids)}" if self.children_ids else ""
         return (
-            f"{self.id} · {self.life_stage} {self.lineage} (Gen {self.generation}, age {self.age_days:.0f}d) — "
+            f"{self.id} ({sex_sym}) · {self.life_stage} {self.lineage} (Gen {self.generation}, age {self.age_days:.0f}d){mate_info}{preg_info}{kids_info} — "
             f"{self.action_label}. Holding: {held}. "
             f"Emotion: {self.mood}. Allies: {allies}, Rivals: {rivals}."
         )
@@ -306,7 +320,7 @@ class KobAgent:
         )
         others_desc = (
             "; ".join(
-                f"{a.id} ({'same kind' if a.lineage == self.lineage else 'other kind'}, "
+                f"{a.id} ({'male' if a.sex == 'M' else 'female'}, {'same kind' if a.lineage == self.lineage else 'other kind'}, "
                 f"bond {self.trust_bonds.get(a.id, 0.0):+.1f}"
                 + (f", sound «{a.last_utterance}»" if a.last_utterance else "")
                 + ")"
@@ -322,11 +336,13 @@ class KobAgent:
             else ""
         )
         recent_mem = " | ".join(self.memories[-3:]) or "newly awakened"
+        sex_word = "male" if self.sex == "M" else "female"
+        preg_word = ", carrying an unborn child within" if self.is_pregnant else ""
 
         prompt = (
             "Raw sensory impressions:\n"
             f"- Sky: {light_feel} ({weather_feel}). Air: {temp_feel}.{cave_note}\n"
-            f"- Body: nourishment={self.energy:.0f}/100, hydration={self.hydration:.0f}/100, warmth={self.warmth:.0f}/100, "
+            f"- Body ({sex_word}{preg_word}): nourishment={self.energy:.0f}/100, hydration={self.hydration:.0f}/100, warmth={self.warmth:.0f}/100, "
             f"tension={self.stress:.0f}/100, health={self.integrity:.0f}/100.\n"
             f"- Inner drives: curiosity={self.genome.curiosity}, empathy={self.genome.empathy}, "
             f"fierceness={self.genome.aggression}, hive_collectivism={self.genome.collectivism}.\n"

@@ -688,13 +688,17 @@
 
       const racesHtml = (b.races || []).length > 0 ? `
         <div>
-          <div style="font-weight:700;color:var(--emerald);margin-bottom:6px;">🧬 ${es ? 'CENSO POR RAZAS Y DIAGNÓSTICO DE EXTINCIÓN (SIN INTERVENIR)' : 'CENSUS BY RACE & EXTINCTION BOTTLENECK STATUS'}</div>
+          <div style="font-weight:700;color:var(--emerald);margin-bottom:6px;">🧬 ${es ? 'CENSO POR RAZAS, SEXO (♂/♀), PAREJAS Y DIAGNÓSTICO DE EXTINCIÓN' : 'CENSUS BY RACE, SEX (♂/♀), COUPLES & EXTINCTION BOTTLENECK'}</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:8px;">
             ${b.races.map(r => {
               const col = r.count === 0 ? 'var(--rose)' : (r.count <= 4 ? 'var(--amber)' : 'var(--emerald)');
+              const sexTxt = (r.males !== undefined || r.females !== undefined)
+                ? `<div style="font-size:10.5px;color:#e2e8f0;margin-top:2px;">♂ ${r.males || 0} ${es ? 'Machos' : 'Males'} · ♀ ${r.females || 0} ${es ? 'Hembras' : 'Females'} ${r.pregnant > 0 ? `· <span style="color:#f472b6;font-weight:700;">🤰 ${r.pregnant}</span>` : ''} ${r.bonded > 0 ? `· ❤️ ${Math.ceil(r.bonded / 2)}` : ''}</div>`
+                : '';
               return `<div style="background:rgba(15,23,42,0.78);border:1px solid ${col};border-radius:9px;padding:8px 10px;">
                 <div style="display:flex;justify-content:space-between;"><strong>${r.lineage} ${r.is_hybrid ? '✨' : ''}</strong><strong style="color:${col}">${r.count}</strong></div>
                 <div style="font-size:11px;color:${col};font-weight:600;">${es ? r.status_es : r.status_en}</div>
+                ${sexTxt}
                 <div style="font-size:10px;color:var(--muted);">${es ? 'Energía media' : 'Mean nourishment'}: ${r.avg_energy}%</div>
               </div>`;
             }).join('')}
@@ -1396,10 +1400,18 @@
       const spearMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.15, 6), new THREE.MeshStandardMaterial({ color: 0x22d3ee, emissive: 0x0891b2, emissiveIntensity: 0.3 }));
       spearMesh.position.set(-0.36, 0.62, 0.12); spearMesh.rotation.x = 0.25; spearMesh.visible = false;
 
+      // Maternal Pregnancy Glow Belly (visible when female is gestating a child!)
+      const pregnantMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.24, 14, 12),
+        new THREE.MeshStandardMaterial({ color: 0xf472b6, emissive: 0xfbbf24, emissiveIntensity: 0.85, transparent: true, opacity: 0.78 })
+      );
+      pregnantMesh.position.set(0, 0.48, 0.14);
+      pregnantMesh.visible = !!ag.pregnant;
+
       const halo = new THREE.Mesh(new THREE.RingGeometry(0.46, 0.58, 28), new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide }));
       halo.rotation.x = Math.PI / 2; halo.position.y = 0.04; halo.visible = false;
 
-      group.add(leftLeg, rightLeg, torso, leftArm, rightArm, cloak, headGroup, heldMesh, spearMesh, halo);
+      group.add(leftLeg, rightLeg, torso, leftArm, rightArm, cloak, headGroup, heldMesh, spearMesh, pregnantMesh, halo);
       const y0 = terrainHeight(ag.x, ag.y);
       group.position.set(ag.x, y0, ag.y);
       group.rotation.y = ag.heading || 0;
@@ -1421,7 +1433,7 @@
         nextBlink: Math.random() * 4 + 2,
         isBlinking: false,
         headGroup, leftLeg, rightLeg, leftArm, rightArm,
-        cloak, heldMesh, spearMesh, halo, tag,
+        cloak, heldMesh, spearMesh, pregnantMesh, halo, tag,
         tagPriority: 0,
         phase: Math.random() * Math.PI * 2
       };
@@ -2220,6 +2232,15 @@
         selectedSubjectId = subj.id;
         selectedEntity = { type: 'agent', id: subj.id };
         for (const [id, rig] of agentRigs.entries()) rig.userData.halo.visible = (id === subj.id);
+        const es = currentLang === 'es';
+        const sexIcon = subj.sex === 'M' ? '♂' : '♀';
+        const sexLbl = subj.sex === 'M' ? (es ? '♂ Macho' : '♂ Male') : (es ? '♀ Hembra' : '♀ Female');
+        const famBits = [
+          `${es ? 'Sexo biológico' : 'Biological sex'}: ${sexLbl}`,
+          subj.partner_id ? `❤️ ${es ? 'Pareja' : 'Mate'}: ${subj.partner_id}` : (es ? 'Soltero/a (buscando pareja afín)' : 'Unbonded (open to courtship)'),
+          subj.pregnant ? `🤰 ${es ? 'Embarazada / Gestando' : 'Pregnant / Gestating'}: ${subj.gestation_pct || 1}%` : null,
+          subj.children_count ? `👶 ${es ? 'Hijos nacidos' : 'Children born'}: ${subj.children_count} (${(subj.children_ids || []).join(', ')})` : null
+        ].filter(Boolean);
         document.getElementById('subj-bio').textContent = subj.bio;
         document.getElementById('val-energy').textContent = `${Math.round(subj.energy)}%`;
         document.getElementById('bar-energy').style.width = `${subj.energy}%`;
@@ -2231,7 +2252,8 @@
         document.getElementById('val-stress').textContent = `${Math.round(subj.stress)}%`;
         document.getElementById('bar-stress').style.width = `${subj.stress}%`;
         document.getElementById('subj-thought').textContent = `«${subj.thought}»`;
-        document.getElementById('subj-memories').innerHTML = (subj.memories || []).slice().reverse().map(
+        const famHtml = `<div style="color:var(--accent);font-weight:600;margin-bottom:3px;">${sexIcon} ${famBits.join(' · ')}</div>`;
+        document.getElementById('subj-memories').innerHTML = famHtml + (subj.memories || []).slice().reverse().map(
           mem => `<div>• ${mem}</div>`
         ).join('');
       }
@@ -2436,6 +2458,7 @@
         }
         rig.userData.cloak.visible = ag.has_cloak;
         rig.userData.spearMesh.visible = ag.has_tool;
+        if (rig.userData.pregnantMesh) rig.userData.pregnantMesh.visible = !!ag.pregnant;
 
         rig.userData.isSleeping = !!ag.sleeping;
         if (ag.mood !== rig.userData.lastMood || ag.sleeping !== rig.userData.wasSleeping) {
@@ -2452,21 +2475,27 @@
           rig.userData.heldMesh.visible = false;
         }
 
+        const sexBadge = ag.sex === 'M' ? '<span style="color:#38bdf8">♂</span>' : '<span style="color:#f472b6">♀</span>';
+        const famBadge = `${ag.partner_id ? ' ❤️' : ''}${ag.pregnant ? ` 🤰${ag.gestation_pct || ''}%` : ''}`;
         const isSelAgent = (selectedEntity.type === 'agent' && ag.id === selectedEntity.id);
         if (isSelAgent) {
           rig.userData.tagPriority = 3;
           rig.userData.tag.className = ag.utterance ? 'floating-tag speech' : 'floating-tag';
           rig.userData.tag.innerHTML = ag.utterance
-            ? `<strong>${ag.id}</strong>: <span class="phoneme">«${ag.utterance}»</span> (${ag.referent})`
-            : `<strong>${ag.id}</strong> · ${ag.sleeping ? '💤 Sleeping' : ag.action}`;
+            ? `<strong>${ag.id} ${sexBadge}${famBadge}</strong>: <span class="phoneme">«${ag.utterance}»</span> (${ag.referent})`
+            : `<strong>${ag.id} ${sexBadge}${famBadge}</strong> · ${ag.sleeping ? '💤 Sleeping' : ag.action}`;
+        } else if (ag.pregnant) {
+          rig.userData.tagPriority = 2;
+          rig.userData.tag.className = 'floating-tag';
+          rig.userData.tag.innerHTML = `🤰 <strong>${ag.id}</strong> ${sexBadge} (${ag.gestation_pct || 1}%)`;
         } else if (ag.utterance) {
           rig.userData.tagPriority = 2;
           rig.userData.tag.className = 'floating-tag speech';
-          rig.userData.tag.innerHTML = `<span class="phoneme">«${ag.utterance}»</span> (${ag.referent})`;
+          rig.userData.tag.innerHTML = `${sexBadge} <span class="phoneme">«${ag.utterance}»</span> (${ag.referent})`;
         } else if (ag.sleeping) {
           rig.userData.tagPriority = 1;
           rig.userData.tag.className = 'floating-tag';
-          rig.userData.tag.innerHTML = `💤 ${ag.id}`;
+          rig.userData.tag.innerHTML = `💤 ${ag.id} ${sexBadge}`;
         } else {
           rig.userData.tagPriority = 0;
           rig.userData.tag.style.display = 'none';
@@ -2577,12 +2606,14 @@
           </div>`
         ).join('');
 
-      rosterBox.innerHTML = state.agents.map(a =>
-        `<div class="roster-row" data-aid="${a.id}">
-          <span><span class="swatch" style="background:${a.body_color}"></span><strong>${a.id}</strong> · ${a.lineage} (${a.stage})</span>
+      rosterBox.innerHTML = state.agents.map(a => {
+        const sIcon = a.sex === 'M' ? '<span style="color:#38bdf8;font-weight:700">♂</span>' : '<span style="color:#f472b6;font-weight:700">♀</span>';
+        const fBadges = `${a.partner_id ? ' ❤️' : ''}${a.pregnant ? ` 🤰${a.gestation_pct || ''}%` : ''}${a.children_count ? ` 👶${a.children_count}` : ''}`;
+        return `<div class="roster-row" data-aid="${a.id}">
+          <span><span class="swatch" style="background:${a.body_color}"></span><strong>${a.id}</strong> ${sIcon}${fBadges} · ${a.lineage} (${a.stage})</span>
           <span style="color:var(--muted)">${a.mood}</span>
-        </div>`
-      ).join('') + structsHtml + cavesHtml;
+        </div>`;
+      }).join('') + structsHtml + cavesHtml;
 
       rosterBox.querySelectorAll('.roster-row[data-aid]').forEach(r => {
         r.addEventListener('click', () => {
@@ -2923,6 +2954,10 @@
         }
 
         ud.headGroup.rotation.z = Math.sin(t * 1.8 + ud.phase) * 0.045;
+        if (ud.pregnantMesh && ud.pregnantMesh.visible) {
+          const pScale = 1.0 + Math.sin(t * 3.2 + ud.phase) * 0.08;
+          ud.pregnantMesh.scale.setScalar(pScale);
+        }
 
         if (ud.tagPriority > 0) {
           projVec.copy(rig.position);
