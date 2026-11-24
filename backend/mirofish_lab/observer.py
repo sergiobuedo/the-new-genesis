@@ -225,10 +225,13 @@ class PopulationSimulation:
         sick_ratio = sum(1 for a in living if a.illness) / float(max(1, n_focus))
         avg_energy = sum(a.energy for a in living) / float(max(1, n_focus))
         # Daily intrinsic growth rate r driven purely by live vitality, couples, disease & disasters
-        r = 0.00018 * (1.0 + min(2.0, couples / 8.0)) if avg_energy > 52.0 else -0.00015
-        r -= sick_ratio * 0.0012
+        # Realistic Neolithic-to-Modern demographic scaling across 4 colonized continents!
+        if "first_agriculture" in self.discoveries and len(self.discoveries) >= 40 and self.planetary_population < 8_500:
+            self.planetary_population = float(8_500 + n_focus * 45)
+        r = 0.0018 * (1.0 + min(2.5, couples / 8.0)) if avg_energy > 48.0 else -0.0004
+        r -= sick_ratio * 0.0025
         if self.world.active_disaster in ("volcanic_eruption", "earthquake", "wildfire"):
-            r -= 0.0006
+            r -= 0.0012
         delta = r * self.planetary_population * (1.0 - (self.planetary_population / k_cap))
         self.planetary_population = max(float(n_focus), min(k_cap, self.planetary_population + delta))
 
@@ -391,7 +394,7 @@ class PopulationSimulation:
                     agent.last_cortex_tick = self.world.tick_count
                     cortex_requests.append((agent, prompt))
 
-        if self.world.tick_count % 18 == 0 and len(self.living_agents) < 108:
+        if self.world.tick_count % 10 == 0 and len(self.living_agents) < 180:
             self._check_species_reproduction()
 
         # Distant Continental Refugia: if an entire continent's native lineage vanished, isolated far-continent survivors can re-emerge after long eras
@@ -1719,9 +1722,9 @@ class PopulationSimulation:
         ]
         used_males = set()
         for fem in females:
-            # Local Continental Carrying Capacity (55m basin max 36 beings)
+            # Local Continental Carrying Capacity (55m basin max 68 beings for thriving Neolithic villages!)
             local_basin_pop = sum(1 for o in living_all if math.hypot(o.x - fem.x, o.y - fem.y) < 55.0)
-            if local_basin_pop >= 36:
+            if local_basin_pop >= 68:
                 continue
             for mal in males:
                 if mal.id in used_males:
@@ -1960,14 +1963,14 @@ class MiroFishObservatory:
                 for lin in sw.get("lineages", ["Vespera"]):
                     lex_by_lineage[lin][sw["referent"]] = sw["word"]
 
-            if len(saved_agents) > 88:
+            if len(saved_agents) > 180:
                 by_lin: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
                 for item in saved_agents:
                     by_lin[item.get("lineage", "Sylphid")].append(item)
                 balanced: List[Dict[str, Any]] = []
-                while len(balanced) < 88 and any(by_lin.values()):
+                while len(balanced) < 180 and any(by_lin.values()):
                     for k in list(by_lin.keys()):
-                        if by_lin[k] and len(balanced) < 88:
+                        if by_lin[k] and len(balanced) < 180:
                             balanced.append(by_lin[k].pop(0))
                 saved_agents = balanced
 
