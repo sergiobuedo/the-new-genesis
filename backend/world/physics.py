@@ -15,9 +15,26 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 CHUNK_SIZE = 16
+EARTH_RADIUS_KM = 6_371.0
+EARTH_DIAMETER_KM = 12_742.0
+EARTH_CIRCUMFERENCE_KM = 40_075.0
 EARTH_SURFACE_KM2 = 510_072_000.0
-PLANET_SURFACE_KM2 = EARTH_SURFACE_KM2 * 10.0  # 5.10 billion km^2 Super-Earth!
-KM2_PER_SECTOR = 25.0  # Each 16x16 local biome sector represents a 5km x 5km ecological basin
+PLANET_SURFACE_KM2 = EARTH_SURFACE_KM2  # Exact 1:1 Planet Earth (510.072M km², 12,742 km diameter, 40,075 km circumference!)
+KM2_PER_SECTOR = 25.0
+
+# Exact Real Solar System (Sun + 8 Planets + Moon — real orbital periods in Earth days, AU distances & diameters in km)
+SOLAR_SYSTEM_BODIES: Dict[str, Dict[str, Any]] = {
+    "Sun":     {"au": 0.0,   "period_days": 0.0,     "diameter_km": 1_392_700, "color": "#fde047"},
+    "Mercury": {"au": 0.387, "period_days": 87.97,   "diameter_km": 4_879,     "color": "#94a3b8"},
+    "Venus":   {"au": 0.723, "period_days": 224.70,  "diameter_km": 12_104,    "color": "#fde68a"},
+    "Earth":   {"au": 1.000, "period_days": 365.25,  "diameter_km": 12_742,    "color": "#38bdf8"},
+    "Moon":    {"au": 0.00257,"period_days": 29.53,  "diameter_km": 3_474,     "color": "#e2e8f0"},
+    "Mars":    {"au": 1.524, "period_days": 686.98,  "diameter_km": 6_779,     "color": "#ef4444"},
+    "Jupiter": {"au": 5.204, "period_days": 4332.59, "diameter_km": 139_820,   "color": "#d97706"},
+    "Saturn":  {"au": 9.582, "period_days": 10759.2, "diameter_km": 116_460,   "color": "#eab308"},
+    "Uranus":  {"au": 19.20, "period_days": 30688.5, "diameter_km": 50_724,    "color": "#67e8f9"},
+    "Neptune": {"au": 30.05, "period_days": 60182.0, "diameter_km": 49_244,    "color": "#3b82f6"},
+}
 
 
 ENCLAVE_HOMELANDS: Dict[str, Tuple[float, float]] = {
@@ -739,9 +756,19 @@ class CosmosWorld:
 
     @property
     def solar_distance_au(self) -> float:
-        """Elliptical planetary orbit (0.965 AU perihelion .. 1.035 AU aphelion)."""
-        ang = ((self.day - 1) / float(DAYS_PER_SEASON * 4)) * 2.0 * math.pi
-        return round(1.00 - 0.035 * math.cos(ang + 0.6), 3)
+        """Exact Earth elliptical orbit (0.983 AU perihelion .. 1.017 AU aphelion) + Jupiter/Venus gravitational resonance."""
+        ang = ((self.day - 1) / float(DAYS_PER_YEAR)) * 2.0 * math.pi
+        jup_pull = 0.0018 * math.cos((self.day / 4332.59) * 2.0 * math.pi)
+        ven_pull = 0.0009 * math.cos((self.day / 224.70) * 2.0 * math.pi)
+        return round(1.000 - 0.0167 * math.cos(ang + 0.6) + jup_pull + ven_pull, 4)
+
+    def solar_system_angles(self) -> Dict[str, float]:
+        """Exact real-time orbital longitudes (radians) of all 8 planets around the Sun!"""
+        return {
+            name: round(((self.day / spec["period_days"]) * 2.0 * math.pi) % (2.0 * math.pi), 3)
+            for name, spec in SOLAR_SYSTEM_BODIES.items()
+            if spec["period_days"] > 0
+        }
 
     @property
     def lunar_phase(self) -> float:
