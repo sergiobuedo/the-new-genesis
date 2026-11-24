@@ -2,7 +2,7 @@ name: "24/7 Autonomous Cloud Cosmos (TheNewGenesis)"
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "0 * * * *"
   workflow_dispatch:
 
 concurrency:
