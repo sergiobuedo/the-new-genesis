@@ -18,6 +18,8 @@ import networkx as nx
 from backend.mind.agent import LINEAGE_SPECS, KobAgent, KobGenome, OllamaCortex
 from backend.mind.epistemic_guard import normalize_phonetic_utterance
 from backend.mirofish_lab.storage import LongitudinalWarehouse
+from backend.world.combinatorics import VALID_PROCESSES, synthesize_open_compound
+from backend.world.earth_geography import earth_location_summary
 from backend.world.physics import (
     BLIND_MATERIALS,
     ENCLAVE_HOMELANDS,
@@ -79,7 +81,8 @@ class PopulationSimulation:
         self.couples_formed: int = 0
         self.disease_cases: int = 0
         self.cures_applied: int = 0
-        self.planetary_population: float = float(founders_per_lineage * 3)  # Multi-scale cohort engine (scales seamlessly past 8B+!)
+        self.planetary_population: float = float(founders_per_lineage * 3)  # Pure 1:1 verifiable individual count (zero extrapolation)
+        self.emergent_compounds: Dict[str, Dict[str, Any]] = {}  # Unscripted open-ended combinatorial discoveries
         self.recent_fx: List[Dict[str, Any]] = []  # Live 3D Action FX cues (attack, fire, plant, eat, birth, death, bury...)
         self.discoveries: Dict[str, int] = {}
         self.max_generation: int = 1
@@ -212,27 +215,8 @@ class PopulationSimulation:
         return k
 
     def _step_macro_demography(self, living: List[KobAgent]) -> None:
-        """Advances the multi-scale planetary population organically once per Earth day (Neolithic ~4M baseline!)."""
-        n_focus = len(living)
-        if n_focus == 0:
-            self.planetary_population = 0.0
-            return
-        # Calibrate to authentic Earth Neolithic (~10,000 BCE) global Homo sapiens baseline (~4,000,000)
-        if self.enable_culture and "first_agriculture" in self.discoveries and self.planetary_population < 4_000_000:
-            self.planetary_population = 4_000_000.0 + n_focus * 1250.0
-        self.planetary_population = max(self.planetary_population, float(n_focus))
-        if not self.enable_culture or n_focus < 10:
-            return
-        k_cap = float(self.compute_planetary_carrying_capacity())
-        couples = sum(1 for a in living if a.partner_id) // 2
-        sick_ratio = sum(1 for a in living if a.illness) / float(max(1, n_focus))
-        avg_energy = sum(a.energy for a in living) / float(max(1, n_focus))
-        r = 0.00085 * (1.0 + min(2.5, couples / 8.0)) if avg_energy > 48.0 else -0.00035
-        r -= sick_ratio * 0.0022
-        if self.world.active_disaster in ("volcanic_eruption", "earthquake", "wildfire"):
-            r -= 0.0010
-        delta = r * self.planetary_population * (1.0 - (self.planetary_population / k_cap))
-        self.planetary_population = max(float(n_focus), min(k_cap, self.planetary_population + delta))
+        """Pure 1:1 verifiable demography: reported population equals exact living simulated individuals (zero multiplier)."""
+        self.planetary_population = float(len(living))
 
     def step_tick(self) -> List[Tuple[KobAgent, str]]:
         self.world.step_environment()
@@ -1483,6 +1467,39 @@ class PopulationSimulation:
                 agent.add_memory(desc, self.world.day)
                 if outcome_kind == "partial_insight":
                     self._record_event("insight", f"{agent.lineage} {agent.id}: {desc}", [agent.id], agent.x, agent.y, importance=2)
+                elif outcome_kind != "breakthrough":
+                    # Open-Ended Combinatorial Material Physics (unscripted emergent compound synthesis)
+                    proc = self.world.rng.choice(VALID_PROCESSES)
+                    comp = synthesize_open_compound(item_a, item_b, proc, self.world.ambient_temperature)
+                    if comp is not None and comp.compound_id not in self.emergent_compounds:
+                        geo = earth_location_summary(agent.x, agent.y)
+                        c_rec = comp.to_dict()
+                        c_rec["discoverer"] = agent.id
+                        c_rec["lineage"] = agent.lineage
+                        c_rec["day"] = self.world.day
+                        c_rec["year"] = self.world.year
+                        c_rec["region"] = geo["region"]
+                        c_rec["coords"] = geo["coords_str"]
+                        self.emergent_compounds[comp.compound_id] = c_rec
+                        agent.prestige = round(agent.prestige + 1.8, 1)
+                        agent.skill_xp["crafting"] = agent.skill_xp.get("crafting", 0.0) + 1.5
+                        if comp.functional_class == "empirical_remedy" and agent.illness:
+                            agent.illness = None
+                            agent.illness_severity = 0.0
+                            self.cures_applied += 1
+                        elif comp.functional_class == "insulating_weave":
+                            agent.has_cloak = True
+                        elif comp.functional_class in ("composite_edge", "proto_alloy"):
+                            agent.has_tool = True
+                        agent.add_memory(f"Synthesized novel {comp.functional_class} {comp.compound_id} ({comp.formula})", self.world.day, permanent=True)
+                        self._record_event(
+                            "breakthrough",
+                            f"Open Synthesis ({geo['region']}): {agent.lineage} {agent.id} created {comp.compound_id} [{comp.functional_class}] {comp.formula}",
+                            [agent.id],
+                            agent.x,
+                            agent.y,
+                            importance=4,
+                        )
                 elif outcome_kind == "breakthrough":
                     agent.inventory.remove(item_a)
                     agent.inventory.remove(item_b)
@@ -1721,9 +1738,9 @@ class PopulationSimulation:
         ]
         used_males = set()
         for fem in females:
-            # Local Continental Carrying Capacity (55m basin max 68 beings for thriving Neolithic villages!)
+            # Local Continental Carrying Capacity (55m basin max 180 real 1:1 individuals)
             local_basin_pop = sum(1 for o in living_all if math.hypot(o.x - fem.x, o.y - fem.y) < 55.0)
-            if local_basin_pop >= 68:
+            if local_basin_pop >= 180:
                 continue
             for mal in males:
                 if mal.id in used_males:
@@ -2887,6 +2904,8 @@ class MiroFishObservatory:
             "stone_burials": self.live.stone_burials,
             "corpse_avoidance": self.live.corpse_avoidance,
             "experiment_trials": self.live.experiment_trials,
+            "emergent_compounds_count": len(self.live.emergent_compounds),
+            "emergent_compounds": list(self.live.emergent_compounds.values())[-12:],
             "philosophical_count": self.live.philosophical_count,
             "structures": dict(struct_counts),
             "discoveries": dict(self.live.discoveries),
@@ -2990,6 +3009,7 @@ class MiroFishObservatory:
                     "skill_xp": {k: round(v, 1) for k, v in a.skill_xp.items()},
                     "x": a.x,
                     "y": a.y,
+                    "earth_geo": earth_location_summary(a.x, a.y),
                     "heading": round(a.heading, 3),
                     "energy": round(a.energy, 1),
                     "protein_balance": round(a.protein_balance, 1),

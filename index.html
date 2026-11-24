@@ -1721,49 +1721,18 @@
       if (grassInstanced.instanceColor) grassInstanced.instanceColor.needsUpdate = true;
     }
 
-    // 2,500 GPU-Instanced Living Regional Inhabitants across Earth's Continents (1 Draw Call @ 60 FPS!)
-    const CROWD_COUNT = 2500;
+    // Pure 1:1 Verifiable Reality: zero decorative crowd sprites — every single visible being is a real simulated individual!
+    const CROWD_COUNT = 1;
     const crowdBodyGeo = new THREE.CapsuleGeometry(0.11, 0.28, 5, 8);
-    crowdBodyGeo.translate(0, 0.25, 0);
     const crowdMat = new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0.05 });
     const crowdInstanced = new THREE.InstancedMesh(crowdBodyGeo, crowdMat, CROWD_COUNT);
     crowdInstanced.count = 0;
-    surfaceWorld.add(crowdInstanced);
     const crowdData = [];
     const crowdDummy = new THREE.Object3D();
 
     function populateRegionalCrowds() {
       crowdData.length = 0;
-      const hubs = [
-        { x: -135, z: -115, col: 0x38bdf8 },
-        { x: 145,  z: -115, col: 0xfbbf24 },
-        { x: 12,   z: 145,  col: 0xc084fc },
-        { x: -18,  z: -10,  col: 0x34d399 },
-        { x: 32,   z: 22,   col: 0xf472b6 }
-      ];
-      const cCol = new THREE.Color();
-      let idx = 0;
-      for (const h of hubs) {
-        for (let i = 0; i < 480 && idx < CROWD_COUNT; i++) {
-          const ang = (i * 2.39996) + h.x * 0.1;
-          const r = 4.0 + Math.sqrt(i / 480) * 68.0;
-          const cx = h.x + Math.cos(ang) * r;
-          const cz = h.z + Math.sin(ang) * r;
-          const cy = terrainHeight(cx, cz);
-          if (cy < 0.08 || cy > 5.8) continue;
-          crowdData.push({ x: cx, z: cz, baseX: cx, baseZ: cz, ang: Math.random() * Math.PI * 2, spd: 0.35 + (i % 5) * 0.12 });
-          crowdDummy.position.set(cx, cy, cz);
-          crowdDummy.scale.setScalar(0.85 + (i % 4) * 0.08);
-          crowdDummy.updateMatrix();
-          crowdInstanced.setMatrixAt(idx, crowdDummy.matrix);
-          cCol.setHex(h.col);
-          crowdInstanced.setColorAt(idx, cCol);
-          idx++;
-        }
-      }
-      crowdInstanced.count = idx;
-      crowdInstanced.instanceMatrix.needsUpdate = true;
-      if (crowdInstanced.instanceColor) crowdInstanced.instanceColor.needsUpdate = true;
+      crowdInstanced.count = 0;
     }
 
     function buildContinuousTerrain(isWinter = false) {
@@ -3804,9 +3773,8 @@
         globeGroup.userData.moonMesh.position.set(Math.cos(mAng) * 44, Math.sin(mAng * 0.5) * 8, Math.sin(mAng) * 44);
       }
 
-      const hasAg = !!(m.discoveries && m.discoveries.first_agriculture);
-      const pPop = Math.max(m.planetary_population || m.live_population, (hasAg && m.live_population >= 15) ? (4000000 + m.live_population * 1250) : m.live_population);
-      document.getElementById('ui-pop').textContent = pPop > m.live_population ? `${formatPopScale(pPop)} (${m.live_population} foco)` : `${m.live_population}`;
+      // Pure 1:1 Verifiable Population — exact count of real simulated individuals (zero extrapolation!)
+      document.getElementById('ui-pop').textContent = `${m.live_population}`;
       document.getElementById('ui-ctrl').textContent = m.control_population;
       if (m.wild_species_alive !== undefined) {
         document.getElementById('ui-fauna').textContent = `${m.wild_species_alive}/${m.wild_species_total || 42}`;
@@ -3820,19 +3788,15 @@
       document.getElementById('ui-archetype').textContent = `🔒 ${arch || ''}`;
 
       const sp = m.species_counts || {};
-      const spMacro = m.species_macro_counts || {};
-      const totalFocus = Math.max(1, m.live_population || 1);
       const pillsBox = document.getElementById('species-pills-box');
       if (pillsBox) {
         const raceColors = { Sylphid: '#38bdf8', Lithokin: '#fbbf24', Vespera: '#c084fc' };
         const allLins = Array.from(new Set(['Sylphid', 'Lithokin', 'Vespera', ...Object.keys(sp)]));
         pillsBox.innerHTML = allLins.map(lin => {
           const cnt = sp[lin] || 0;
-          const mCnt = spMacro[lin] || Math.round((cnt / totalFocus) * pPop);
           const isHyb = lin.includes('-');
           const col = raceColors[lin] || (isHyb ? '#34d399' : '#f472b6');
-          const popTxt = pPop > 1000 ? `${formatPopScale(mCnt)} <span style="font-size:9px;color:var(--muted)">(${cnt})</span>` : `${cnt}`;
-          return `<div class="sp-pill" data-jump-lineage="${lin}" style="border-color:${col};min-width:84px;flex:1 1 auto;opacity:${cnt === 0 ? '0.45' : '1'}"><strong style="color:${col}">📍 ${lin}${isHyb ? ' ✨' : ''}</strong><br><span>${popTxt}</span></div>`;
+          return `<div class="sp-pill" data-jump-lineage="${lin}" style="border-color:${col};min-width:84px;flex:1 1 auto;opacity:${cnt === 0 ? '0.45' : '1'}"><strong style="color:${col}">📍 ${lin}${isHyb ? ' ✨' : ''}</strong><br><span>${cnt}</span></div>`;
         }).join('');
         pillsBox.querySelectorAll('[data-jump-lineage]').forEach(pill => {
           pill.addEventListener('click', () => flyToLineage(pill.dataset.jumpLineage));

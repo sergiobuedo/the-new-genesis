@@ -289,6 +289,27 @@ def test_earth_solar_timezones_proto_writing_and_human_parity_metrics():
         assert obs.speed_multiplier == 20
         m = obs.compute_scientific_metrics()
         assert "vocations" in m and "diplomacy_es" in m and "macro_population" in m
+        # Pure 1:1 Verifiable Reality: reported macro_population MUST equal exact living count (zero multiplier!)
+        assert m["macro_population"] == m["live_population"]
+
+
+def test_pure_1to1_reality_earth_geography_and_open_combinatorics():
+    """Verify real Earth (lat, lon) region mapping and open-ended combinatorial material synthesis."""
+    from backend.world.earth_geography import earth_location_summary
+    from backend.world.combinatorics import synthesize_open_compound
+
+    geo = earth_location_summary(42.0, 10.0)
+    assert -90.0 <= geo["lat"] <= 90.0 and -180.0 <= geo["lon"] <= 180.0
+    assert geo["continent"] and geo["region"]
+
+    # Open-ended synthesis produces deterministic novel compounds with zero hardcoded recipes
+    comp = synthesize_open_compound("flint_dark", "stalk_wood", "bind", ambient_temp_c=22.0)
+    assert comp is not None
+    assert comp.compound_id.startswith("CMP-")
+    assert comp.utility_score >= 0.58
+    comp_rev = synthesize_open_compound("stalk_wood", "flint_dark", "bind", ambient_temp_c=22.0)
+    assert comp_rev is not None and comp_rev.compound_id == comp.compound_id
+
 
 
 
