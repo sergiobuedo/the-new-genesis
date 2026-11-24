@@ -599,7 +599,7 @@
     const gltfLoader = new GLTFLoader();
     const blenderModelCache = new Map();
     const BLENDER_ASSETS = {
-      humanoid: { url: './assets/models/humanoid.glb', targetH: 1.48 },
+      humanoid: { url: './assets/models/humanoid.glb', targetH: 1.52, fixedScale: 0.86 },
       horse:    { url: './assets/models/horse.glb',    targetH: 1.05 },
       fox:      { url: './assets/models/fox.glb',      targetH: 0.68 },
       bird:     { url: './assets/models/bird.glb',     targetH: 0.42 }
@@ -2194,8 +2194,8 @@
           const box = new THREE.Box3().setFromObject(gltf.scene);
           const size = new THREE.Vector3();
           box.getSize(size);
-          const normScale = cfg.targetH / Math.max(0.01, size.y);
-          const yOffset = -box.min.y;
+          const normScale = cfg.fixedScale || (cfg.targetH / Math.max(0.01, size.y));
+          const yOffset = cfg.fixedScale ? 0.0 : -box.min.y;
           blenderModelCache.set(key, { scene: gltf.scene, animations: gltf.animations || [], normScale, yOffset });
           // Hot-upgrade all already spawned beings & animals in the live scene!
           if (key === 'humanoid' && latestState?.agents) {
@@ -4386,14 +4386,14 @@
         } else if (camMode === 'closeup') {
           skipOrbitUpdate = true;
           const s = focus.scale.y || 1.0;
-          const headH = focus.userData.hasGLB ? 1.38 : 0.96;
+          const headH = focus.userData.hasGLB ? 1.42 : 0.96;
           const headY = focus.position.y + headH * s;
           const faceDirX = Math.sin(focus.rotation.y);
           const faceDirZ = Math.cos(focus.rotation.y);
           desiredCam.set(
-            focus.position.x + faceDirX * (1.75 * s + 0.30),
-            focus.position.y + (headH + 0.14) * s,
-            focus.position.z + faceDirZ * (1.75 * s + 0.30)
+            focus.position.x + faceDirX * (1.85 * s + 0.35),
+            focus.position.y + (headH + 0.16) * s,
+            focus.position.z + faceDirZ * (1.85 * s + 0.35)
           );
           if (snapCloseup) {
             camera.position.copy(desiredCam);
