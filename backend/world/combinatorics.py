@@ -82,48 +82,49 @@ def synthesize_open_compound(
     digest = hashlib.sha256(sig.encode("utf-8")).hexdigest()
     synergy = 0.85 + (int(digest[:4], 16) / 65535.0) * 0.35  # 0.85..1.20 nonlinear reaction yield
 
-    # Continuous physical properties
+    # Continuous physical properties from authentic BlindMaterial vectors
     avg_hard = (m1.hardness + m2.hardness) * 0.5
     max_hard = max(m1.hardness, m2.hardness)
-    avg_cond = (m1.thermal_conductivity + m2.thermal_conductivity) * 0.5
+    max_sharp = max(m1.sharpness, m2.sharpness)
+    avg_metal = (m1.metallic + m2.metallic) * 0.5
+    avg_insul = (m1.insulation + m2.insulation) * 0.5
+    avg_bind = (m1.bindability + m2.bindability) * 0.5
+    avg_heal = (m1.healing + m2.healing) * 0.5
+    avg_flam = (m1.flammability + m2.flammability) * 0.5
     avg_luster = (m1.luster + m2.luster) * 0.5
     avg_tox = (m1.toxicity + m2.toxicity) * 0.5
-    is_organic_mix = (m1.edible or m1.combustible or m2.edible or m2.combustible)
-    is_mineral_mix = (m1.hardness >= 0.65 or m2.hardness >= 0.65)
+    is_organic_mix = (m1.nutrition > 0 or m1.flammability > 0.2 or m2.nutrition > 0 or m2.flammability > 0.2)
+    is_mineral_mix = (m1.hardness >= 0.65 or m2.hardness >= 0.65 or avg_metal > 0.2)
 
     # Process physics modifiers
     if process == "heat":
-        # Thermal sintering / smelting / charcoal-hardening
         hardness = min(1.0, max_hard * 1.15 * synergy if is_mineral_mix else avg_hard * 0.85)
-        conductivity = min(1.0, avg_cond * 1.35 * synergy + (0.18 if avg_luster > 0.5 else 0.0))
-        tensile = min(1.0, (avg_hard * 0.6 + avg_luster * 0.5) * synergy)
-        thermal_insulation = max(0.0, (1.0 - conductivity) * 0.75)
-        medicinal_potency = min(1.0, (0.45 if is_organic_mix and avg_tox < 0.35 else 0.12) * synergy)
-        buoyancy = max(0.0, (0.55 if (m1.combustible and m2.combustible) else 0.15) * synergy)
+        conductivity = min(1.0, (avg_metal * 1.25 + avg_luster * 0.35) * synergy)
+        tensile = min(1.0, (avg_hard * 0.5 + max(m1.malleability, m2.malleability) * 0.5) * synergy)
+        thermal_insulation = min(1.0, avg_insul * 0.9 * synergy)
+        medicinal_potency = min(1.0, (avg_heal * 1.2 + (0.28 if is_organic_mix and avg_tox < 0.35 else 0.05)) * synergy)
+        buoyancy = max(0.0, (0.55 if avg_flam > 0.35 else 0.15) * synergy)
     elif process == "grind":
-        # Pulverizing / sharpening / mineral paste
-        hardness = min(1.0, max_hard * 1.12 * synergy)
-        tensile = min(1.0, (avg_hard * 0.45 + 0.2) * synergy)
-        conductivity = min(1.0, avg_cond * 0.9)
-        thermal_insulation = max(0.0, (1.0 - avg_cond) * 0.65)
-        medicinal_potency = min(1.0, (0.62 if is_organic_mix and avg_tox <= 0.45 else 0.18) * synergy)
+        hardness = min(1.0, max(max_hard, max_sharp) * 1.12 * synergy)
+        tensile = min(1.0, (avg_hard * 0.45 + avg_bind * 0.35) * synergy)
+        conductivity = min(1.0, avg_metal * 0.9)
+        thermal_insulation = min(1.0, avg_insul * 0.85)
+        medicinal_potency = min(1.0, (avg_heal * 1.45 + (0.32 if is_organic_mix and avg_tox <= 0.45 else 0.08)) * synergy)
         buoyancy = 0.12
     elif process == "soak":
-        # Extraction / fermentation / clay-tempering
         hardness = min(1.0, avg_hard * 0.72 * synergy)
-        tensile = min(1.0, (0.55 if is_organic_mix else 0.28) * synergy)
-        conductivity = min(1.0, avg_cond * 0.85)
-        thermal_insulation = min(1.0, (0.68 if is_organic_mix else 0.45) * synergy)
-        medicinal_potency = min(1.0, (0.78 if is_organic_mix and avg_tox < 0.50 else 0.22) * synergy)
+        tensile = min(1.0, (avg_bind * 0.65 + (0.25 if is_organic_mix else 0.1)) * synergy)
+        conductivity = min(1.0, avg_metal * 0.8)
+        thermal_insulation = min(1.0, (avg_insul * 1.1 + 0.18) * synergy)
+        medicinal_potency = min(1.0, (avg_heal * 1.6 + (0.38 if is_organic_mix and avg_tox < 0.50 else 0.1)) * synergy)
         buoyancy = min(1.0, (0.48 if is_organic_mix else 0.15) * synergy)
     else:  # "bind"
-        # Composite lashing / weaving / structural lamination
-        hardness = min(1.0, (max_hard * 0.88 + 0.12) * synergy)
-        tensile = min(1.0, (0.65 if is_organic_mix else 0.35) * synergy)
-        conductivity = avg_cond * 0.7
-        thermal_insulation = min(1.0, (0.82 if is_organic_mix else 0.40) * synergy)
-        medicinal_potency = 0.15
-        buoyancy = min(1.0, (0.84 if (m1.combustible or m2.combustible) and avg_hard < 0.6 else 0.22) * synergy)
+        hardness = min(1.0, (max(max_hard, max_sharp) * 0.9 + 0.14) * synergy)
+        tensile = min(1.0, (avg_bind * 0.85 + 0.25) * synergy)
+        conductivity = avg_metal * 0.7
+        thermal_insulation = min(1.0, (avg_insul * 1.15 + avg_bind * 0.35) * synergy)
+        medicinal_potency = avg_heal * 0.6
+        buoyancy = min(1.0, (0.78 if avg_flam > 0.3 and avg_hard < 0.75 else 0.22) * synergy)
 
     # Slight ambient temperature effect on thermal/fermentation yield
     if process == "soak" and ambient_temp_c >= 18.0:
