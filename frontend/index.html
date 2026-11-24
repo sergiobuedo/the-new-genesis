@@ -591,10 +591,18 @@
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
-    // Blender .glb Asset Cache (drop any Blender-exported .glb into ./assets/models/<key>.glb for instant AAA swap!)
+    // Real Blender .glb Model Loader & Skeletal Animation Cache (0% Server Load — Static GitHub Pages CDN!)
     const gltfLoader = new GLTFLoader();
     const blenderModelCache = new Map();
+    const BLENDER_ASSETS = {
+      humanoid: { url: './assets/models/humanoid.glb', targetH: 1.48 },
+      horse:    { url: './assets/models/horse.glb',    targetH: 1.05 },
+      fox:      { url: './assets/models/fox.glb',      targetH: 0.68 },
+      bird:     { url: './assets/models/bird.glb',     targetH: 0.42 }
+    };
+
     function formatPopScale(n) {
       if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
       if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
@@ -2008,10 +2016,12 @@
 
     function disposeObject3D(root) {
       if (!root) return;
+      if (root.userData?.mixer) root.userData.mixer.stopAllAction();
       if (root.userData?.tag) root.userData.tag.remove();
       root.traverse((obj) => {
-        if (obj.geometry) obj.geometry.dispose();
-        if (obj.material) {
+        if (obj.userData?.sharedGLB) return;
+        if (obj.geometry && !obj.userData?.fromGLB) obj.geometry.dispose();
+        if (obj.material && !obj.userData?.fromGLB) {
           const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
           for (const m of mats) {
             if (m.map) m.map.dispose();
@@ -2020,6 +2030,130 @@
         }
       });
     }
+
+    function attachHumanoidGLB(rig, ag) {
+      const asset = blenderModelCache.get('humanoid');
+      if (!asset || rig.userData.hasGLB) return;
+      rig.userData.hasGLB = true;
+      // Hide fallback primitive body parts while keeping halo, cloak, spear, pregnancy/illness auras & shadow!
+      for (const part of [rig.userData.torso, rig.userData.headGroup, rig.userData.leftLeg, rig.userData.rightLeg, rig.userData.leftArm, rig.userData.rightArm]) {
+        if (part) part.visible = false;
+      }
+      rig.children.forEach(ch => {
+        if (ch.geometry && (ch.geometry.type === 'CylinderGeometry' || ch.geometry.type === 'SphereGeometry') && ch !== rig.userData.pregnantMesh && ch !== rig.userData.spearMesh) {
+          ch.visible = false;
+        }
+      });
+      const clone = SkeletonUtils.clone(asset.scene);
+      const colMain = new THREE.Color(ag.body_color || '#38bdf8');
+      const colAcc = new THREE.Color(ag.accent_color || '#e2e8f0');
+      let meshIdx = 0;
+      clone.traverse(o => {
+        o.userData.fromGLB = true;
+        if (o.isMesh) {
+          o.castShadow = true;
+          o.receiveShadow = true;
+          const m = o.material.clone();
+          m.color = (meshIdx % 2 === 0) ? colMain.clone().lerp(new THREE.Color(0xffffff), 0.15) : colAcc.clone();
+          m.roughness = 0.45;
+          m.metalness = 0.08;
+          o.material = m;
+          meshIdx++;
+        }
+      });
+      const s = asset.normScale * (ag.sex === 'M' ? 1.03 : 0.96);
+      clone.scale.setScalar(s);
+      clone.position.y = asset.yOffset * s;
+      rig.add(clone);
+      rig.userData.glbRoot = clone;
+      if (asset.animations && asset.animations.length > 0) {
+        const mixer = new THREE.AnimationMixer(clone);
+        const walkClip = asset.animations.find(c => /walk/i.test(c.name)) || asset.animations[0];
+        const idleClip = asset.animations.find(c => /idle/i.test(c.name)) || asset.animations[0];
+        const walkAct = mixer.clipAction(walkClip);
+        const idleAct = mixer.clipAction(idleClip);
+        idleAct.play();
+        rig.userData.mixer = mixer;
+        rig.userData.walkAct = walkAct;
+        rig.userData.idleAct = idleAct;
+        rig.userData.isWalkingAnim = false;
+      }
+    }
+
+    function attachAnimalGLB(ar, an) {
+      if (ar.userData.hasGLB) return;
+      const sp = ar.userData.species || '';
+      const dom = ar.userData.domain || 'land';
+      let key = null;
+      if (dom === 'air' && sp !== 'pollenwing') key = 'bird';
+      else if (['slyfox', 'packhound', 'sunmane', 'shadowstalker', 'stripeclaw', 'frostmaw', 'bonecruncher'].includes(sp)) key = 'fox';
+      else if (['windstrider', 'lumigrazer', 'thunderhorn', 'titanotusk', 'dunestrider', 'tallneck', 'frostantler', 'craghorn', 'woolflock', 'rootboar'].includes(sp)) key = 'horse';
+      if (!key || !blenderModelCache.has(key)) return;
+      const asset = blenderModelCache.get(key);
+      ar.userData.hasGLB = true;
+      ar.children.forEach(ch => {
+        if (ch !== ar.userData.halo && ch !== ar.userData.collar && ch.material !== contactShadowMat) ch.visible = false;
+      });
+      const clone = SkeletonUtils.clone(asset.scene);
+      const tintMap = {
+        titanotusk: 0x6b5b4d, thunderhorn: 0x451a03, lumigrazer: 0xc2956e, windstrider: 0xb45309,
+        craghorn: 0xd6d3d1, woolflock: 0xf1f5f9, rootboar: 0x57534e, dunestrider: 0xd9a05b,
+        tallneck: 0xeab308, frostantler: 0x94a3b8, shadowstalker: 0x1e293b, sunmane: 0xd97706,
+        stripeclaw: 0xea580c, frostmaw: 0x78350f, packhound: 0x64748b, bonecruncher: 0x71717a,
+        skyglider: 0x78350f, nightwing: 0x94a3b8, reedwing: 0x0f766e, carrionwing: 0x334155
+      };
+      const tint = an.color ? new THREE.Color(an.color) : (tintMap[sp] ? new THREE.Color(tintMap[sp]) : null);
+      clone.traverse(o => {
+        o.userData.fromGLB = true;
+        if (o.isMesh) {
+          o.castShadow = true;
+          if (tint && key !== 'fox') {
+            const m = o.material.clone();
+            m.color = tint;
+            o.material = m;
+          }
+        }
+      });
+      const sizeMul = sp === 'titanotusk' ? 1.65 : (sp === 'frostmaw' ? 1.45 : (sp === 'tallneck' ? 1.50 : (sp === 'thunderhorn' ? 1.32 : 1.0))) * (an.scale || 1.0);
+      const s = asset.normScale * sizeMul;
+      clone.scale.setScalar(s);
+      clone.position.y = asset.yOffset * s;
+      ar.add(clone);
+      if (asset.animations && asset.animations.length > 0) {
+        const mixer = new THREE.AnimationMixer(clone);
+        const clip = asset.animations.find(c => /walk|run|fly/i.test(c.name)) || asset.animations[0];
+        const act = mixer.clipAction(clip);
+        act.timeScale = key === 'bird' ? 1.4 : 1.1;
+        act.play();
+        ar.userData.mixer = mixer;
+      }
+    }
+
+    function preloadBlenderModels() {
+      for (const [key, cfg] of Object.entries(BLENDER_ASSETS)) {
+        gltfLoader.load(cfg.url, (gltf) => {
+          const box = new THREE.Box3().setFromObject(gltf.scene);
+          const size = new THREE.Vector3();
+          box.getSize(size);
+          const normScale = cfg.targetH / Math.max(0.01, size.y);
+          const yOffset = -box.min.y;
+          blenderModelCache.set(key, { scene: gltf.scene, animations: gltf.animations || [], normScale, yOffset });
+          // Hot-upgrade all already spawned beings & animals in the live scene!
+          if (key === 'humanoid' && latestState?.agents) {
+            for (const ag of latestState.agents) {
+              const r = agentRigs.get(ag.id);
+              if (r) attachHumanoidGLB(r, ag);
+            }
+          } else if (latestState?.animals) {
+            for (const an of latestState.animals) {
+              const ar = animalRigs.get(an.id);
+              if (ar) attachAnimalGLB(ar, an);
+            }
+          }
+        }, undefined, () => {});
+      }
+    }
+    preloadBlenderModels();
 
     function pickNaturalWaypoint(ax, az, span, domain = 'land') {
       for (let attempt = 0; attempt < 10; attempt++) {
@@ -2183,6 +2317,7 @@
         phase: Math.random() * Math.PI * 2
       };
       surfaceWorld.add(group);
+      if (blenderModelCache.has('humanoid')) attachHumanoidGLB(group, ag);
       return group;
     }
 
@@ -2319,6 +2454,7 @@
       });
       g.scale.setScalar(WORLD_ENTITY_SCALE);
       surfaceWorld.add(g);
+      attachAnimalGLB(g, an);
       return g;
     }
 
@@ -3878,7 +4014,16 @@
         const targetTilt = ud.isSleeping ? -Math.PI * 0.42 : 0.0;
         rig.rotation.x += (targetTilt - rig.rotation.x) * 0.14;
 
-        if (!ud.isSleeping && distSq > 0.0012) {
+        const isMovingNow = !ud.isSleeping && distSq > 0.0012;
+        if (ud.mixer) {
+          ud.mixer.update(dt * (isMovingNow ? 1.15 : 0.75));
+          if (ud.walkAct && ud.idleAct && isMovingNow !== ud.isWalkingAnim) {
+            ud.isWalkingAnim = isMovingNow;
+            if (isMovingNow) { ud.idleAct.fadeOut(0.2); ud.walkAct.reset().fadeIn(0.2).play(); }
+            else { ud.walkAct.fadeOut(0.2); ud.idleAct.reset().fadeIn(0.2).play(); }
+          }
+        }
+        if (isMovingNow) {
           if (isCloudMode) {
             const dist = Math.sqrt(distSq);
             const step = Math.min(dist, dt * walkSpeedCloud);
@@ -4034,6 +4179,7 @@
       const animalSpeedCloud = 0.58 + viewSpeed * 0.14;
       for (const ar of animalRigs.values()) {
         const aud = ar.userData;
+        if (aud.mixer) aud.mixer.update(dt);
         const tp = aud.targetPos;
         let dx = tp.x - ar.position.x;
         let dz = tp.z - ar.position.z;
