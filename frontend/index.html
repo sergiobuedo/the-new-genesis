@@ -595,11 +595,10 @@
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
-    // Real Blender .glb Model Loader & Skeletal Animation Cache (0% Server Load — Static GitHub Pages CDN!)
+    // Real Sculpted .glb Wildlife Loader (0% Server Load — Static GitHub Pages CDN!)
     const gltfLoader = new GLTFLoader();
     const blenderModelCache = new Map();
     const BLENDER_ASSETS = {
-      humanoid: { url: './assets/models/humanoid.glb', targetH: 1.52, fixedScale: 0.86 },
       horse:    { url: './assets/models/horse.glb',    targetH: 1.05 },
       fox:      { url: './assets/models/fox.glb',      targetH: 0.68 },
       bird:     { url: './assets/models/bird.glb',     targetH: 0.42 }
@@ -1497,32 +1496,32 @@
     scene.add(globeGroup);
 
     function buildSphericalPlanet() {
-      const gGeo = new THREE.SphereGeometry(24, 128, 96);
-      const gPos = gGeo.attributes.position;
-      const gCols = new Float32Array(gPos.count * 3);
-      const c = new THREE.Color();
-      for (let i = 0; i < gPos.count; i++) {
-        const vx = gPos.getX(i), vy = gPos.getY(i), vz = gPos.getZ(i);
-        const lat = vy / 24.0;
-        const n = Math.sin(vx * 0.16 + 1.2) * Math.cos(vz * 0.16 - 0.8) + 0.45 * Math.sin(vy * 0.24 + vx * 0.21);
-        let rMul = 1.0;
-        if (Math.abs(lat) > 0.82) { c.setHex(0xf8fafc); rMul = 1.012; }
-        else if (n < -0.05) { c.setHex(0x0284c7); }
-        else if (n < 0.08) { c.setHex(0xfde68a); rMul = 1.005; }
-        else if (Math.abs(lat) < 0.25 && n > 0.25) { c.setHex(0x65a30d); rMul = 1.022; }
-        else if (n > 0.65) { c.setHex(0x94a3b8); rMul = 1.042; }
-        else { c.setHex(0x16a34a); rMul = 1.018; }
-        gPos.setXYZ(i, vx * rMul, vy * rMul, vz * rMul);
-        gCols[i * 3] = c.r; gCols[i * 3 + 1] = c.g; gCols[i * 3 + 2] = c.b;
-      }
-      gGeo.setAttribute('color', new THREE.BufferAttribute(gCols, 3));
-      gGeo.computeVertexNormals();
-      const planetMesh = new THREE.Mesh(gGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.68, metalness: 0.08 }));
+      // Exact Photo-Realistic Planet Earth (NASA Blue Marble Diffuse + Normal Relief + Swirling Clouds!)
+      const texLoader = new THREE.TextureLoader();
+      const earthDayTex = texLoader.load('./assets/textures/earth_day.jpg');
+      const earthNormTex = texLoader.load('./assets/textures/earth_normal.jpg');
+      const earthCloudTex = texLoader.load('./assets/textures/earth_clouds.png');
+      const gGeo = new THREE.SphereGeometry(24, 96, 64);
+      const planetMesh = new THREE.Mesh(
+        gGeo,
+        new THREE.MeshStandardMaterial({
+          map: earthDayTex,
+          normalMap: earthNormTex,
+          normalScale: new THREE.Vector2(0.85, 0.85),
+          roughness: 0.62,
+          metalness: 0.08
+        })
+      );
+      const cloudsSphere = new THREE.Mesh(
+        new THREE.SphereGeometry(24.38, 64, 48),
+        new THREE.MeshStandardMaterial({ map: earthCloudTex, transparent: true, opacity: 0.72, depthWrite: false, roughness: 0.9 })
+      );
+      globeGroup.userData.cloudsSphere = cloudsSphere;
       const atmoMesh = new THREE.Mesh(
         new THREE.SphereGeometry(25.6, 64, 48),
         new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.18, side: THREE.BackSide })
       );
-      globeGroup.add(planetMesh, atmoMesh);
+      globeGroup.add(planetMesh, cloudsSphere, atmoMesh);
 
       // Starfield backdrop for Globe Mode
       const starGeo = new THREE.BufferGeometry();
@@ -1638,10 +1637,10 @@
     waterMesh.position.set(0, -0.04, 0);
     surfaceWorld.add(waterMesh);
 
-    // 1-Draw-Call Instanced Wild Meadow Grass Tufts around all Continental Valleys!
-    const grassTuftGeo = new THREE.ConeGeometry(0.06, 0.34, 4);
-    grassTuftGeo.translate(0, 0.17, 0);
-    const grassTuftMat = new THREE.MeshStandardMaterial({ color: 0x4d7c0f, roughness: 0.85, flatShading: false });
+    // Soft Translucent Meadow Grass Tufts (natural organic blend, no dark spikes!)
+    const grassTuftGeo = new THREE.ConeGeometry(0.045, 0.24, 4);
+    grassTuftGeo.translate(0, 0.12, 0);
+    const grassTuftMat = new THREE.MeshStandardMaterial({ color: 0x65a30d, roughness: 0.9, transparent: true, opacity: 0.58 });
     const grassInstanced = new THREE.InstancedMesh(grassTuftGeo, grassTuftMat, 1200);
     grassInstanced.count = 0;
     surfaceWorld.add(grassInstanced);
@@ -2005,10 +2004,13 @@
 
     initWorldScenery();
 
-    const MAX_RES = 600;
+    // Subtle Natural Ground Resources (small flattened pebbles/berries — no giant neon spheres!)
+    const MAX_RES = 450;
+    const resGeo = new THREE.SphereGeometry(0.042, 7, 5);
+    resGeo.scale(1.2, 0.42, 1.0);
     const resInstanced = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(0.075, 8, 8),
-      new THREE.MeshStandardMaterial({ roughness: 0.3, metalness: 0.1 }),
+      resGeo,
+      new THREE.MeshStandardMaterial({ roughness: 0.72, metalness: 0.05 }),
       MAX_RES
     );
     resInstanced.count = 0;
@@ -2317,6 +2319,128 @@
         headGroup.add(crest);
       }
 
+      // Individual Genetic Body Diversity (varied height & build so nobody looks like an identical clone!)
+      const idHash = Array.from(String(ag.id || 'A1')).reduce((acc, ch) => acc * 31 + ch.charCodeAt(0), 7);
+      const heightVar = 0.88 + (Math.abs(idHash) % 25) * 0.012; // 0.88x .. 1.17x
+      const buildVar = 0.88 + (Math.abs(idHash >> 3) % 24) * 0.012; // slim .. sturdy
+      torso.scale.multiply(new THREE.Vector3(buildVar, heightVar, buildVar));
+
+      // Charming 3D Race Headpiece attached DIRECTLY to headGroup (always 100% locked to the head!)
+      const raceHat = new THREE.Group();
+      raceHat.position.y = 0.24;
+      if (ag.lineage === 'Sylphid') {
+        const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.03, 18), new THREE.MeshStandardMaterial({ color: 0x0369a1, roughness: 0.35 }));
+        const cr = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.24, 18), new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.35 }));
+        cr.position.y = 0.13;
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(0.165, 0.165, 0.045, 18), new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.7, roughness: 0.25 }));
+        band.position.y = 0.05;
+        raceHat.add(brim, cr, band);
+      } else if (ag.lineage === 'Lithokin') {
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.17, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), new THREE.MeshStandardMaterial({ color: 0xb45309, metalness: 0.5, roughness: 0.35 }));
+        const hMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, metalness: 0.3, roughness: 0.3 });
+        for (const side of [-1, 1]) {
+          const h = new THREE.Mesh(new THREE.ConeGeometry(0.048, 0.24, 10), hMat);
+          h.position.set(side * 0.16, 0.13, 0); h.rotation.z = -side * 0.52;
+          raceHat.add(h);
+        }
+        raceHat.add(cap);
+      } else if (ag.lineage === 'Vespera') {
+        const pMat = new THREE.MeshStandardMaterial({ color: 0xc084fc, emissive: 0x7e22ce, emissiveIntensity: 0.25, roughness: 0.4 });
+        for (let p = 0; p < 6; p++) {
+          const ang = (p / 6) * Math.PI * 2;
+          const pet = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), pMat);
+          pet.scale.set(1.35, 0.42, 0.68);
+          pet.position.set(Math.cos(ang) * 0.11, 0.05, Math.sin(ang) * 0.11);
+          pet.rotation.y = -ang;
+          raceHat.add(pet);
+        }
+        const core = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 10), new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xeab308, emissiveIntensity: 0.8 }));
+        core.position.y = 0.07;
+        raceHat.add(core);
+      } else if (ag.lineage === 'Lith-Sylp') {
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.32, 16), new THREE.MeshStandardMaterial({ color: 0x34d399, metalness: 0.72, roughness: 0.22 }));
+        cone.position.y = 0.16;
+        const rim = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.024, 8, 20), new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.9, roughness: 0.15 }));
+        rim.rotation.x = Math.PI / 2;
+        raceHat.add(cone, rim);
+      } else {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.026, 8, 18), new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.85, roughness: 0.2 }));
+        ring.rotation.x = Math.PI / 2; ring.position.y = 0.04;
+        raceHat.add(ring);
+        for (let s3 = 0; s3 < 3; s3++) {
+          const ang = (s3 / 3) * Math.PI * 2;
+          const spk = new THREE.Mesh(new THREE.ConeGeometry(0.038, 0.15, 6), new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xd97706, emissiveIntensity: 0.45 }));
+          spk.position.set(Math.cos(ang) * 0.13, 0.11, Math.sin(ang) * 0.13);
+          raceHat.add(spk);
+        }
+      }
+      headGroup.add(raceHat);
+
+      // Classic-Game Rendered 3D Action Diorama Props (unmistakable visual storytelling — no random particles!)
+      const diorama = {};
+      // 1. Eating Prop: 3D red fruit/roasted food held right in front of mouth
+      const eatProp = new THREE.Group();
+      const apple = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3 }));
+      const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.09, 5), new THREE.MeshStandardMaterial({ color: 0x22c55e }));
+      leaf.position.set(0.03, 0.11, 0); leaf.rotation.z = -0.4;
+      eatProp.add(apple, leaf); eatProp.position.set(0.18, 0.82, 0.36); eatProp.visible = false;
+      diorama.eat = eatProp;
+
+      // 2. Making Fire / Crafting Prop: mini stone-ring campfire with glowing flame at their feet
+      const fireProp = new THREE.Group();
+      const fBase = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.05, 6, 10), new THREE.MeshStandardMaterial({ color: 0x64748b }));
+      fBase.rotation.x = Math.PI / 2; fBase.position.y = 0.05;
+      const fFlame = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.36, 8), new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xea580c, emissiveIntensity: 2.0 }));
+      fFlame.position.y = 0.22;
+      fireProp.add(fBase, fFlame); fireProp.position.set(0, 0, 0.62); fireProp.visible = false;
+      diorama.fire = fireProp;
+
+      // 3. Planting Prop: green sprouting soil patch right in front of them
+      const plantProp = new THREE.Group();
+      const mound = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.30, 0.08, 10), new THREE.MeshStandardMaterial({ color: 0x713f12 }));
+      mound.position.y = 0.04;
+      const spr1 = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.26, 6), new THREE.MeshStandardMaterial({ color: 0x22c55e }));
+      spr1.position.set(-0.07, 0.18, 0);
+      const spr2 = spr1.clone(); spr2.position.set(0.08, 0.20, 0.05);
+      plantProp.add(mound, spr1, spr2); plantProp.position.set(0, 0, 0.60); plantProp.visible = false;
+      diorama.plant = plantProp;
+
+      // 4. Combat / Hunting Prop: round wooden shield + raised spear
+      const attackProp = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.05, 14), new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.7 }));
+      attackProp.rotation.x = Math.PI / 2; attackProp.position.set(-0.34, 0.62, 0.28); attackProp.visible = false;
+      diorama.attack = attackProp;
+
+      // 5. Courtship Prop: solid glossy 3D pink heart floating overhead
+      const courtProp = new THREE.Group();
+      const hMatC = new THREE.MeshStandardMaterial({ color: 0xf43f5e, emissive: 0xe11d48, emissiveIntensity: 0.7 });
+      const hL = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), hMatC); hL.position.set(-0.08, 0.06, 0);
+      const hR = hL.clone(); hR.position.x = 0.08;
+      const hBot = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.24, 10), hMatC); hBot.rotation.x = Math.PI; hBot.position.y = -0.07;
+      courtProp.add(hL, hR, hBot); courtProp.position.set(0, 1.72, 0); courtProp.visible = false;
+      diorama.court = courtProp;
+
+      // 6. Sleeping Prop: woven grass sleeping mat underneath
+      const sleepProp = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.04, 1.25), new THREE.MeshStandardMaterial({ color: 0xca8a04, roughness: 0.9 }));
+      sleepProp.position.set(0, 0.03, 0); sleepProp.visible = false;
+      diorama.sleep = sleepProp;
+
+      // 7. Mourning / Burial Prop: small memorial candle & stone
+      const vigilProp = new THREE.Group();
+      const vStone = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.36, 0.10), new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
+      vStone.position.y = 0.18;
+      const vCandle = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xfbbf24, emissiveIntensity: 2.2 }));
+      vCandle.position.set(0, 0.42, 0.06);
+      vigilProp.add(vStone, vCandle); vigilProp.position.set(0, 0, 0.62); vigilProp.visible = false;
+      diorama.vigil = vigilProp;
+      diorama.bury = vigilProp;
+
+      // 8. Healing Prop: emerald herb bundle
+      const healProp = new THREE.Mesh(new THREE.DodecahedronGeometry(0.13, 0), new THREE.MeshStandardMaterial({ color: 0x14b8a6, emissive: 0x0d9488, emissiveIntensity: 0.8 }));
+      healProp.position.set(0.28, 0.65, 0.30); healProp.visible = false;
+      diorama.heal = healProp;
+
+      group.add(eatProp, fireProp, plantProp, attackProp, courtProp, sleepProp, vigilProp, healProp);
+
       const cloak = new THREE.Mesh(
         new THREE.ConeGeometry(0.38, 0.48, 12, 1, true),
         new THREE.MeshStandardMaterial({ color: 0xf472b6, side: THREE.DoubleSide, roughness: 0.8 })
@@ -2371,12 +2495,11 @@
         nextBlink: Math.random() * 4 + 2,
         isBlinking: false,
         torso, headGroup, leftLeg, rightLeg, leftArm, rightArm,
-        cloak, heldMesh, spearMesh, pregnantMesh, illnessMesh, halo, tag,
+        cloak, heldMesh, spearMesh, pregnantMesh, illnessMesh, halo, tag, diorama,
         tagPriority: 0,
         phase: Math.random() * Math.PI * 2
       };
       surfaceWorld.add(group);
-      if (blenderModelCache.has('humanoid')) attachHumanoidGLB(group, ag);
       return group;
     }
 
@@ -3682,8 +3805,18 @@
 
         const actFx = inferActionFX(ag);
         rig.userData.currentActionFx = actFx;
-        if (actFx && Math.random() < 0.35) {
-          spawnActionFX(actFx, rig.position.x, rig.position.z, 5);
+        // Toggle Classic-Game 3D Action Diorama Prop (crystal-clear rendered action — zero confusing particles!)
+        if (rig.userData.diorama) {
+          for (const [k, prop] of Object.entries(rig.userData.diorama)) {
+            prop.visible = false;
+          }
+          if (ag.sleeping && rig.userData.diorama.sleep) {
+            rig.userData.diorama.sleep.visible = true;
+          } else if (actFx && rig.userData.diorama[actFx]) {
+            rig.userData.diorama[actFx].visible = true;
+          } else if (ag.partner_id && ag.mood === 'affectionate' && rig.userData.diorama.court) {
+            rig.userData.diorama.court.visible = true;
+          }
         }
         const fxBadge = actFx ? ` ${FX_ICON[actFx] || ''}` : '';
         const sexBadge = ag.sex === 'M' ? '<span style="color:#38bdf8">♂</span>' : '<span style="color:#f472b6">♀</span>';
@@ -4060,6 +4193,7 @@
         setCamMode('globe');
       } else if (camMode === 'globe') {
         globeGroup.rotation.y += 0.0018;
+        if (globeGroup.userData.cloudsSphere) globeGroup.userData.cloudsSphere.rotation.y += 0.0007;
         for (const gs of globeSatMeshes.values()) {
           const oAng = t * 0.65 + (gs.userData.phase || 0);
           gs.position.set(Math.cos(oAng) * 31.5, Math.sin(oAng * 1.4) * 14.0, Math.sin(oAng) * 31.5);
@@ -4141,37 +4275,14 @@
         let dz = target.z - rig.position.z;
         let distSq = dx * dx + dz * dz;
 
-        // Purposeful Cloud-Mode Kinematics: pause to perform visible actions (eat/fire/plant/vigil/sleep), otherwise walk purposefully!
-        const isStationaryAct = ['eat', 'fire', 'plant', 'vigil', 'bury', 'heal', 'court'].includes(ud.currentActionFx);
-        if (isCloudMode && isStationaryAct && Math.random() < 0.03) {
-          spawnActionFX(ud.currentActionFx, rig.position.x, rig.position.z, 3);
+        // ZERO aimless random wandering! Beings walk smoothly ONLY toward their real server positions,
+        // and stand calmly performing their rendered 3D Classic-Game Action Diorama!
+        if (ud.diorama?.court?.visible) {
+          ud.diorama.court.rotation.y = t * 2.2;
+          ud.diorama.court.position.y = 1.72 + Math.sin(t * 3.5) * 0.06;
         }
-        if (isCloudMode && !ud.isSleeping && !isStationaryAct && distSq <= 0.06 && t >= (ud.pauseUntil || 0)) {
-          const anchor = ud.serverAnchor || { x: rig.position.x, z: rig.position.z };
-          let wp = null;
-          if (Math.random() < 0.24 && latestState?.caves?.length) {
-            const nearCave = latestState.caves.find(cv => Math.hypot(cv.x - anchor.x, cv.y - anchor.z) < 26.0);
-            if (nearCave) {
-              const ang = Math.random() * Math.PI * 2, rIn = Math.random() * 1.3;
-              wp = { x: nearCave.x + Math.cos(ang) * rIn, z: nearCave.y + Math.sin(ang) * rIn };
-              wp.y = Math.max(0.06, terrainHeight(nearCave.x, nearCave.y) + 0.05);
-            }
-          }
-          if (!wp && Math.random() < 0.28 && latestState?.structures?.length) {
-            const nearbyFarm = latestState.structures.find(s => s.kind === 'crop_plot' && Math.hypot(s.x - anchor.x, s.y - anchor.z) < 12.0);
-            if (nearbyFarm) {
-              const ang = Math.random() * Math.PI * 2;
-              wp = { x: nearbyFarm.x + Math.cos(ang) * 0.65, z: nearbyFarm.y + Math.sin(ang) * 0.65 };
-              wp.y = terrainHeight(wp.x, wp.z);
-            }
-          }
-          if (!wp) wp = pickNaturalWaypoint(anchor.x, anchor.z, 14.5, 'land');
-          ud.targetPos.set(wp.x, wp.y, wp.z);
-          ud.targetHeading = Math.atan2(wp.x - rig.position.x, wp.z - rig.position.z);
-          ud.pauseUntil = t + 0.35 + Math.random() * 1.0;
-          dx = ud.targetPos.x - rig.position.x;
-          dz = ud.targetPos.z - rig.position.z;
-          distSq = dx * dx + dz * dz;
+        if (ud.diorama?.eat?.visible) {
+          ud.diorama.eat.position.y = 0.82 + Math.sin(t * 8.0) * 0.05;
         }
 
         rig.rotation.y = shortestAngleLerp(rig.rotation.y, ud.targetHeading, 0.12);
