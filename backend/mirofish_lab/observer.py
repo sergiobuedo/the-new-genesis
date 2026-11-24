@@ -79,6 +79,7 @@ class PopulationSimulation:
         self.couples_formed: int = 0
         self.disease_cases: int = 0
         self.cures_applied: int = 0
+        self.planetary_population: float = float(founders_per_lineage * 3)  # Multi-scale cohort engine (scales seamlessly past 8B+!)
         self.recent_fx: List[Dict[str, Any]] = []  # Live 3D Action FX cues (attack, fire, plant, eat, birth, death, bury...)
         self.discoveries: Dict[str, int] = {}
         self.max_generation: int = 1
@@ -193,8 +194,48 @@ class PopulationSimulation:
         if len(self.recent_fx) > 24:
             self.recent_fx.pop(0)
 
+    def compute_planetary_carrying_capacity(self) -> int:
+        """Real Verhulst-Pearl ecological carrying capacity K (scales from 12K Paleolithic to 25B+ Spacefaring!)."""
+        d = self.discoveries
+        structs = {s.kind for s in self.world.structures.values()}
+        k = 12_000
+        if "struct_hearth" in d or "first_cooked_meal" in d or "hearth" in structs:
+            k = max(k, 65_000)
+        if "first_agriculture" in d or "crop_plot" in structs or "granary" in structs:
+            k = max(k, 2_500_000)
+        if "craft_bronze_tool" in d or "struct_watercraft" in d or "struct_shelter" in d:
+            k = max(k, 85_000_000)
+        if "struct_edifice" in d or "craft_antiseptic_balm" in d or "struct_comm_relay" in d:
+            k = max(k, 2_500_000_000)
+        if "craft_clinical_cure" in d or "struct_land_vehicle" in d or "struct_orbital_satellite" in d:
+            k = max(k, 25_000_000_000)  # Supports > 8,000,000,000+ inhabitants on 10x Super-Earth!
+        return k
+
+    def _step_macro_demography(self, living: List[KobAgent]) -> None:
+        """Advances the multi-scale planetary population organically once per Earth day (0% artificial jumps)."""
+        n_focus = len(living)
+        if n_focus == 0:
+            self.planetary_population = 0.0
+            return
+        self.planetary_population = max(self.planetary_population, float(n_focus))
+        if not self.enable_culture or n_focus < 15:
+            return
+        k_cap = float(self.compute_planetary_carrying_capacity())
+        couples = sum(1 for a in living if a.partner_id) // 2
+        sick_ratio = sum(1 for a in living if a.illness) / float(max(1, n_focus))
+        avg_energy = sum(a.energy for a in living) / float(max(1, n_focus))
+        # Daily intrinsic growth rate r driven purely by live vitality, couples, disease & disasters
+        r = 0.00018 * (1.0 + min(2.0, couples / 8.0)) if avg_energy > 52.0 else -0.00015
+        r -= sick_ratio * 0.0012
+        if self.world.active_disaster in ("volcanic_eruption", "earthquake", "wildfire"):
+            r -= 0.0006
+        delta = r * self.planetary_population * (1.0 - (self.planetary_population / k_cap))
+        self.planetary_population = max(float(n_focus), min(k_cap, self.planetary_population + delta))
+
     def step_tick(self) -> List[Tuple[KobAgent, str]]:
         self.world.step_environment()
+        if self.world.tick_count % TICKS_PER_DAY == 0:
+            self._step_macro_demography(self.living_agents)
         if self.world.newly_triggered_disaster and self.enable_culture:
             d_info = self.world.newly_triggered_disaster
             d_names = {
@@ -2035,6 +2076,7 @@ class MiroFishObservatory:
             self.live.couples_formed = int(m.get("bonded_couples", 0))
             self.live.disease_cases = int(m.get("disease_cases", 0))
             self.live.cures_applied = int(m.get("cures_applied", 0))
+            self.live.planetary_population = float(max(len(self.live.living_agents), int(m.get("planetary_population", len(self.live.living_agents)))))
             # Upgrade legacy 24-species extinction list when expanding to 42-species full Earth biosphere!
             saved_extinct = dict(m.get("extinct_fauna", {}))
             if len(saved_extinct) > 10 and int(m.get("wild_species_total", 24)) < 40:
@@ -2537,7 +2579,11 @@ class MiroFishObservatory:
             + struct_counts.get("burrow_network", 0) * 14
             + struct_counts.get("edifice", 0) * 35
         )
-        macro_population = len(living) + (settlement_bonus if len(living) >= 12 else 0)
+        macro_population = max(
+            int(round(self.live.planetary_population)),
+            len(living) + (settlement_bonus if len(living) >= 12 else 0),
+        )
+        planetary_capacity = self.live.compute_planetary_carrying_capacity()
         rare_held = sum(
             1 for a in living for c in a.inventory if c in BLIND_MATERIALS and BLIND_MATERIALS[c].luster >= 0.80
         )
@@ -2789,6 +2835,8 @@ class MiroFishObservatory:
             "disease_cases": self.live.disease_cases,
             "cures_applied": self.live.cures_applied,
             "macro_population": macro_population,
+            "planetary_population": macro_population,
+            "planetary_carrying_capacity": planetary_capacity,
             "clan_leaders": clan_leaders,
             "vocations": dict(vocations_cnt),
             "oral_traditions_count": oral_traditions_count,

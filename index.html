@@ -589,6 +589,18 @@
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // Blender .glb Asset Cache (drop any Blender-exported .glb into ./assets/models/<key>.glb for instant AAA swap!)
+    const gltfLoader = new GLTFLoader();
+    const blenderModelCache = new Map();
+    function formatPopScale(n) {
+      if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
+      if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+      if (n >= 1e4) return `${(n / 1e3).toFixed(1)}K`;
+      return String(Math.round(n || 0));
+    }
 
     const params = new URLSearchParams(location.search);
     if (params.get('clean') === '1') document.body.classList.add('clean-shot');
@@ -1245,6 +1257,14 @@
     scene.background = new THREE.Color(0x87ceeb);
     scene.fog = new THREE.FogExp2(0x93c5fd, 0.0018);
 
+    // AAA Physically-Based Image-Based Lighting (PMREM IBL Environment Map — 100% Client GPU!)
+    try {
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      scene.environmentIntensity = 0.42;
+      pmrem.dispose();
+    } catch (_) {}
+
     const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.35, 1400);
     camera.position.set(-130, 19, -92);
 
@@ -1559,18 +1579,50 @@
     surfaceWorld.add(precipPoints);
 
     let terrainMesh = null;
-    const waterGeo = new THREE.PlaneGeometry(740, 740, 64, 64);
+    const waterGeo = new THREE.PlaneGeometry(740, 740, 72, 72);
     waterGeo.rotateX(-Math.PI / 2);
+    const waterUniforms = {
+      uTime: { value: 0 },
+      uSunDir: { value: new THREE.Vector3(0.5, 0.7, 0.4).normalize() },
+      uDeepColor: { value: new THREE.Color(0x0c4a6e) },
+      uShallowColor: { value: new THREE.Color(0x0284c7) },
+      uSkyColor: { value: new THREE.Color(0xbae6fd) }
+    };
     const waterMesh = new THREE.Mesh(
       waterGeo,
-      new THREE.MeshStandardMaterial({
-        color: 0x0369a1,
-        roughness: 0.14,
-        metalness: 0.42,
-        bumpMap: waterRippleTex,
-        bumpScale: 0.14,
+      new THREE.ShaderMaterial({
+        uniforms: waterUniforms,
         transparent: true,
-        opacity: 0.86
+        vertexShader: `
+          uniform float uTime;
+          varying vec3 vWorldPos;
+          void main() {
+            vec4 wp = modelMatrix * vec4(position, 1.0);
+            wp.y += sin(wp.x * 0.25 + uTime * 1.4) * 0.025 + cos(wp.z * 0.22 - uTime * 1.1) * 0.025;
+            vWorldPos = wp.xyz;
+            gl_Position = projectionMatrix * viewMatrix * wp;
+          }
+        `,
+        fragmentShader: `
+          uniform float uTime;
+          uniform vec3 uSunDir;
+          uniform vec3 uDeepColor;
+          uniform vec3 uShallowColor;
+          uniform vec3 uSkyColor;
+          varying vec3 vWorldPos;
+          void main() {
+            float w1 = sin(vWorldPos.x * 0.55 + uTime * 1.8) * cos(vWorldPos.z * 0.48 - uTime * 1.3);
+            float w2 = sin((vWorldPos.x - vWorldPos.z) * 1.15 + uTime * 2.4);
+            vec3 n = normalize(vec3((w1 + w2 * 0.45) * 0.14, 1.0, (w1 - w2 * 0.45) * 0.14));
+            vec3 viewDir = normalize(cameraPosition - vWorldPos);
+            float fresnel = pow(1.0 - max(dot(viewDir, n), 0.0), 3.2);
+            vec3 halfVec = normalize(uSunDir + viewDir);
+            float spec = pow(max(dot(n, halfVec), 0.0), 96.0) * 0.95;
+            vec3 baseCol = mix(uDeepColor, uShallowColor, 0.45 + w1 * 0.18);
+            vec3 col = mix(baseCol, uSkyColor, clamp(fresnel * 0.72, 0.0, 0.75)) + vec3(1.0, 0.97, 0.88) * spec;
+            gl_FragColor = vec4(col, 0.87);
+          }
+        `
       })
     );
     waterMesh.position.set(0, -0.04, 0);
@@ -2451,16 +2503,40 @@
         dish.position.y = -0.42;
         g.add(bus, pL, pR, dish);
       } else if (st.kind === 'hearth') {
-        const stones = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.12, 8, 12), new THREE.MeshStandardMaterial({ color: 0x64748b }));
-        stones.rotation.x = Math.PI / 2; stones.position.y = 0.08;
-        const flame = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.72, 8), new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xf97316, emissiveIntensity: 2.2 }));
-        flame.position.y = 0.42;
-        const light = new THREE.PointLight(0xf97316, 4.2, 11.0); light.position.y = 1.0;
-        g.add(stones, flame, light);
+        // AAA Stone-Ringed Oak-Log Campfire with Dual-Layer Animated Flame!
+        const stoneMatH = new THREE.MeshStandardMaterial({ color: 0x64748b, bumpMap: stoneBumpTex, bumpScale: 0.08, roughness: 0.9 });
+        for (let k = 0; k < 8; k++) {
+          const ang = (k / 8) * Math.PI * 2;
+          const rk = new THREE.Mesh(new THREE.DodecahedronGeometry(0.14, 0), stoneMatH);
+          rk.position.set(Math.cos(ang) * 0.48, 0.10, Math.sin(ang) * 0.48);
+          rk.castShadow = true; g.add(rk);
+        }
+        const logMatH = new THREE.MeshStandardMaterial({ color: 0x451a03, bumpMap: barkBumpTex, bumpScale: 0.06, roughness: 0.95 });
+        for (let l = 0; l < 4; l++) {
+          const lg = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.65, 7), logMatH);
+          lg.rotation.z = Math.PI * 0.42; lg.rotation.y = (l / 4) * Math.PI;
+          lg.position.y = 0.14; g.add(lg);
+        }
+        const flame = new THREE.Group();
+        const outerF = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.78, 10), new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xea580c, emissiveIntensity: 2.0, transparent: true, opacity: 0.88 }));
+        outerF.position.y = 0.44;
+        const innerF = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.48, 8), new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xfacc15, emissiveIntensity: 2.8 }));
+        innerF.position.y = 0.34;
+        flame.add(outerF, innerF);
+        const light = new THREE.PointLight(0xf97316, 4.8, 13.0); light.position.y = 1.15;
+        g.add(flame, light);
         g.userData.flame = flame; g.userData.light = light;
       } else if (st.kind === 'shelter') {
-        const hut = new THREE.Mesh(new THREE.SphereGeometry(0.95, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.85 }));
-        hut.castShadow = true; g.add(hut);
+        // AAA Timber-Framed Stone & Woven-Thatch Hut with Warm Glowing Doorway!
+        const wall = new THREE.Mesh(new THREE.CylinderGeometry(0.86, 0.94, 0.72, 12), new THREE.MeshStandardMaterial({ color: 0xd6d3d1, bumpMap: stoneBumpTex, bumpScale: 0.10, roughness: 0.88 }));
+        wall.position.y = 0.36; wall.castShadow = true; wall.receiveShadow = true;
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(1.18, 0.88, 14), new THREE.MeshStandardMaterial({ color: 0xb45309, bumpMap: barkBumpTex, bumpScale: 0.12, roughness: 0.92 }));
+        roof.position.y = 1.12; roof.castShadow = true;
+        const door = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.48, 0.12), new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xd97706, emissiveIntensity: 0.85 }));
+        door.position.set(0, 0.25, 0.86);
+        const frameL = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.56, 6), trunkMat); frameL.position.set(-0.20, 0.28, 0.90);
+        const frameR = frameL.clone(); frameR.position.x = 0.20;
+        g.add(wall, roof, door, frameL, frameR);
       } else if (st.kind === 'granary') {
         const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.30, 0.65, 14), new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.6 }));
         pot.position.y = 0.32; g.add(pot);
@@ -3196,7 +3272,8 @@
         globeGroup.userData.moonMesh.position.set(Math.cos(mAng) * 44, Math.sin(mAng * 0.5) * 8, Math.sin(mAng) * 44);
       }
 
-      document.getElementById('ui-pop').textContent = m.live_population;
+      const pPop = m.planetary_population || m.live_population;
+      document.getElementById('ui-pop').textContent = pPop > m.live_population ? `${m.live_population} (${formatPopScale(pPop)})` : `${m.live_population}`;
       document.getElementById('ui-ctrl').textContent = m.control_population;
       if (m.wild_species_alive !== undefined) {
         document.getElementById('ui-fauna').textContent = `${m.wild_species_alive}/${m.wild_species_total || 42}`;
@@ -3618,6 +3695,8 @@
       const isCloudMode = Boolean(cloudPollTimer);
       const tidal = (latestState?.world?.tidal_offset || 0) * 0.32;
       waterMesh.position.y = -0.04 + tidal + Math.sin(t * 1.6) * 0.02;
+      waterUniforms.uTime.value = t;
+      waterUniforms.uSkyColor.value.copy(skyUniforms.horizonColor.value);
       waterRippleTex.offset.x = (t * 0.025) % 1;
       waterRippleTex.offset.y = (t * 0.018) % 1;
       for (const cg of cloudGroup.children) {
