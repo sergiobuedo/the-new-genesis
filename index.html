@@ -3663,7 +3663,9 @@
       const isNewServerTick = (w.tick !== lastCloudTick);
       lastCloudTick = w.tick;
 
-      document.getElementById('ui-time').textContent = `Y${w.year} · Day ${w.day}`;
+      const bceYr = Math.max(0, 10000 - (w.year || 1));
+      const eraTag = currentLang === 'es' ? `Neolítico ~${bceYr.toLocaleString('es-ES')} a.C.` : `Neolithic ~${bceYr.toLocaleString('en-US')} BCE`;
+      document.getElementById('ui-time').textContent = `${eraTag} · Y${w.year}`;
       document.getElementById('ui-season').textContent = w.season;
       document.getElementById('ui-temp').textContent = `${w.ambient_temp}°C`;
       const weatherMap = {
@@ -3709,8 +3711,9 @@
         globeGroup.userData.moonMesh.position.set(Math.cos(mAng) * 44, Math.sin(mAng * 0.5) * 8, Math.sin(mAng) * 44);
       }
 
-      const pPop = m.planetary_population || m.live_population;
-      document.getElementById('ui-pop').textContent = pPop > m.live_population ? `${m.live_population} (${formatPopScale(pPop)})` : `${m.live_population}`;
+      const hasAg = !!(m.discoveries && m.discoveries.first_agriculture);
+      const pPop = Math.max(m.planetary_population || m.live_population, (hasAg && m.live_population >= 15) ? (4000000 + m.live_population * 1250) : m.live_population);
+      document.getElementById('ui-pop').textContent = pPop > m.live_population ? `${formatPopScale(pPop)} (${m.live_population} foco)` : `${m.live_population}`;
       document.getElementById('ui-ctrl').textContent = m.control_population;
       if (m.wild_species_alive !== undefined) {
         document.getElementById('ui-fauna').textContent = `${m.wild_species_alive}/${m.wild_species_total || 42}`;
@@ -3724,15 +3727,19 @@
       document.getElementById('ui-archetype').textContent = `🔒 ${arch || ''}`;
 
       const sp = m.species_counts || {};
+      const spMacro = m.species_macro_counts || {};
+      const totalFocus = Math.max(1, m.live_population || 1);
       const pillsBox = document.getElementById('species-pills-box');
       if (pillsBox) {
         const raceColors = { Sylphid: '#38bdf8', Lithokin: '#fbbf24', Vespera: '#c084fc' };
         const allLins = Array.from(new Set(['Sylphid', 'Lithokin', 'Vespera', ...Object.keys(sp)]));
         pillsBox.innerHTML = allLins.map(lin => {
           const cnt = sp[lin] || 0;
+          const mCnt = spMacro[lin] || Math.round((cnt / totalFocus) * pPop);
           const isHyb = lin.includes('-');
           const col = raceColors[lin] || (isHyb ? '#34d399' : '#f472b6');
-          return `<div class="sp-pill" data-jump-lineage="${lin}" style="border-color:${col};min-width:74px;flex:1 1 auto;opacity:${cnt === 0 ? '0.45' : '1'}"><strong style="color:${col}">📍 ${lin}${isHyb ? ' ✨' : ''}</strong><br><span>${cnt}</span></div>`;
+          const popTxt = pPop > 1000 ? `${formatPopScale(mCnt)} <span style="font-size:9px;color:var(--muted)">(${cnt})</span>` : `${cnt}`;
+          return `<div class="sp-pill" data-jump-lineage="${lin}" style="border-color:${col};min-width:84px;flex:1 1 auto;opacity:${cnt === 0 ? '0.45' : '1'}"><strong style="color:${col}">📍 ${lin}${isHyb ? ' ✨' : ''}</strong><br><span>${popTxt}</span></div>`;
         }).join('');
         pillsBox.querySelectorAll('[data-jump-lineage]').forEach(pill => {
           pill.addEventListener('click', () => flyToLineage(pill.dataset.jumpLineage));
@@ -4308,14 +4315,23 @@
         let dz = target.z - rig.position.z;
         let distSq = dx * dx + dz * dz;
 
-        // ZERO aimless random wandering! Beings walk smoothly ONLY toward their real server positions,
-        // and stand calmly performing their rendered 3D Classic-Game Action Diorama!
+        // Calm, Natural, Purposeful Walking + Classic-Game 3D Action Dioramas (never frozen, never spinning!)
         if (ud.diorama?.court?.visible) {
           ud.diorama.court.rotation.y = t * 2.2;
           ud.diorama.court.position.y = 1.72 + Math.sin(t * 3.5) * 0.06;
         }
         if (ud.diorama?.eat?.visible) {
           ud.diorama.eat.position.y = 0.82 + Math.sin(t * 8.0) * 0.05;
+        }
+        if (isCloudMode && !ud.isSleeping && distSq <= 0.05 && t >= (ud.pauseUntil || 0)) {
+          const anchor = ud.serverAnchor || { x: rig.position.x, z: rig.position.z };
+          const wp = pickNaturalWaypoint(anchor.x, anchor.z, 7.5, 'land');
+          ud.targetPos.set(wp.x, wp.y, wp.z);
+          ud.targetHeading = Math.atan2(wp.x - rig.position.x, wp.z - rig.position.z);
+          ud.pauseUntil = t + 2.8 + Math.random() * 3.2; // Calm pause to perform action diorama, then purposeful walk!
+          dx = ud.targetPos.x - rig.position.x;
+          dz = ud.targetPos.z - rig.position.z;
+          distSq = dx * dx + dz * dz;
         }
 
         rig.rotation.y = shortestAngleLerp(rig.rotation.y, ud.targetHeading, 0.12);

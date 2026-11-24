@@ -195,43 +195,42 @@ class PopulationSimulation:
             self.recent_fx.pop(0)
 
     def compute_planetary_carrying_capacity(self) -> int:
-        """Real Verhulst-Pearl ecological carrying capacity K (scales from 12K Paleolithic to 25B+ Spacefaring!)."""
+        """Real Verhulst-Pearl ecological carrying capacity K (Neolithic 4M baseline -> 25B+ Spacefaring!)."""
         d = self.discoveries
         structs = {s.kind for s in self.world.structures.values()}
-        k = 12_000
+        k = 1_500_000  # Late Paleolithic global Homo sapiens baseline (~1.5M)
         if "struct_hearth" in d or "first_cooked_meal" in d or "hearth" in structs:
-            k = max(k, 65_000)
+            k = max(k, 4_500_000)
         if "first_agriculture" in d or "crop_plot" in structs or "granary" in structs:
-            k = max(k, 2_500_000)
+            k = max(k, 25_000_000)  # Neolithic Agrarian Revolution (4M -> 25M)
         if "craft_bronze_tool" in d or "struct_watercraft" in d or "struct_shelter" in d:
-            k = max(k, 85_000_000)
+            k = max(k, 180_000_000)  # Bronze / Iron Age Civilizations
         if "struct_edifice" in d or "craft_antiseptic_balm" in d or "struct_comm_relay" in d:
-            k = max(k, 2_500_000_000)
+            k = max(k, 2_800_000_000)  # Urban / Industrial / Antiseptic Era
         if "craft_clinical_cure" in d or "struct_land_vehicle" in d or "struct_orbital_satellite" in d:
-            k = max(k, 25_000_000_000)  # Supports > 8,000,000,000+ inhabitants on 10x Super-Earth!
+            k = max(k, 25_000_000_000)  # Modern / Spacefaring Super-Earth (> 8,000,000,000+!)
         return k
 
     def _step_macro_demography(self, living: List[KobAgent]) -> None:
-        """Advances the multi-scale planetary population organically once per Earth day (0% artificial jumps)."""
+        """Advances the multi-scale planetary population organically once per Earth day (Neolithic ~4M baseline!)."""
         n_focus = len(living)
         if n_focus == 0:
             self.planetary_population = 0.0
             return
+        # Calibrate to authentic Earth Neolithic (~10,000 BCE) global Homo sapiens baseline (~4,000,000)
+        if self.enable_culture and "first_agriculture" in self.discoveries and self.planetary_population < 4_000_000:
+            self.planetary_population = 4_000_000.0 + n_focus * 1250.0
         self.planetary_population = max(self.planetary_population, float(n_focus))
-        if not self.enable_culture or n_focus < 15:
+        if not self.enable_culture or n_focus < 10:
             return
         k_cap = float(self.compute_planetary_carrying_capacity())
         couples = sum(1 for a in living if a.partner_id) // 2
         sick_ratio = sum(1 for a in living if a.illness) / float(max(1, n_focus))
         avg_energy = sum(a.energy for a in living) / float(max(1, n_focus))
-        # Daily intrinsic growth rate r driven purely by live vitality, couples, disease & disasters
-        # Realistic Neolithic-to-Modern demographic scaling across 4 colonized continents!
-        if "first_agriculture" in self.discoveries and len(self.discoveries) >= 40 and self.planetary_population < 8_500:
-            self.planetary_population = float(8_500 + n_focus * 45)
-        r = 0.0018 * (1.0 + min(2.5, couples / 8.0)) if avg_energy > 48.0 else -0.0004
-        r -= sick_ratio * 0.0025
+        r = 0.00085 * (1.0 + min(2.5, couples / 8.0)) if avg_energy > 48.0 else -0.00035
+        r -= sick_ratio * 0.0022
         if self.world.active_disaster in ("volcanic_eruption", "earthquake", "wildfire"):
-            r -= 0.0012
+            r -= 0.0010
         delta = r * self.planetary_population * (1.0 - (self.planetary_population / k_cap))
         self.planetary_population = max(float(n_focus), min(k_cap, self.planetary_population + delta))
 
@@ -2584,9 +2583,17 @@ class MiroFishObservatory:
         )
         macro_population = max(
             int(round(self.live.planetary_population)),
-            len(living) + (settlement_bonus if len(living) >= 12 else 0),
+            (4_000_000 + len(living) * 1250) if ("first_agriculture" in self.live.discoveries and len(living) >= 15) else len(living),
         )
         planetary_capacity = self.live.compute_planetary_carrying_capacity()
+        total_f = max(1, len(living))
+        species_macro_counts = {
+            lin: int(round((cnt / total_f) * macro_population))
+            for lin, cnt in species_counts.items()
+        }
+        earth_bce_year = max(0, 10000 - self.live.world.year)
+        earth_era_label_es = f"Neolítico (~{earth_bce_year:,} a.C.)".replace(",", ".")
+        earth_era_label_en = f"Neolithic (~{earth_bce_year:,} BCE)"
         rare_held = sum(
             1 for a in living for c in a.inventory if c in BLIND_MATERIALS and BLIND_MATERIALS[c].luster >= 0.80
         )
@@ -2840,6 +2847,9 @@ class MiroFishObservatory:
             "macro_population": macro_population,
             "planetary_population": macro_population,
             "planetary_carrying_capacity": planetary_capacity,
+            "species_macro_counts": species_macro_counts,
+            "earth_era_label_es": earth_era_label_es,
+            "earth_era_label_en": earth_era_label_en,
             "clan_leaders": clan_leaders,
             "vocations": dict(vocations_cnt),
             "oral_traditions_count": oral_traditions_count,
