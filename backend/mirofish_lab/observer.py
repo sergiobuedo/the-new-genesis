@@ -2591,9 +2591,9 @@ class MiroFishObservatory:
             lin: int(round((cnt / total_f) * macro_population))
             for lin, cnt in species_counts.items()
         }
-        earth_bce_year = max(0, 10000 - self.live.world.year)
-        earth_era_label_es = f"Neolítico (~{earth_bce_year:,} a.C.)".replace(",", ".")
-        earth_era_label_en = f"Neolithic (~{earth_bce_year:,} BCE)"
+        day_of_year = ((max(1, self.live.world.day) - 1) % 365) + 1
+        earth_era_label_es = f"Año {self.live.world.year} · Día {day_of_year}"
+        earth_era_label_en = f"Year {self.live.world.year} · Day {day_of_year}"
         rare_held = sum(
             1 for a in living for c in a.inventory if c in BLIND_MATERIALS and BLIND_MATERIALS[c].luster >= 0.80
         )

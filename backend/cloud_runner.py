@@ -93,14 +93,14 @@ async def run_cloud_burst(duration_seconds: int = 660, speed: int = 5) -> None:
         if not x_date_file.exists() or x_date_file.read_text(encoding="utf-8").strip() != today_iso:
             m_x = snap_now["metrics"]
             w_x = snap_now["world"]
-            sp_str = ", ".join(f"{k}: {v}" for k, v in m_x.get("species_counts", {}).items())
+            day_of_yr = ((max(1, w_x["day"]) - 1) % 365) + 1
+            recent_events = [e.get("text", "") for e in snap_now.get("timeline", [])[:3] if e.get("text")]
+            highlight = recent_events[0][:110] if recent_events else f"Society state: {m_x['archetype_en']}."
             x_post = (
-                f"The New Genesis · Year {w_x['year']}, Day {w_x['day']} (0% human intervention)\n\n"
-                f"Population: {m_x['live_population']} beings ({m_x.get('males_count',0)}♂ / {m_x.get('females_count',0)}♀, "
-                f"{m_x.get('bonded_couples',0)} couples, {m_x.get('pregnant_count',0)} expecting). "
-                f"Lineages: {sp_str}.\n"
-                f"Society: {m_x['archetype_en']} · Life expectancy: ~{int(round(m_x.get('era_life_expectancy_yrs',36)))} yrs · "
-                f"Invented words: {m_x['shared_words_count']} · Breakthroughs: {len(m_x.get('discoveries',{}))}.\n\n"
+                f"Year {w_x['year']}, Day {day_of_yr} · The New Genesis 🌍\n\n"
+                f"What happened today (0% human intervention): {highlight}\n"
+                f"• Couples: {m_x.get('bonded_couples',0)} · Expecting: {m_x.get('pregnant_count',0)} · "
+                f"Invented words: {m_x['shared_words_count']} · Breakthroughs: {len(m_x.get('discoveries',{}))}\n\n"
                 f"Watch live 24/7: https://agobac-ia.es"
             )
             (CHRONICLES_DIR / "daily_x_dispatch.txt").write_text(x_post, encoding="utf-8")

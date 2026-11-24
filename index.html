@@ -3754,9 +3754,11 @@
       const isNewServerTick = (w.tick !== lastCloudTick);
       lastCloudTick = w.tick;
 
-      const bceYr = Math.max(0, 10000 - (w.year || 1));
-      const eraTag = currentLang === 'es' ? `Neolítico ~${bceYr.toLocaleString('es-ES')} a.C.` : `Neolithic ~${bceYr.toLocaleString('en-US')} BCE`;
-      document.getElementById('ui-time').textContent = `${eraTag} · Y${w.year}`;
+      const epochLabel = w.emergent_calendar_epoch ? `${w.emergent_calendar_epoch} · ` : '';
+      const dayOfYear = ((Math.max(1, w.day || 1) - 1) % 365) + 1;
+      document.getElementById('ui-time').textContent = currentLang === 'es'
+        ? `${epochLabel}Año ${w.year || 1} · Día ${dayOfYear}`
+        : `${epochLabel}Year ${w.year || 1} · Day ${dayOfYear}`;
       document.getElementById('ui-season').textContent = w.season;
       document.getElementById('ui-temp').textContent = `${w.ambient_temp}°C`;
       const weatherMap = {
