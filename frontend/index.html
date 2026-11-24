@@ -455,8 +455,8 @@
             <span class="collapse-btn">▾</span>
           </h2>
           <div class="card-body">
-            <div class="species-pills" title="Click any lineage to fly directly to their continent!">
-              <div class="sp-pill" data-jump-lineage="Sylphid" style="border-color:#38bdf8"><strong style="color:#38bdf8">📍 Sylphids</strong><br><span id="sp-syl">7</span></div>
+            <div class="species-pills" id="species-pills-box" style="flex-wrap:wrap;" title="Haz clic en cualquier raza para volar directamente a su poblado / Click any race to fly to their settlement!">
+              <div class="sp-pill" data-jump-lineage="Sylphid" style="border-color:#38bdf8"><strong style="color:#38bdf8">📍 Sylphid</strong><br><span id="sp-syl">7</span></div>
               <div class="sp-pill" data-jump-lineage="Lithokin" style="border-color:#fbbf24"><strong style="color:#fbbf24">📍 Lithokin</strong><br><span id="sp-lit">7</span></div>
               <div class="sp-pill" data-jump-lineage="Vespera" style="border-color:#c084fc"><strong style="color:#c084fc">📍 Vespera</strong><br><span id="sp-ves">7</span></div>
             </div>
@@ -1849,6 +1849,21 @@
       attack: '⚔️', fire: '🔥', plant: '🌱', eat: '🍎', court: '❤️',
       birth: '👶', death: '💀', vigil: '🕯️', bury: '🪨', heal: '🌿'
     };
+    const FX_TEXT_ES = {
+      attack: '⚔️ Cazando / Luchando', fire: '🔥 Fuego / Creando', plant: '🌱 Sembrando',
+      eat: '🍎 Comiendo', court: '❤️ Cortejo / Pareja', birth: '👶 ¡Parto!',
+      death: '💀 Fallecimiento', vigil: '🕯️ Velando tumba', bury: '🪨 Enterrando', heal: '🌿 Curando'
+    };
+    const FX_TEXT_EN = {
+      attack: '⚔️ Hunting / Fighting', fire: '🔥 Fire / Crafting', plant: '🌱 Planting',
+      eat: '🍎 Eating', court: '❤️ Courting', birth: '👶 Giving Birth!',
+      death: '💀 Passing', vigil: '🕯️ Mourning Vigil', bury: '🪨 Burying', heal: '🌿 Healing'
+    };
+
+    // Glowing Rose-Pink Couple Bond Lines connecting bonded mates (❤️) when walking near each other!
+    const coupleBondsGroup = new THREE.Group();
+    surfaceWorld.add(coupleBondsGroup);
+    const coupleLineMat = new THREE.LineBasicMaterial({ color: 0xf472b6, transparent: true, opacity: 0.72 });
 
     function createCaveMesh(cv) {
       const g = new THREE.Group();
@@ -2958,7 +2973,14 @@
           subj.prestige > 0 ? `⭐ ${es ? 'Prestigio' : 'Prestige'}: ${subj.prestige}` : null,
           (subj.antibodies && subj.antibodies.length) ? `🛡️ ${es ? 'Inmune' : 'Immune'}: ${subj.antibodies.join(', ')}` : null
         ].filter(Boolean);
-        document.getElementById('subj-bio').textContent = subj.bio;
+        const stageEs = { Infant: 'Bebé', Newborn: 'Recién nacido', Juvenile: 'Joven', Adult: 'Adulto/a', Elder: 'Anciano/a' }[subj.stage] || subj.stage;
+        const moodEs = { curious: 'Curioso/a', content: 'Tranquilo/a', affectionate: 'Afectuoso/a', hungry: 'Con hambre', cold: 'Con frío', tense: 'En tensión', sleepy: 'Con sueño', grieving: 'En duelo', inventing: 'Inspirado/a' }[subj.mood] || subj.mood;
+        const actFxSubj = inferActionFX(subj);
+        const actNiceEs = actFxSubj ? FX_TEXT_ES[actFxSubj] : (subj.sleeping ? '💤 Durmiendo' : subj.action);
+        const heldNice = subj.held_label || (es ? 'manos vacías' : 'empty hands');
+        document.getElementById('subj-bio').textContent = es
+          ? `${subj.id} (${sexLbl} · ${stageEs} ${subj.lineage} · ${ageYrs} años) — ${actNiceEs}. Lleva: ${heldNice}. Ánimo: ${moodEs}.`
+          : subj.bio;
         document.getElementById('val-energy').textContent = `${Math.round(subj.energy)}%`;
         document.getElementById('bar-energy').style.width = `${subj.energy}%`;
         document.getElementById('val-warmth').textContent = `${Math.round(subj.warmth)}%`;
@@ -3059,6 +3081,39 @@
       }).join('');
     }
 
+    function humanizeEventText(ev) {
+      const s = ev.summary || '';
+      if (currentLang !== 'es') return s;
+      if (s.includes('Live Birth') || s.includes('NEW HYBRID SENTIENT')) {
+        return `👶 <strong>¡Nacimiento!</strong> ${s.replace('Live Birth (♀+♂): ', '').replace('Mother ', 'Madre ').replace('& Father ', 'y Padre ').replace('welcomed newborn', 'tuvieron a').replace('son', 'hijo ♂').replace('daughter', 'hija ♀')}`;
+      }
+      if (s.includes('COURTSHIP & CONCEPTION')) {
+        return `❤️ <strong>¡Nueva pareja y embarazo!</strong> ${s.replace('HUMAN-LIKE COURTSHIP & CONCEPTION! ', '').replace('formed a pair-bond and conceived a child!', 'formaron pareja estable y esperan un hijo.')}`;
+      }
+      if (s.includes('Wild danger!')) {
+        return `⚔️ <strong>Ataque salvaje:</strong> ${s.replace('Wild danger! ', '').replace('was attacked by', 'fue atacado por').replace('was envenomed by', 'fue envenenado por')}`;
+      }
+      if (s.includes('Barter trade:') || s.includes('Inter-species trade!')) {
+        return `🤝 <strong>Intercambio:</strong> ${s.replace('Inter-species trade! ', '(entre razas) ').replace('Barter trade: ', '').replace('exchanged', 'cambió').replace('with', 'con').replace('for', 'por')}`;
+      }
+      if (s.includes('perished from')) {
+        return `💀 <strong>Fallecimiento:</strong> ${s.replace('perished from', 'murió por').replace('natural old age', 'vejez natural').replace('starvation', 'hambre').replace('winter hypothermia', 'hipotermia invernal').replace('age ', 'edad ')}`;
+      }
+      if (s.includes('FUNERARY RITE') || s.includes('burial cairn')) {
+        return `🪨 <strong>Rito funerario:</strong> ${s.replace('FUNERARY RITE! ', '').replace('stacked stones into a burial cairn over', 'levantó un túmulo de piedra sobre la tumba de')}`;
+      }
+      if (s.includes('BREAKTHROUGH!') || s.includes('AGRICULTURE') || s.includes('MEDICINE') || s.includes('MEDICAL CURE')) {
+        return `🔥 <strong>¡Gran avance!</strong> ${s.replace('BREAKTHROUGH! ', '')}`;
+      }
+      if (s.includes('Distant Continent Surveyed')) {
+        return `🗺️ <strong>Nuevo poblado descubierto:</strong> ${s.replace('Distant Continent Surveyed: Native', 'Poblado nativo').replace('population', 'con').replace('observed thriving in their', 'prosperando en su continente')}`;
+      }
+      if (s.includes('GEOPHYSICS!')) {
+        return `🌋 <strong>Fenómeno natural:</strong> ${s.replace('GEOPHYSICS! ', '')}`;
+      }
+      return s;
+    }
+
     function renderTimeline(events) {
       const box = document.getElementById('timeline-list');
       const filtered = (events || []).filter(ev => {
@@ -3071,8 +3126,20 @@
         const cls = ['invention', 'philosophy'].includes(ev.kind) ? 'breakthrough'
           : ['conflict', 'predation', 'death'].includes(ev.kind) ? 'conflict'
           : ev.kind === 'lexicon' ? 'lexicon' : '';
-        return `<div class="ev-item ${cls}"><span class="ev-day">[Y${ev.year}·D${ev.day}]</span> ${ev.summary}</div>`;
+        const txt = humanizeEventText(ev);
+        return `<div class="ev-item ${cls}" data-evx="${ev.x ?? ''}" data-evy="${ev.y ?? ''}" style="cursor:pointer;" title="${currentLang === 'es' ? 'Haz clic para ir al lugar del suceso' : 'Click to fly to event location'}"><span class="ev-day">[A${ev.year}·D${ev.day}]</span> ${txt}</div>`;
       }).join('');
+      box.querySelectorAll('.ev-item[data-evx]').forEach(el => {
+        el.addEventListener('click', () => {
+          const ex = parseFloat(el.dataset.evx), ey = parseFloat(el.dataset.evy);
+          if (!Number.isNaN(ex) && !Number.isNaN(ey)) {
+            setCamMode('topdown');
+            const ty = terrainHeight(ex, ey);
+            controls.target.set(ex, ty + 0.5, ey);
+            camera.position.set(ex + 2.5, ty + 11.5, ey + 14.0);
+          }
+        });
+      });
     }
 
     function applyState(state) {
@@ -3143,9 +3210,20 @@
       document.getElementById('ui-archetype').textContent = `🔒 ${arch || ''}`;
 
       const sp = m.species_counts || {};
-      document.getElementById('sp-syl').textContent = sp.Sylphid || 0;
-      document.getElementById('sp-lit').textContent = sp.Lithokin || 0;
-      document.getElementById('sp-ves').textContent = sp.Vespera || 0;
+      const pillsBox = document.getElementById('species-pills-box');
+      if (pillsBox) {
+        const raceColors = { Sylphid: '#38bdf8', Lithokin: '#fbbf24', Vespera: '#c084fc' };
+        const allLins = Array.from(new Set(['Sylphid', 'Lithokin', 'Vespera', ...Object.keys(sp)]));
+        pillsBox.innerHTML = allLins.map(lin => {
+          const cnt = sp[lin] || 0;
+          const isHyb = lin.includes('-');
+          const col = raceColors[lin] || (isHyb ? '#34d399' : '#f472b6');
+          return `<div class="sp-pill" data-jump-lineage="${lin}" style="border-color:${col};min-width:74px;flex:1 1 auto;opacity:${cnt === 0 ? '0.45' : '1'}"><strong style="color:${col}">📍 ${lin}${isHyb ? ' ✨' : ''}</strong><br><span>${cnt}</span></div>`;
+        }).join('');
+        pillsBox.querySelectorAll('[data-jump-lineage]').forEach(pill => {
+          pill.addEventListener('click', () => flyToLineage(pill.dataset.jumpLineage));
+        });
+      }
 
       const isWinter = w.season.includes('Winter');
       if (isWinter !== lastWinterState) {
@@ -3243,10 +3321,11 @@
           rig.userData.tag.innerHTML = ag.utterance
             ? `<strong>${ag.id} ${sexBadge}${famBadge}</strong>: <span class="phoneme">«${ag.utterance}»</span> (${ag.referent})`
             : `<strong>${ag.id} ${sexBadge}${famBadge}</strong> · ${ag.sleeping ? '💤 Sleeping' : ag.action}`;
-        } else if (actFx && ['attack', 'fire', 'plant', 'birth', 'vigil', 'bury', 'court', 'heal'].includes(actFx)) {
+        } else if (actFx && ['attack', 'fire', 'plant', 'birth', 'vigil', 'bury', 'court', 'heal', 'eat'].includes(actFx)) {
           rig.userData.tagPriority = 2.5;
           rig.userData.tag.className = 'floating-tag';
-          rig.userData.tag.innerHTML = `${FX_ICON[actFx]} <strong>${ag.id}</strong> ${sexBadge}`;
+          const fxLabel = currentLang === 'es' ? (FX_TEXT_ES[actFx] || FX_ICON[actFx]) : (FX_TEXT_EN[actFx] || FX_ICON[actFx]);
+          rig.userData.tag.innerHTML = `<strong>${ag.id}</strong> ${sexBadge} · ${fxLabel}`;
         } else if (ag.pregnant) {
           rig.userData.tagPriority = 2;
           rig.userData.tag.className = 'floating-tag';
@@ -3833,10 +3912,35 @@
         }
       }
 
+      // Draw subtle rose-pink 3D bond beams between nearby bonded couples (❤️)!
+      while (coupleBondsGroup.children.length > 0) {
+        const ch = coupleBondsGroup.children.pop();
+        ch.geometry?.dispose();
+      }
+      if (latestState?.agents) {
+        const drawnPairs = new Set();
+        for (const a of latestState.agents) {
+          if (!a.partner_id) continue;
+          const pKey = [a.id, a.partner_id].sort().join('|');
+          if (drawnPairs.has(pKey)) continue;
+          drawnPairs.add(pKey);
+          const rA = agentRigs.get(a.id), rB = agentRigs.get(a.partner_id);
+          if (rA && rB && rA.position.distanceTo(rB.position) < 8.5) {
+            const pts = [
+              new THREE.Vector3(rA.position.x, rA.position.y + 0.45, rA.position.z),
+              new THREE.Vector3((rA.position.x + rB.position.x) * 0.5, Math.max(rA.position.y, rB.position.y) + 0.82, (rA.position.z + rB.position.z) * 0.5),
+              new THREE.Vector3(rB.position.x, rB.position.y + 0.45, rB.position.z)
+            ];
+            const lg = new THREE.BufferGeometry().setFromPoints(pts);
+            coupleBondsGroup.add(new THREE.Line(lg, coupleLineMat));
+          }
+        }
+      }
+
       labelCandidates.sort((a, b) => b.prio - a.prio);
       const placed = [];
       for (const cand of labelCandidates) {
-        if (placed.length >= 6) { cand.tag.style.display = 'none'; continue; }
+        if (placed.length >= 10) { cand.tag.style.display = 'none'; continue; }
         const collides = placed.some(p => Math.abs(p.sx - cand.sx) < 130 && Math.abs(p.sy - cand.sy) < 34);
         if (collides) {
           cand.tag.style.display = 'none';

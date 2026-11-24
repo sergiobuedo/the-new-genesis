@@ -471,6 +471,12 @@ class PopulationSimulation:
         agent.action_fx = ""
         if agent.grief_ticks > 0:
             agent.grief_ticks -= 1
+        # Natural warm-weather spoilage of unpreserved raw meat/fish (makes fire cooking & granaries vital!)
+        if self.world.ambient_temperature > 24.0 and self.world.tick_count % 120 == 0:
+            for raw_c in ("wild_meat", "wild_fish"):
+                if raw_c in agent.inventory and self.world.rng.random() < 0.14:
+                    agent.inventory.remove(raw_c)
+                    break
         # Freshwater Hydrology & Thirst Homeostasis
         thirst_burn = 0.088 if self.world.weather == "drought" else (0.018 if agent.is_sleeping else 0.044)
         agent.hydration = max(0.0, agent.hydration - thirst_burn)
@@ -1576,7 +1582,7 @@ class PopulationSimulation:
                 my = sum(o.y for o in nearby_others) / len(nearby_others)
                 drift_x = (mx - agent.x) * 0.15
                 drift_y = (my - agent.y) * 0.15
-            nomad_span = 36.0 if (self.world.soil_fertility_at(agent.x, agent.y) < 0.78 or agent.genome.curiosity > 0.62) else 18.0
+            nomad_span = 8.0 if (agent.is_pregnant and agent.gestation_ticks > 4200) else (36.0 if (self.world.soil_fertility_at(agent.x, agent.y) < 0.78 or agent.genome.curiosity > 0.62) else 18.0)
             tx, ty = self.world.find_nearest_dry_spot(
                 max(-255.0, min(255.0, agent.x + drift_x + self.world.rng.uniform(-nomad_span, nomad_span))),
                 max(-255.0, min(255.0, agent.y + drift_y + self.world.rng.uniform(-nomad_span, nomad_span))),
