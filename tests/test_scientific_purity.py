@@ -303,11 +303,11 @@ def test_pure_1to1_reality_earth_geography_and_open_combinatorics():
     assert geo["continent"] and geo["region"]
 
     # Open-ended synthesis produces deterministic novel compounds with zero hardcoded recipes
-    comp = synthesize_open_compound("flint_dark", "stalk_wood", "bind", ambient_temp_c=22.0)
+    comp = synthesize_open_compound("ivory_horn", "fiber_dry", "bind", ambient_temp_c=22.0)
     assert comp is not None
     assert comp.compound_id.startswith("CMP-")
     assert comp.utility_score >= 0.58
-    comp_rev = synthesize_open_compound("stalk_wood", "flint_dark", "bind", ambient_temp_c=22.0)
+    comp_rev = synthesize_open_compound("fiber_dry", "ivory_horn", "bind", ambient_temp_c=22.0)
     assert comp_rev is not None and comp_rev.compound_id == comp.compound_id
 
 
