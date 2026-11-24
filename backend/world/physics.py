@@ -1158,7 +1158,7 @@ class CosmosWorld:
                 tx = cx * CHUNK_SIZE + self.rng.randrange(0, CHUNK_SIZE)
                 ty = cy * CHUNK_SIZE + self.rng.randrange(0, CHUNK_SIZE)
                 biome = classify_biome(tx, ty, self.seed)
-                if biome != "water":
+                if biome != "water" and self.rng.random() < min(1.0, self.soil_fertility.get((cx, cy), 1.0)):
                     self._seed_tile_resources(tx, ty, biome, self.rng, initial=False)
                 # Lunar spring tides wash shells & nutrients onto riverbanks/shores!
                 if biome == "riverbank" and abs(self.tidal_offset) > 0.11 and self.rng.random() < 0.22:

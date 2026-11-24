@@ -1103,30 +1103,42 @@ class PopulationSimulation:
                     return
 
         if self.enable_culture and agent.current_intent == "hunt" and nearby_animals:
-            huntable = ("lumigrazer", "burrowhare", "craghorn", "rootboar", "thunderhorn", "titanotusk", "canopykin", "reedwing")
+            huntable = ("lumigrazer", "burrowhare", "craghorn", "rootboar", "thunderhorn", "titanotusk", "canopykin", "reedwing", "woolflock", "dunestrider", "tallneck", "frostantler", "meadowfowl", "shellback", "quillback")
             grazers = [an for an in nearby_animals if an.species in huntable and an.alive]
             if grazers:
                 prey = grazers[0]
                 pspec = FAUNA_CATALOG[prey.species]
-                if math.hypot(prey.x - agent.x, prey.y - agent.y) <= 2.1:
-                    prey.health -= 62.0 if agent.has_tool else 28.0
+                if math.hypot(prey.x - agent.x, prey.y - agent.y) <= 2.4:
+                    # Cooperative Group Hunting (Tomasello Shared Intentionality): nearby allies join the hunt!
+                    allies_hunting = [o for o in nearby_others if agent.trust_bonds.get(o.id, 0.0) >= 0.15 and math.hypot(o.x - prey.x, o.y - prey.y) <= 4.5]
+                    group_dmg = (62.0 if agent.has_tool else 28.0) + len(allies_hunting) * 26.0
+                    prey.health -= group_dmg
                     agent.action_fx = "attack"
                     self._emit_fx("attack", prey.x, prey.y, agent.id, f"Hunt {prey.species}")
-                    agent.action_label = f"Hunting wild {prey.species} {prey.id}"
+                    agent.action_label = f"{'Group hunting' if allies_hunting else 'Hunting'} wild {prey.species} {prey.id}"
                     agent.pause_ticks = 3
                     # Dangerous megafauna / boars counter-charge if hunted solo without spears!
-                    if prey.health > 0 and pspec.get("danger", 0) > 0 and not agent.has_tool and len(nearby_others) < 2:
+                    if prey.health > 0 and pspec.get("danger", 0) > 0 and not agent.has_tool and not allies_hunting:
                         counter = float(pspec["danger"]) * 0.65
                         agent.integrity = max(0.0, agent.integrity - counter)
                         agent.stress = min(100.0, agent.stress + 20.0)
-                        agent.add_memory(f"Gored by charging {prey.species} while hunting unarmed!", self.world.day)
+                        agent.add_memory(f"Gored by charging {prey.species} while hunting unarmed!", self.world.day, permanent=True)
                         if agent.integrity <= 0:
                             agent.cause_of_death = f"charging {prey.species}"
                     if prey.health <= 0:
                         prey.alive = False
+                        agent.skill_xp["hunting"] = agent.skill_xp.get("hunting", 0.0) + 1.5
+                        agent.prestige = round(agent.prestige + 1.4, 1)
                         for _ in range(pspec.get("meat", 1)):
                             if len(agent.inventory) < 8:
                                 agent.inventory.append("wild_meat")
+                        # Share meat cooperatively with hunting allies!
+                        for ally in allies_hunting[:2]:
+                            if len(ally.inventory) < 8:
+                                ally.inventory.append("wild_meat")
+                            ally.skill_xp["hunting"] = ally.skill_xp.get("hunting", 0.0) + 1.0
+                            agent.trust_bonds[ally.id] = min(2.0, agent.trust_bonds.get(ally.id, 0.0) + 0.25)
+                            ally.trust_bonds[agent.id] = min(2.0, ally.trust_bonds.get(agent.id, 0.0) + 0.25)
                         if prey.species in ("titanotusk", "thunderhorn") and len(agent.inventory) < 8:
                             agent.inventory.append("ivory_horn")
                         self.hunts_count += 1
@@ -1263,19 +1275,25 @@ class PopulationSimulation:
                     agent.trust_bonds[partner.id] = min(2.0, bond + 0.35)
                     partner.trust_bonds[agent.id] = min(2.0, partner.trust_bonds.get(agent.id, 0.0) + 0.35)
                     self.trade_count += 1
+                    agent.skill_xp["trading"] = agent.skill_xp.get("trading", 0.0) + 0.8
+                    partner.skill_xp["trading"] = partner.skill_xp.get("trading", 0.0) + 0.8
                     agent.current_intent = "socialize"
                     agent.pause_ticks = 4
                     agent.action_label = f"Trading {BLIND_MATERIALS[give_item].observer_label} with {partner.id}"
+                    is_proto_curr = give_item in ("nacre_shell", "gold_nugget", "silver_ore", "crafted_ornament") or take_item in ("nacre_shell", "gold_nugget", "silver_ore", "crafted_ornament")
+                    if is_proto_curr and "first_proto_currency" not in self.discoveries:
+                        self.discoveries["first_proto_currency"] = self.world.day
                     if "first_barter_trade" not in self.discoveries:
                         self.discoveries["first_barter_trade"] = self.world.day
-                    self._record_event(
-                        "altruism",
-                        f"{'Inter-species trade! ' if cross_species else 'Barter trade: '}{agent.lineage} {agent.id} exchanged {BLIND_MATERIALS[give_item].observer_label} with {partner.lineage} {partner.id} for {BLIND_MATERIALS[take_item].observer_label}.",
-                        [agent.id, partner.id],
-                        agent.x,
-                        agent.y,
-                        importance=5 if cross_species else 3,
-                    )
+                    if self.trade_count <= 3 or is_proto_curr or (cross_species and self.trade_count % 5 == 0) or self.trade_count % 15 == 0:
+                        self._record_event(
+                            "altruism",
+                            f"{'Inter-species trade! ' if cross_species else 'Barter trade: '}{agent.lineage} {agent.id} exchanged {BLIND_MATERIALS[give_item].observer_label} with {partner.lineage} {partner.id} for {BLIND_MATERIALS[take_item].observer_label}.",
+                            [agent.id, partner.id],
+                            agent.x,
+                            agent.y,
+                            importance=5 if (cross_species or is_proto_curr) else 3,
+                        )
                     return
 
             # C. Acoustic Communication & Elder Cumulative Cultural Mentorship (Henrich Collective Brain!)
@@ -1419,11 +1437,23 @@ class PopulationSimulation:
                 elif outcome_kind == "breakthrough":
                     agent.inventory.remove(item_a)
                     agent.inventory.remove(item_b)
+                    agent.skill_xp["crafting" if crafted else "building"] = agent.skill_xp.get("crafting" if crafted else "building", 0.0) + 2.0
+                    agent.prestige = round(agent.prestige + 2.5, 1)
+                    agent.action_fx = "fire"
+                    self._emit_fx("fire", agent.x, agent.y, agent.id, desc[:28])
+                    agent.add_memory(f"Invented/built: {desc}", self.world.day, permanent=True)
                     if crafted:
                         agent.inventory.append(crafted)
                         m_key = f"craft_{crafted}"
                     else:
                         m_key = f"struct_{struct.kind}"  # type: ignore[union-attr]
+                    # Observational / Vicarious Social Learning (Bandura & Henrich Cultural Ratchet!):
+                    # Nearby witnesses imitate & acquire the inventor's empirical insights naturally!
+                    for witness in nearby_others:
+                        if math.hypot(witness.x - agent.x, witness.y - agent.y) <= 8.0 and self.world.rng.random() < (0.45 + witness.genome.curiosity * 0.45):
+                            for k_lore, lvl in agent.insight_map.items():
+                                witness.insight_map[k_lore] = max(witness.insight_map.get(k_lore, 0), lvl)
+                            witness.add_memory(f"Observed {agent.id} achieve: {desc[:60]}", self.world.day)
                     agent.mood = "inventing"
                     is_first = m_key not in self.discoveries
                     if is_first:

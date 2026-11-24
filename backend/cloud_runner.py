@@ -85,21 +85,40 @@ async def run_cloud_burst(duration_seconds: int = 660, speed: int = 5) -> None:
 
             await asyncio.sleep(0.18)
 
-        # Weekly Sunday APA 7th Monograph check
+        # Daily X (1x per human UTC day) plain-English chronicle dispatch + Weekly Sunday APA 7th Monograph
         now_utc = datetime.now(timezone.utc)
+        x_date_file = CHRONICLES_DIR / "last_x_dispatch_date.txt"
+        today_iso = now_utc.strftime("%Y-%m-%d")
+        snap_now = obs.snapshot_for_ui()
+        if not x_date_file.exists() or x_date_file.read_text(encoding="utf-8").strip() != today_iso:
+            m_x = snap_now["metrics"]
+            w_x = snap_now["world"]
+            sp_str = ", ".join(f"{k}: {v}" for k, v in m_x.get("species_counts", {}).items())
+            x_post = (
+                f"The New Genesis · Year {w_x['year']}, Day {w_x['day']} (0% human intervention)\n\n"
+                f"Population: {m_x['live_population']} beings ({m_x.get('males_count',0)}♂ / {m_x.get('females_count',0)}♀, "
+                f"{m_x.get('bonded_couples',0)} couples, {m_x.get('pregnant_count',0)} expecting). "
+                f"Lineages: {sp_str}.\n"
+                f"Society: {m_x['archetype_en']} · Life expectancy: ~{int(round(m_x.get('era_life_expectancy_yrs',36)))} yrs · "
+                f"Invented words: {m_x['shared_words_count']} · Breakthroughs: {len(m_x.get('discoveries',{}))}.\n\n"
+                f"Watch live 24/7: https://agobac-ia.es"
+            )
+            (CHRONICLES_DIR / "daily_x_dispatch.txt").write_text(x_post, encoding="utf-8")
+            x_date_file.write_text(today_iso, encoding="utf-8")
+
         manifest_path = PAPERS_DIR / "papers_manifest.json"
         papers = (
             json.loads(manifest_path.read_text(encoding="utf-8"))
             if manifest_path.exists()
             else []
         )
-        expected_issues = max(1, (obs.live.world.day // 280) + 1)
+        expected_issues = max(1, (obs.live.world.day // 365) + 1)
         if now_utc.weekday() == 6 and len(papers) < expected_issues:
             compile_weekly_apa_paper(
                 CHRONICLES_DIR / "universe_xxv.sqlite", PAPERS_DIR, len(papers) + 1
             )
 
-        snap = obs.snapshot_for_ui()
+        snap = snap_now
         (CHRONICLES_DIR / "latest_public_state.json").write_text(
             json.dumps(snap, ensure_ascii=False), encoding="utf-8"
         )

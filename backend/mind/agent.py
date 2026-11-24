@@ -203,6 +203,7 @@ class KobAgent:
     personal_lexicon: Dict[str, str] = field(default_factory=dict)
     insight_map: Dict[str, int] = field(default_factory=dict)
     memories: List[str] = field(default_factory=list)
+    key_life_memories: List[str] = field(default_factory=list)  # Permanent lifelong autobiographical milestones!
     cultural_lore: List[str] = field(default_factory=list)  # Oral traditions, myths & clan history passed down!
     skill_xp: Dict[str, float] = field(default_factory=dict)  # Earned organically: hunting, healing, crafting, trading, farming, building
     prestige: float = 0.0  # Emergent social respect earned through altruism, survival, defense, or invention!
@@ -256,12 +257,16 @@ class KobAgent:
             return 1.04
         return 1.0
 
-    def add_memory(self, text: str, day: int) -> None:
+    def add_memory(self, text: str, day: int, permanent: bool = False) -> None:
         entry = f"[Day {day}] {text}"
         if not self.memories or self.memories[-1] != entry:
             self.memories.append(entry)
-            if len(self.memories) > 14:
+            if len(self.memories) > 40:
                 self.memories.pop(0)
+        if permanent and entry not in self.key_life_memories:
+            self.key_life_memories.append(entry)
+            if len(self.key_life_memories) > 12:
+                self.key_life_memories.pop(0)
 
     @property
     def held_item(self) -> Optional[str]:
@@ -379,7 +384,9 @@ class KobAgent:
             if nearby_corpses
             else ""
         )
-        recent_mem = " | ".join(self.memories[-3:]) or "newly awakened"
+        recent_mem = " | ".join(self.memories[-5:]) or "newly awakened"
+        life_lore = " | ".join((self.key_life_memories[-3:] + self.cultural_lore[-2:])[:4])
+        lore_line = f"- Deep life & ancestral memory: {life_lore}.\n" if life_lore else ""
         sex_word = "male" if self.sex == "M" else "female"
         preg_word = ", carrying an unborn child within" if self.is_pregnant else ""
         sick_word = ", aching with burning chills and weak limbs" if self.illness else ""
@@ -395,7 +402,8 @@ class KobAgent:
             f"- Structures: {struct_desc}. Wild creatures: {fauna_desc}.\n"
             f"{corpse_line}"
             f"- Other beings: {others_desc}.\n"
-            f"- Memories: {recent_mem}.\n\n"
+            f"{lore_line}"
+            f"- Recent memories: {recent_mem}.\n\n"
             "Nothing is forbidden or commanded—follow your own drives freely: "
             "forage, warm_up, socialize, share, barter, plant_seed, "
             "pool_nest, confront, tinker, hunt, migrate, rest, vigil, leave_offering, or bury_cairn.\n"
