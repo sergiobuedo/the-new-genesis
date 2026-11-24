@@ -344,6 +344,7 @@
   <div id="canvas-wrap"></div>
   <div id="labels-layer"></div>
   <div id="pan-toast">🧭 Gliding across the planet…</div>
+  <div id="box-select-rect" style="position:fixed;display:none;pointer-events:none;z-index:65;border:2px solid #38bdf8;background:rgba(56,189,248,0.16);border-radius:4px;box-shadow:0 0 14px rgba(56,189,248,0.35);"></div>
 
   <div id="hud-shell">
     <header class="topbar" id="topbar-el">
@@ -377,6 +378,7 @@
         <button id="btn-topdown" class="active" title="Continental Surface View (Use Arrows / Drag / Pinch)">🦅 Map</button>
         <button id="btn-autodir" title="Follow Active Creature">🎥 Follow</button>
         <button id="btn-closeup" title="Close-Up Emotional Face">🔍 Face</button>
+        <button id="btn-boxsel" title="Seleccionar Zona en el Mapa (o Shift + Arrastrar) / Box-Select Zone (or Shift+Drag)">⬜ Zona</button>
         <button id="btn-toggle-hud" title="Show or Hide All Side Panels">👁️ Menus</button>
         <button id="btn-advances" style="border-color:var(--emerald);background:rgba(52,211,153,0.16);color:#ecfdf5;font-weight:700;" title="Ver todos los Avances y Hitos de la Civilización / View All Civilizational Advances">🏛️ Avances</button>
         <button id="btn-wizard" style="border-color:var(--accent);background:rgba(56,189,248,0.16);color:#e0f2fe;font-weight:700;" title="Guía Rápida Interactiva / Quick Interactive Tour">❓ Guía</button>
@@ -2066,6 +2068,63 @@
       clone.position.y = asset.yOffset * s;
       rig.add(clone);
       rig.userData.glbRoot = clone;
+
+      // Distinctive Charming 3D Race Headpiece so every race is unmistakable at a glance!
+      const hatGrp = new THREE.Group();
+      hatGrp.position.y = 1.46 * (ag.sex === 'M' ? 1.03 : 0.96);
+      if (ag.lineage === 'Sylphid') {
+        // 🎩 Elegant Teal Top Hat with Gold Band
+        const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.03, 18), new THREE.MeshStandardMaterial({ color: 0x0369a1, roughness: 0.35 }));
+        const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.16, 0.26, 18), new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.35 }));
+        crown.position.y = 0.14;
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(0.165, 0.165, 0.05, 18), new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.7, roughness: 0.25 }));
+        band.position.y = 0.05;
+        hatGrp.add(brim, crown, band);
+      } else if (ag.lineage === 'Lithokin') {
+        // 🦄 Golden Curved Horns Helmet
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), new THREE.MeshStandardMaterial({ color: 0xb45309, metalness: 0.55, roughness: 0.35 }));
+        const hornMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, metalness: 0.35, roughness: 0.3 });
+        for (const side of [-1, 1]) {
+          const h = new THREE.Mesh(new THREE.ConeGeometry(0.048, 0.26, 10), hornMat);
+          h.position.set(side * 0.16, 0.14, 0); h.rotation.z = -side * 0.52;
+          hatGrp.add(h);
+        }
+        hatGrp.add(cap);
+      } else if (ag.lineage === 'Vespera') {
+        // 🌸 Blooming Violet Lotus Flower with Glowing Golden Center
+        const petMat = new THREE.MeshStandardMaterial({ color: 0xc084fc, emissive: 0x7e22ce, emissiveIntensity: 0.3, roughness: 0.4 });
+        for (let p = 0; p < 6; p++) {
+          const ang = (p / 6) * Math.PI * 2;
+          const pet = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8), petMat);
+          pet.scale.set(1.4, 0.45, 0.7);
+          pet.position.set(Math.cos(ang) * 0.12, 0.05, Math.sin(ang) * 0.12);
+          pet.rotation.y = -ang;
+          hatGrp.add(pet);
+        }
+        const core = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 10), new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xeab308, emissiveIntensity: 0.8 }));
+        core.position.y = 0.07;
+        hatGrp.add(core);
+      } else if (ag.lineage === 'Lith-Sylp') {
+        // 🔺 Gleaming Metallic Foil / Wizard Conical Hat!
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(0.20, 0.36, 16), new THREE.MeshStandardMaterial({ color: 0x34d399, metalness: 0.75, roughness: 0.22 }));
+        cone.position.y = 0.17;
+        const rim = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.025, 8, 20), new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.9, roughness: 0.15 }));
+        rim.rotation.x = Math.PI / 2;
+        hatGrp.add(cone, rim);
+      } else {
+        // 👑 Warm Golden Star Crown for Lith-Vesp & Sylp-Vesp hybrids
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.028, 8, 18), new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.85, roughness: 0.2 }));
+        ring.rotation.x = Math.PI / 2; ring.position.y = 0.04;
+        hatGrp.add(ring);
+        for (let s3 = 0; s3 < 3; s3++) {
+          const ang = (s3 / 3) * Math.PI * 2;
+          const spk = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.16, 6), new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xd97706, emissiveIntensity: 0.45 }));
+          spk.position.set(Math.cos(ang) * 0.13, 0.12, Math.sin(ang) * 0.13);
+          hatGrp.add(spk);
+        }
+      }
+      rig.add(hatGrp);
+      rig.userData.hatGrp = hatGrp;
       if (asset.animations && asset.animations.length > 0) {
         const mixer = new THREE.AnimationMixer(clone);
         const walkClip = asset.animations.find(c => /walk/i.test(c.name)) || asset.animations[0];
@@ -3213,10 +3272,112 @@
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     let pointerDownPt = { x: 0, y: 0 };
+    let boxSelectMode = false;
+    let isBoxDragging = false;
+    const boxRectEl = document.getElementById('box-select-rect');
+    const btnBoxSel = document.getElementById('btn-boxsel');
+
+    btnBoxSel.addEventListener('click', () => {
+      boxSelectMode = !boxSelectMode;
+      btnBoxSel.classList.toggle('active', boxSelectMode);
+      controls.enabled = !boxSelectMode;
+      renderer.domElement.style.cursor = boxSelectMode ? 'crosshair' : 'default';
+    });
+
+    function inspectEntitiesInScreenBox(x1, y1, x2, y2) {
+      const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
+      const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
+      const proj = new THREE.Vector3();
+      const inBox = (pos) => {
+        proj.copy(pos).project(camera);
+        if (proj.z >= 1) return false;
+        const sx = (proj.x * 0.5 + 0.5) * window.innerWidth;
+        const sy = (-proj.y * 0.5 + 0.5) * window.innerHeight;
+        return sx >= minX && sx <= maxX && sy >= minY && sy <= maxY;
+      };
+      const foundAgents = [];
+      for (const a of (latestState?.agents || [])) {
+        const r = agentRigs.get(a.id);
+        if (r && inBox(r.position)) foundAgents.push(a);
+      }
+      const foundStructs = [];
+      for (const s of (latestState?.structures || [])) {
+        const sm = structMeshes.get(s.id);
+        if (sm && inBox(sm.position)) foundStructs.push(s);
+      }
+      const foundAnimals = [];
+      for (const an of (latestState?.animals || [])) {
+        const ar = animalRigs.get(an.id);
+        if (ar && inBox(ar.position)) foundAnimals.push(an);
+      }
+      const es = currentLang === 'es';
+      showLeftTab('focus');
+      if (window.innerWidth <= 940) document.body.classList.add('mob-left');
+      document.getElementById('subj-bio').textContent = es
+        ? `⬜ ZONA SELECCIONADA: ${foundAgents.length} seres · ${foundStructs.length} construcciones/tumbas · ${foundAnimals.length} animales salvajes`
+        : `⬜ SELECTED ZONE: ${foundAgents.length} beings · ${foundStructs.length} structures/graves · ${foundAnimals.length} wild animals`;
+      document.getElementById('subj-thought').textContent = es
+        ? 'Haz clic en cualquier ser o elemento de la lista inferior para enfocarlo directamente.'
+        : 'Click any being or structure in the list below to focus directly on it.';
+      const rows = [];
+      for (const a of foundAgents.slice(0, 18)) {
+        const actFx = inferActionFX(a);
+        const actTxt = actFx ? (es ? FX_TEXT_ES[actFx] : FX_TEXT_EN[actFx]) : (a.sleeping ? '💤' : a.action);
+        rows.push(`<div class="zone-pick" data-ztype="agent" data-zid="${a.id}" style="cursor:pointer;padding:3px 5px;border-radius:5px;background:rgba(56,189,248,0.10);margin-bottom:3px;"><strong>${a.id}</strong> (${a.sex === 'M' ? '♂' : '♀'} ${a.lineage}${a.pregnant ? ' 🤰' : ''}${a.partner_id ? ' ❤️' : ''}) · ${actTxt}</div>`);
+      }
+      for (const s of foundStructs.slice(0, 10)) {
+        rows.push(`<div class="zone-pick" data-ztype="structure" data-zid="${s.id}" style="cursor:pointer;padding:3px 5px;border-radius:5px;background:rgba(251,191,36,0.12);margin-bottom:3px;">🏗️ <strong>${s.id}</strong> · ${s.name || s.kind} (${s.lineage || ''})</div>`);
+      }
+      for (const an of foundAnimals.slice(0, 10)) {
+        rows.push(`<div class="zone-pick" data-ztype="animal" data-zid="${an.id}" style="cursor:pointer;padding:3px 5px;border-radius:5px;background:rgba(52,211,153,0.12);margin-bottom:3px;">🐾 <strong>${an.label || an.species}</strong></div>`);
+      }
+      const memEl = document.getElementById('subj-memories');
+      memEl.innerHTML = rows.length > 0 ? rows.join('') : `<div style="color:var(--muted)">${es ? 'No hay seres ni estructuras en el recuadro seleccionado.' : 'No beings or structures inside the selected box.'}</div>`;
+      memEl.querySelectorAll('.zone-pick').forEach(el => {
+        el.addEventListener('click', () => {
+          selectedEntity = { type: el.dataset.ztype, id: el.dataset.zid };
+          if (el.dataset.ztype === 'agent') selectedSubjectId = el.dataset.zid;
+          renderSelectedInspector();
+        });
+      });
+    }
+
     renderer.domElement.addEventListener('pointerdown', (ev) => {
       pointerDownPt = { x: ev.clientX, y: ev.clientY };
+      if (boxSelectMode || ev.shiftKey) {
+        isBoxDragging = true;
+        controls.enabled = false;
+        boxRectEl.style.display = 'block';
+        boxRectEl.style.left = `${ev.clientX}px`;
+        boxRectEl.style.top = `${ev.clientY}px`;
+        boxRectEl.style.width = '0px';
+        boxRectEl.style.height = '0px';
+      }
+    });
+    renderer.domElement.addEventListener('pointermove', (ev) => {
+      if (!isBoxDragging) return;
+      const lx = Math.min(pointerDownPt.x, ev.clientX);
+      const ty = Math.min(pointerDownPt.y, ev.clientY);
+      boxRectEl.style.left = `${lx}px`;
+      boxRectEl.style.top = `${ty}px`;
+      boxRectEl.style.width = `${Math.abs(ev.clientX - pointerDownPt.x)}px`;
+      boxRectEl.style.height = `${Math.abs(ev.clientY - pointerDownPt.y)}px`;
     });
     renderer.domElement.addEventListener('pointerup', (ev) => {
+      if (isBoxDragging) {
+        isBoxDragging = false;
+        boxRectEl.style.display = 'none';
+        if (Math.hypot(ev.clientX - pointerDownPt.x, ev.clientY - pointerDownPt.y) > 14) {
+          inspectEntitiesInScreenBox(pointerDownPt.x, pointerDownPt.y, ev.clientX, ev.clientY);
+        }
+        if (boxSelectMode) {
+          boxSelectMode = false;
+          btnBoxSel.classList.remove('active');
+          renderer.domElement.style.cursor = 'default';
+        }
+        controls.enabled = true;
+        return;
+      }
       if (Math.hypot(ev.clientX - pointerDownPt.x, ev.clientY - pointerDownPt.y) > 9) return; // Ignore camera drags!
       pointer.x = (ev.clientX / window.innerWidth) * 2 - 1;
       pointer.y = -(ev.clientY / window.innerHeight) * 2 + 1;
@@ -3980,8 +4141,12 @@
         let dz = target.z - rig.position.z;
         let distSq = dx * dx + dz * dz;
 
-        // Continuous 60 FPS Autonomous Life Kinematics between Cloud Telemetry Snapshots!
-        if (isCloudMode && !ud.isSleeping && distSq <= 0.06 && t >= (ud.pauseUntil || 0)) {
+        // Purposeful Cloud-Mode Kinematics: pause to perform visible actions (eat/fire/plant/vigil/sleep), otherwise walk purposefully!
+        const isStationaryAct = ['eat', 'fire', 'plant', 'vigil', 'bury', 'heal', 'court'].includes(ud.currentActionFx);
+        if (isCloudMode && isStationaryAct && Math.random() < 0.03) {
+          spawnActionFX(ud.currentActionFx, rig.position.x, rig.position.z, 3);
+        }
+        if (isCloudMode && !ud.isSleeping && !isStationaryAct && distSq <= 0.06 && t >= (ud.pauseUntil || 0)) {
           const anchor = ud.serverAnchor || { x: rig.position.x, z: rig.position.z };
           let wp = null;
           if (Math.random() < 0.24 && latestState?.caves?.length) {
@@ -4221,13 +4386,14 @@
         } else if (camMode === 'closeup') {
           skipOrbitUpdate = true;
           const s = focus.scale.y || 1.0;
-          const headY = focus.position.y + 0.92 * s;
+          const headH = focus.userData.hasGLB ? 1.38 : 0.96;
+          const headY = focus.position.y + headH * s;
           const faceDirX = Math.sin(focus.rotation.y);
           const faceDirZ = Math.cos(focus.rotation.y);
           desiredCam.set(
-            focus.position.x + faceDirX * (2.05 * s + 0.35),
-            focus.position.y + 1.12 * s,
-            focus.position.z + faceDirZ * (2.05 * s + 0.35)
+            focus.position.x + faceDirX * (1.75 * s + 0.30),
+            focus.position.y + (headH + 0.14) * s,
+            focus.position.z + faceDirZ * (1.75 * s + 0.30)
           );
           if (snapCloseup) {
             camera.position.copy(desiredCam);
