@@ -227,12 +227,12 @@ class KobAgent:
 
     @property
     def age_years(self) -> float:
-        return round(self.age_days / 40.0, 1)
+        return round(self.age_days / 365.0, 1)
 
     @property
     def is_fertile(self) -> bool:
-        """Human-like reproductive window: females enter menopause around 48 planetary years (Grandmother Hypothesis!)."""
-        if self.age_days < 7.0:
+        """Human-like reproductive window: fertile from ~14 to 48 Earth years (menopause -> Grandmother Hypothesis!)."""
+        if self.age_days < 30.0:
             return False
         if self.sex == "F" and self.age_years > 48.0:
             return False
@@ -240,19 +240,19 @@ class KobAgent:
 
     @property
     def life_stage(self) -> str:
-        if self.age_days < 6.0:
-            return "Newborn"
-        if self.age_days < 14.0:
+        if self.age_days < 180.0:
+            return "Infant"
+        if self.age_years < 14.0:
             return "Juvenile"
-        if self.age_days < 1000.0:
+        if self.age_years < 48.0:
             return "Adult"
         return "Elder"
 
     @property
     def body_scale(self) -> float:
-        if self.age_days < 14.0:
-            return round(0.52 + (self.age_days / 14.0) * 0.48, 2)
-        if self.age_days >= 1000.0:
+        if self.age_years < 14.0:
+            return round(0.54 + (min(14.0, self.age_years) / 14.0) * 0.46, 2)
+        if self.age_years >= 48.0:
             return 1.04
         return 1.0
 
@@ -303,7 +303,7 @@ class KobAgent:
         rivals = sum(1 for v in self.trust_bonds.values() if v <= -0.35)
         sex_sym = "♂ Male" if self.sex == "M" else "♀ Female"
         mate_info = f" · ❤️ Mate: {self.partner_id}" if self.partner_id else ""
-        preg_info = f" · 🤰 Pregnant ({min(100, int(self.gestation_ticks * 100 / 220))}%)" if self.is_pregnant else ""
+        preg_info = f" · 🤰 Pregnant ({min(100, int(self.gestation_ticks * 100 / 6480))}%, {round(self.gestation_ticks / 720.0, 1)}/9m)" if self.is_pregnant else ""
         kids_info = f" · 👶 Offspring: {len(self.children_ids)}" if self.children_ids else ""
         sick_info = f" · 🤒 Ill ({self.illness.replace('_', ' ')}, {self.illness_severity:.0f}%)" if self.illness else ""
         voc_info = f" · 🛠️ {self.emergent_vocation}" if self.emergent_vocation != "Forager" else ""

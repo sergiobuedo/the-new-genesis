@@ -512,7 +512,7 @@ class PopulationSimulation:
             stress_delta += 0.20
         agent.stress = round(min(100.0, max(2.0, agent.stress + stress_delta)), 1)
 
-        max_lifespan_days = self.compute_era_lifespan_years(agent.genome.vitality) * 40.0
+        max_lifespan_days = self.compute_era_lifespan_years(agent.genome.vitality) * 365.0
         if agent.energy <= 1.0 or agent.hydration <= 1.0 or agent.warmth <= 1.0:
             agent.integrity -= 0.50
         elif agent.energy > 55.0 and agent.hydration > 45.0 and agent.warmth > 50.0 and not agent.illness:
@@ -588,10 +588,10 @@ class PopulationSimulation:
                 agent.illness_severity = 0.0
                 agent.add_memory(f"Recovered naturally from {cured_name.replace('_', ' ')} (acquired immunity).", self.world.day)
 
-        # Mammalian / Human-Identical Pregnancy Gestation -> Live Childbirth!
+        # Exact 9-Month (270 Earth Days = 6,480 Hourly Ticks) Human Pregnancy Gestation -> Live Childbirth!
         if agent.is_pregnant and agent.alive:
             agent.gestation_ticks += 1
-            if agent.gestation_ticks >= 220:
+            if agent.gestation_ticks >= 6480:
                 self._deliver_live_birth(agent)
 
         if agent.illness:
@@ -1546,16 +1546,17 @@ class PopulationSimulation:
                 my = sum(o.y for o in nearby_others) / len(nearby_others)
                 drift_x = (mx - agent.x) * 0.15
                 drift_y = (my - agent.y) * 0.15
+            nomad_span = 36.0 if (self.world.soil_fertility_at(agent.x, agent.y) < 0.78 or agent.genome.curiosity > 0.62) else 18.0
             tx, ty = self.world.find_nearest_dry_spot(
-                max(-245.0, min(245.0, agent.x + drift_x + self.world.rng.uniform(-span, span))),
-                max(-245.0, min(245.0, agent.y + drift_y + self.world.rng.uniform(-span, span))),
+                max(-255.0, min(255.0, agent.x + drift_x + self.world.rng.uniform(-nomad_span, nomad_span))),
+                max(-255.0, min(255.0, agent.y + drift_y + self.world.rng.uniform(-nomad_span, nomad_span))),
             )
             agent.target_xy = (tx, ty)
-            agent.pause_ticks = 3
+            agent.pause_ticks = 1
             return
 
-        agent.action_label = "Exploring the valley"
-        self._move_smooth(agent, agent.target_xy[0], agent.target_xy[1], nearby_others, speed=0.23 * spd_mul)
+        agent.action_label = "Nomadic continental exploration" if agent.genome.curiosity > 0.62 else "Exploring the valley"
+        self._move_smooth(agent, agent.target_xy[0], agent.target_xy[1], nearby_others, speed=0.52 * spd_mul)
 
     def _move_smooth(
         self,
@@ -1836,7 +1837,7 @@ class MiroFishObservatory:
             warehouse=None,
         )
 
-        self.speed_multiplier: int = 10  # Default x10 background pace!
+        self.speed_multiplier: int = 20  # Default x20 Earth-time pace (365d/yr, 24h/day, 9m pregnancy)!
         self.last_hash: str = "0" * 64
         self.history_series: List[Dict[str, Any]] = []
         self.daily_logs: List[Dict[str, Any]] = []
@@ -1931,7 +1932,7 @@ class MiroFishObservatory:
                 self.live.world.ensure_frontier_around(raw_x, raw_y)
 
                 is_preg = bool(ad.get("pregnant", False))
-                gest_ticks = int(round(float(ad.get("gestation_pct", 0)) * 2.2)) if is_preg else 0
+                gest_ticks = int(round(float(ad.get("gestation_pct", 0)) * 64.8)) if is_preg else 0
                 ag = KobAgent(
                     id=aid,
                     generation=gen_num,
@@ -1998,7 +1999,12 @@ class MiroFishObservatory:
             self.live.couples_formed = int(m.get("bonded_couples", 0))
             self.live.disease_cases = int(m.get("disease_cases", 0))
             self.live.cures_applied = int(m.get("cures_applied", 0))
-            self.live.world.extinct_fauna = dict(m.get("extinct_fauna", {}))
+            # Upgrade legacy 24-species extinction list when expanding to 42-species full Earth biosphere!
+            saved_extinct = dict(m.get("extinct_fauna", {}))
+            if len(saved_extinct) > 10 and int(m.get("wild_species_total", 24)) < 40:
+                self.live.world.extinct_fauna = {}
+            else:
+                self.live.world.extinct_fauna = saved_extinct
 
             # If upgrading from a legacy save without pair-bonds, naturally bond co-located adult ♀+♂ peers
             if not any(a.partner_id for a in self.live.living_agents):
@@ -2866,7 +2872,8 @@ class MiroFishObservatory:
                     "sex": a.sex,
                     "partner_id": a.partner_id,
                     "pregnant": a.is_pregnant,
-                    "gestation_pct": min(100, int(round(a.gestation_ticks * 100.0 / 220.0))) if a.is_pregnant else 0,
+                    "gestation_pct": min(100, int(round(a.gestation_ticks * 100.0 / 6480.0))) if a.is_pregnant else 0,
+                    "gestation_months": round(a.gestation_ticks / 720.0, 1) if a.is_pregnant else 0.0,
                     "children_ids": a.children_ids[-8:],
                     "children_count": len(a.children_ids),
                     "stage": a.life_stage,

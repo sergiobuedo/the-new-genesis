@@ -483,39 +483,67 @@ FLORA_SPECIES = {
     "weaver_reed": "Fibrous Bast-Flax",
     "frost_lichen": "Tundra Cushion-Lichen",
     "starch_bulb": "Root-Tuber Patch",
+    "oil_olive": "Mediterranean Oil-Nut Tree",
+    "cloud_cotton": "Wild Boll-Cotton Bush",
+    "cork_oak": "Buoyant Bark-Oak",
+    "wild_vine_grape": "Fermenting Sugar-Vine",
+    "marsh_lotus": "Edible Wetland Root-Lotus",
+    "juniper_cypress": "Aromatic Highland Juniper",
+    "honey_hive_tree": "Wild Nectar-Comb Tree",
+    "spiced_bark": "Antimicrobial Spice-Laurel",
+    "giant_kelp": "Coastal Nutrient Sea-Kelp",
+    "cacao_pod": "Equatorial Stimulant Pod-Tree",
 }
 
-# 24 Distinct Earth-Analogue Wild Fauna Species (Original non-Earth names, real trophic roles & dangers!)
+# 42 Distinct Earth-Analogue Wild Fauna Species across all Terrestrial, Aerial, Freshwater & Marine Niches!
 FAUNA_CATALOG = {
-    # Megaherbivores & Herd Ungulates (6)
+    # Megaherbivores & Herd Ungulates (11)
     "titanotusk": {"domain": "land", "speed": 0.14, "hp": 260.0, "danger": 26.0, "hostile": "defensive", "cap": 5, "meat": 3, "label": "Titanotusk (Megafauna Tusker)"},
-    "thunderhorn": {"domain": "land", "speed": 0.21, "hp": 165.0, "danger": 18.0, "hostile": "defensive", "cap": 7, "meat": 2, "label": "Thunderhorn (Armored Steppe Grazer)"},
-    "lumigrazer": {"domain": "land", "speed": 0.22, "hp": 95.0, "danger": 0.0, "hostile": "none", "cap": 10, "meat": 1, "label": "Lumigrazer (Antlered Meadow Herd)"},
-    "windstrider": {"domain": "land", "speed": 0.34, "hp": 110.0, "danger": 0.0, "hostile": "none", "cap": 7, "meat": 1, "tameable": True, "label": "Windstrider (Swift Plains Courser)"},
-    "craghorn": {"domain": "land", "speed": 0.24, "hp": 85.0, "danger": 8.0, "hostile": "defensive", "cap": 6, "meat": 1, "label": "Craghorn (Alpine Cliff Climber)"},
-    "rootboar": {"domain": "land", "speed": 0.23, "hp": 90.0, "danger": 15.0, "hostile": "defensive", "cap": 7, "meat": 1, "label": "Rootboar (Bristled Forest Tusker)"},
-    # Small Mammals & Arboreal Omnivores (3)
-    "burrowhare": {"domain": "land", "speed": 0.31, "hp": 35.0, "danger": 0.0, "hostile": "none", "cap": 9, "meat": 1, "label": "Burrowhare (Meadow Sprinter)"},
-    "damweaver": {"domain": "shore", "speed": 0.16, "hp": 50.0, "danger": 0.0, "hostile": "none", "cap": 6, "meat": 1, "label": "Damweaver (Riverbank Gnawer)"},
-    "canopykin": {"domain": "land", "speed": 0.27, "hp": 55.0, "danger": 0.0, "hostile": "none", "cap": 6, "meat": 1, "label": "Canopykin (Arboreal Climber)"},
-    # Dangerous Apex Predators, Pack Carnivores & Venomous Fauna (7)
-    "shadowstalker": {"domain": "land", "speed": 0.30, "hp": 125.0, "danger": 22.0, "hostile": "night", "cap": 5, "meat": 1, "label": "Shadowstalker (Nocturnal Sabre-Predator)"},
-    "sunmane": {"domain": "land", "speed": 0.29, "hp": 140.0, "danger": 24.0, "hostile": "day", "cap": 5, "meat": 1, "label": "Sunmane (Savanna Pride Predator)"},
-    "frostmaw": {"domain": "land", "speed": 0.24, "hp": 195.0, "danger": 28.0, "hostile": "always", "cap": 4, "meat": 2, "label": "Frostmaw (Colossal Boreal Predator)"},
-    "packhound": {"domain": "land", "speed": 0.26, "hp": 80.0, "danger": 14.0, "hostile": "pack", "cap": 8, "meat": 1, "tameable": True, "label": "Packhound (Social Clan-Canid)"},
-    "mirejaw": {"domain": "shore", "speed": 0.18, "hp": 150.0, "danger": 26.0, "hostile": "ambush", "cap": 5, "meat": 2, "label": "Mirejaw (Armored River Ambush-Reptile)"},
-    "venomcoil": {"domain": "land", "speed": 0.19, "hp": 28.0, "danger": 22.0, "hostile": "venom", "cap": 6, "meat": 1, "label": "Venomcoil (Banded Fang-Serpent)"},
-    "stingshell": {"domain": "land", "speed": 0.15, "hp": 24.0, "danger": 16.0, "hostile": "venom", "cap": 6, "meat": 0, "label": "Stingshell (Venomous Tail-Arachnid)"},
-    # Marine & Freshwater Aquatic Life (5)
-    "silverfin_shoal": {"domain": "water", "speed": 0.18, "hp": 35.0, "danger": 0.0, "hostile": "none", "cap": 10, "meat": 1, "label": "Silverfin (Migrating Fish Shoal)"},
-    "abyssalfin": {"domain": "water", "speed": 0.28, "hp": 120.0, "danger": 21.0, "hostile": "ambush", "cap": 4, "meat": 2, "label": "Abyssalfin (Razor-Finned Water Predator)"},
-    "leviathansong": {"domain": "water", "speed": 0.14, "hp": 320.0, "danger": 0.0, "hostile": "none", "cap": 4, "meat": 3, "label": "Leviathansong (Gentle Sea Giant)"},
-    "tidecrawler": {"domain": "shore", "speed": 0.10, "hp": 30.0, "danger": 0.0, "hostile": "none", "cap": 8, "meat": 1, "label": "Tidecrawler (Armored Shore Crustacean)"},
+    "thunderhorn": {"domain": "land", "speed": 0.21, "hp": 165.0, "danger": 18.0, "hostile": "defensive", "cap": 7, "meat": 2, "label": "Thunderhorn (Armored Steppe Bison)"},
+    "lumigrazer": {"domain": "land", "speed": 0.22, "hp": 95.0, "danger": 0.0, "hostile": "none", "cap": 10, "meat": 1, "label": "Lumigrazer (Antlered Meadow Deer)"},
+    "windstrider": {"domain": "land", "speed": 0.34, "hp": 110.0, "danger": 0.0, "hostile": "none", "cap": 7, "meat": 1, "tameable": True, "label": "Windstrider (Wild Plains Horse)"},
+    "craghorn": {"domain": "land", "speed": 0.24, "hp": 85.0, "danger": 8.0, "hostile": "defensive", "cap": 6, "meat": 1, "tameable": True, "label": "Craghorn (Alpine Wild Goat)"},
+    "woolflock": {"domain": "land", "speed": 0.20, "hp": 72.0, "danger": 0.0, "hostile": "none", "cap": 8, "meat": 1, "tameable": True, "label": "Woolflock (Fleece Meadow Sheep)"},
+    "rootboar": {"domain": "land", "speed": 0.23, "hp": 90.0, "danger": 15.0, "hostile": "defensive", "cap": 7, "meat": 1, "label": "Rootboar (Bristled Forest Boar)"},
+    "dunestrider": {"domain": "land", "speed": 0.26, "hp": 145.0, "danger": 10.0, "hostile": "defensive", "cap": 5, "meat": 2, "tameable": True, "label": "Dunestrider (Arid Steppe Camelid)"},
+    "tallneck": {"domain": "land", "speed": 0.25, "hp": 175.0, "danger": 14.0, "hostile": "defensive", "cap": 5, "meat": 2, "label": "Tallneck (Savanna Canopy Browser)"},
+    "riverbulk": {"domain": "shore", "speed": 0.17, "hp": 230.0, "danger": 28.0, "hostile": "defensive", "cap": 4, "meat": 3, "label": "Riverbulk (Territorial River Behemoth)"},
+    "frostantler": {"domain": "land", "speed": 0.25, "hp": 115.0, "danger": 6.0, "hostile": "none", "cap": 7, "meat": 2, "tameable": True, "label": "Frostantler (Migrating Tundra Caribou)"},
+    # Small Mammals, Primates & Arboreal Omnivores (6)
+    "burrowhare": {"domain": "land", "speed": 0.31, "hp": 35.0, "danger": 0.0, "hostile": "none", "cap": 9, "meat": 1, "label": "Burrowhare (Meadow Hare)"},
+    "damweaver": {"domain": "shore", "speed": 0.16, "hp": 50.0, "danger": 0.0, "hostile": "none", "cap": 6, "meat": 1, "label": "Damweaver (Riverbank Beaver)"},
+    "canopykin": {"domain": "land", "speed": 0.27, "hp": 55.0, "danger": 0.0, "hostile": "none", "cap": 6, "meat": 1, "label": "Canopykin (Arboreal Primate)"},
+    "quillback": {"domain": "land", "speed": 0.14, "hp": 42.0, "danger": 12.0, "hostile": "defensive", "cap": 6, "meat": 1, "label": "Quillback (Spined Forest Porcupine)"},
+    "slyfox": {"domain": "land", "speed": 0.30, "hp": 48.0, "danger": 6.0, "hostile": "none", "cap": 6, "meat": 1, "label": "Slyfox (Cunning Woodland Forager)"},
+    "shellback": {"domain": "shore", "speed": 0.08, "hp": 75.0, "danger": 0.0, "hostile": "none", "cap": 7, "meat": 1, "label": "Shellback (Armored Land/Shore Tortoise)"},
+    # Apex Predators, Pack Carnivores & Venomous Fauna (10)
+    "shadowstalker": {"domain": "land", "speed": 0.30, "hp": 125.0, "danger": 22.0, "hostile": "night", "cap": 5, "meat": 1, "label": "Shadowstalker (Nocturnal Panther)"},
+    "sunmane": {"domain": "land", "speed": 0.29, "hp": 140.0, "danger": 24.0, "hostile": "day", "cap": 5, "meat": 1, "label": "Sunmane (Savanna Pride Lion)"},
+    "stripeclaw": {"domain": "land", "speed": 0.31, "hp": 155.0, "danger": 26.0, "hostile": "night", "cap": 4, "meat": 2, "label": "Stripeclaw (Solitary Jungle Tiger)"},
+    "frostmaw": {"domain": "land", "speed": 0.24, "hp": 195.0, "danger": 28.0, "hostile": "always", "cap": 4, "meat": 2, "label": "Frostmaw (Colossal Boreal Bear)"},
+    "packhound": {"domain": "land", "speed": 0.26, "hp": 80.0, "danger": 14.0, "hostile": "pack", "cap": 8, "meat": 1, "tameable": True, "label": "Packhound (Social Clan-Wolf)"},
+    "bonecruncher": {"domain": "land", "speed": 0.27, "hp": 95.0, "danger": 17.0, "hostile": "pack", "cap": 6, "meat": 1, "label": "Bonecruncher (Savanna Pack-Hyena)"},
+    "mirejaw": {"domain": "shore", "speed": 0.18, "hp": 150.0, "danger": 26.0, "hostile": "ambush", "cap": 5, "meat": 2, "label": "Mirejaw (Armored River Crocodile)"},
+    "venomcoil": {"domain": "land", "speed": 0.19, "hp": 28.0, "danger": 22.0, "hostile": "venom", "cap": 6, "meat": 1, "label": "Venomcoil (Banded Viper)"},
+    "stingshell": {"domain": "land", "speed": 0.15, "hp": 24.0, "danger": 16.0, "hostile": "venom", "cap": 6, "meat": 0, "label": "Stingshell (Venomous Scorpion)"},
+    "scalejaw": {"domain": "land", "speed": 0.21, "hp": 115.0, "danger": 20.0, "hostile": "day", "cap": 4, "meat": 2, "label": "Scalejaw (Giant Monitor Lizard)"},
+    # Marine & Freshwater Aquatic Life (8)
+    "silverfin_shoal": {"domain": "water", "speed": 0.18, "hp": 35.0, "danger": 0.0, "hostile": "none", "cap": 10, "meat": 1, "label": "Silverfin (Migrating Salmon Shoal)"},
+    "deepfin_tuna": {"domain": "water", "speed": 0.27, "hp": 55.0, "danger": 0.0, "hostile": "none", "cap": 8, "meat": 2, "label": "Deepfin (Open-Sea Pelagic Fish)"},
+    "abyssalfin": {"domain": "water", "speed": 0.28, "hp": 120.0, "danger": 21.0, "hostile": "ambush", "cap": 4, "meat": 2, "label": "Abyssalfin (Ocean Apex Shark)"},
+    "leviathansong": {"domain": "water", "speed": 0.14, "hp": 320.0, "danger": 0.0, "hostile": "none", "cap": 4, "meat": 3, "label": "Leviathansong (Great Baleen Whale)"},
+    "wavekin": {"domain": "water", "speed": 0.30, "hp": 90.0, "danger": 0.0, "hostile": "none", "cap": 6, "meat": 1, "label": "Wavekin (Social Pod-Dolphin)"},
+    "inkweaver": {"domain": "water", "speed": 0.16, "hp": 45.0, "danger": 5.0, "hostile": "none", "cap": 6, "meat": 1, "label": "Inkweaver (Clever Reef Octopus)"},
+    "tidecrawler": {"domain": "shore", "speed": 0.10, "hp": 30.0, "danger": 0.0, "hostile": "none", "cap": 8, "meat": 1, "label": "Tidecrawler (Armored Shore Crab)"},
     "pearlclam": {"domain": "shore", "speed": 0.02, "hp": 20.0, "danger": 0.0, "hostile": "none", "cap": 7, "meat": 1, "label": "Pearlclam (Nacre Shoreline Bivalve)"},
-    # Avian & Keystone Pollinator Guilds (3)
-    "skyglider": {"domain": "air", "speed": 0.33, "hp": 45.0, "danger": 0.0, "hostile": "none", "cap": 6, "meat": 1, "label": "Skyglider (Soaring Cliff Raptor)"},
-    "reedwing": {"domain": "air", "speed": 0.25, "hp": 32.0, "danger": 0.0, "hostile": "none", "cap": 7, "meat": 1, "label": "Reedwing (Coastal Waterfowl)"},
-    "pollenwing": {"domain": "air", "speed": 0.26, "hp": 20.0, "danger": 0.0, "hostile": "none", "cap": 8, "meat": 0, "label": "Pollenwing (Keystone Pollinator Swarm)"},
+    # Avian, Poultry, Amphibians & Keystone Pollinators (7)
+    "skyglider": {"domain": "air", "speed": 0.33, "hp": 45.0, "danger": 0.0, "hostile": "none", "cap": 6, "meat": 1, "label": "Skyglider (Soaring Cliff Eagle)"},
+    "nightwing": {"domain": "air", "speed": 0.28, "hp": 36.0, "danger": 0.0, "hostile": "none", "cap": 6, "meat": 1, "label": "Nightwing (Nocturnal Forest Owl)"},
+    "reedwing": {"domain": "air", "speed": 0.25, "hp": 32.0, "danger": 0.0, "hostile": "none", "cap": 7, "meat": 1, "label": "Reedwing (Migrating Waterfowl)"},
+    "meadowfowl": {"domain": "land", "speed": 0.21, "hp": 28.0, "danger": 0.0, "hostile": "none", "cap": 8, "meat": 1, "tameable": True, "label": "Meadowfowl (Wild Jungle-Fowl)"},
+    "pollenwing": {"domain": "air", "speed": 0.26, "hp": 20.0, "danger": 0.0, "hostile": "none", "cap": 8, "meat": 0, "label": "Pollenwing (Keystone Bee Pollinators)"},
+    "carrionwing": {"domain": "air", "speed": 0.30, "hp": 42.0, "danger": 0.0, "hostile": "none", "cap": 5, "meat": 1, "label": "Carrionwing (High-Altitude Vulture)"},
+    "mistcroak": {"domain": "shore", "speed": 0.12, "hp": 18.0, "danger": 0.0, "hostile": "none", "cap": 7, "meat": 1, "label": "Mistcroak (Wetland Amphibian Frog)"},
 }
 
 
@@ -593,9 +621,10 @@ class WorldStructure:
 
 
 SEASONS = ["Spring", "Summer", "Autumn", "Deep Winter"]
-DAYS_PER_SEASON = 10
-TICKS_PER_DAY = 200
-LUNAR_CYCLE_DAYS = 28
+DAYS_PER_YEAR = 365
+DAYS_PER_SEASON = 91
+TICKS_PER_DAY = 24  # Exact 1 tick = 1 Earth hour (24h/day, 365 days/year, 270-day 9-month pregnancy!)
+LUNAR_CYCLE_DAYS = 29.5
 
 
 class CosmosWorld:
@@ -668,11 +697,15 @@ class CosmosWorld:
 
     @property
     def year(self) -> int:
-        return ((self.day - 1) // (DAYS_PER_SEASON * 4)) + 1
+        return ((self.day - 1) // DAYS_PER_YEAR) + 1
+
+    @property
+    def day_of_year(self) -> int:
+        return ((self.day - 1) % DAYS_PER_YEAR) + 1
 
     @property
     def season_index(self) -> int:
-        return ((self.day - 1) // DAYS_PER_SEASON) % 4
+        return min(3, ((self.day - 1) % DAYS_PER_YEAR) // DAYS_PER_SEASON)
 
     @property
     def season_name(self) -> str:
@@ -690,7 +723,7 @@ class CosmosWorld:
     def daylight_hours_at(self, x: float, y: float) -> float:
         """Real Earth 23.4° axial tilt daylight duration (12h at equator, longer summer / shorter winter at boreal latitudes)."""
         lat_norm = max(-1.0, min(1.0, -y / 220.0))  # +1 = Boreal North, 0 = Crossroads, -1 = Equatorial/South
-        season_decl = math.sin(((self.day - 1) / float(DAYS_PER_SEASON * 4)) * 2.0 * math.pi)
+        season_decl = math.sin(((self.day - 1) / float(DAYS_PER_YEAR)) * 2.0 * math.pi)
         # Earth-like photoperiod variation: ~12h at equator, ~8.5h..15.5h at mid-high latitudes
         return round(max(7.5, min(16.5, 12.0 + lat_norm * season_decl * 3.6)), 1)
 
@@ -1241,13 +1274,13 @@ class CosmosWorld:
                 if an.energy < 62.0:
                     hostility = spec.get("hostile", "none")
                     if hostility in ("night", "day", "always", "pack", "ambush"):
-                        # Wild predator hunts wild prey nearby!
+                        # Wild predator hunts wild prey within 18m (or scavenges wild small game in its biome!)
                         prey = next(
                             (
                                 p for p in living_fauna
                                 if p.alive and p.id != an.id
                                 and (self.evolved_fauna.get(p.species) or FAUNA_CATALOG.get(p.species, {})).get("hostile") == "none"
-                                and math.hypot(p.x - an.x, p.y - an.y) <= 4.5
+                                and math.hypot(p.x - an.x, p.y - an.y) <= 18.0
                             ),
                             None,
                         )
@@ -1256,6 +1289,8 @@ class CosmosWorld:
                             if prey.health <= 0:
                                 prey.alive = False
                                 an.energy = min(100.0, an.energy + 55.0)
+                        elif self.rng.random() < 0.35:
+                            an.energy = min(100.0, an.energy + 28.0)  # Wild small-game foraging prevents unrealistic starvation wipes!
                     else:
                         # Wild herbivore grazes local flora (or regenerates on lush grass)
                         gx, gy = int(round(an.x)), int(round(an.y))

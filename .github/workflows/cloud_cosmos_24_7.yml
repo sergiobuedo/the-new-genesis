@@ -53,6 +53,6 @@ jobs:
       - name: Run continuous 24/7 planetary evolution burst
         env:
           OLLAMA_MODEL: "qwen2.5:1.5b"
-          COSMOS_SPEED: "10"
+          COSMOS_SPEED: "20"
           CLOUD_BURST_SECONDS: "660"
         run: python -m backend.cloud_runner

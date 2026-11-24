@@ -366,12 +366,12 @@
       </div>
 
       <div class="controls">
-        <div class="speed-group" title="Observation Speed (Default x10 Background Pace)">
+        <div class="speed-group" title="Observation Speed (Default x20 Earth-Time Pace: 24h/day, 365d/yr, 9m pregnancy)">
           <button data-spd="1">x1</button>
           <button data-spd="2">x2</button>
           <button data-spd="5">x5</button>
-          <button data-spd="10" class="active">x10</button>
-          <button data-spd="20">x20</button>
+          <button data-spd="10">x10</button>
+          <button data-spd="20" class="active">x20</button>
         </div>
         <button id="btn-globe" title="Round 3D Super-Earth Planet View">🌍 Globe</button>
         <button id="btn-topdown" class="active" title="Continental Surface View (Use Arrows / Drag / Pinch)">🦅 Map</button>
@@ -2482,7 +2482,7 @@
     let timelineFilter = 'all';
     let activeDisc = 'psychology';
     let lastWinterState = false;
-    let viewSpeed = 10;
+    let viewSpeed = 20;
 
     document.querySelectorAll('.speed-group button').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -2945,12 +2945,13 @@
         const es = currentLang === 'es';
         const sexIcon = subj.sex === 'M' ? '♂' : '♀';
         const sexLbl = subj.sex === 'M' ? (es ? '♂ Macho' : '♂ Male') : (es ? '♀ Hembra' : '♀ Female');
-        const ageYrs = subj.age_years !== undefined ? subj.age_years : ((subj.age || 0) / 40).toFixed(1);
+        const ageYrs = subj.age_years !== undefined ? subj.age_years : ((subj.age || 0) / 365).toFixed(1);
+        const gestM = subj.gestation_months !== undefined ? `${subj.gestation_months}/9m` : `${subj.gestation_pct || 1}%`;
         const famBits = [
           `${es ? 'Edad' : 'Age'}: ${ageYrs} ${es ? 'años' : 'yrs'}`,
           `${es ? 'Sexo' : 'Sex'}: ${sexLbl}`,
           subj.partner_id ? `❤️ ${es ? 'Pareja' : 'Mate'}: ${subj.partner_id}` : (es ? 'Soltero/a' : 'Unbonded'),
-          subj.pregnant ? `🤰 ${es ? 'Embarazada' : 'Pregnant'}: ${subj.gestation_pct || 1}%` : null,
+          subj.pregnant ? `🤰 ${es ? 'Embarazada' : 'Pregnant'}: ${subj.gestation_pct || 1}% (${gestM})` : null,
           subj.children_count ? `👶 ${es ? 'Hijos' : 'Kids'}: ${subj.children_count}` : null,
           subj.illness ? `🤒 ${es ? 'Enfermedad' : 'Illness'}: ${subj.illness.replace('_', ' ')} (${Math.round(subj.illness_severity || 0)}%)` : `💚 ${es ? 'Sano' : 'Healthy'}`,
           (subj.vocation && subj.vocation !== 'Forager') ? `🛠️ ${es ? 'Oficio' : 'Vocation'}: ${subj.vocation}` : null,
@@ -3131,7 +3132,7 @@
       document.getElementById('ui-pop').textContent = m.live_population;
       document.getElementById('ui-ctrl').textContent = m.control_population;
       if (m.wild_species_alive !== undefined) {
-        document.getElementById('ui-fauna').textContent = `${m.wild_species_alive}/${m.wild_species_total || 24}`;
+        document.getElementById('ui-fauna').textContent = `${m.wild_species_alive}/${m.wild_species_total || 42}`;
       }
       document.getElementById('ui-km2').textContent = `${m.explored_area_km2 || 225} km²`;
       document.getElementById('ui-llm').textContent = `${m.llm_deliberations}`;
@@ -3156,7 +3157,7 @@
         // Real Earth-like regional longitude & 23.4° axial tilt daylight at camera location!
         const dPhase = ((w.day_phase !== undefined ? w.day_phase : 0.35) + (controls.target.x / 310.0) * 0.5 + 10.0) % 1.0;
         const latNorm = Math.max(-1, Math.min(1, -controls.target.z / 220.0));
-        const seasonDecl = Math.sin(((w.day || 1) / 40.0) * Math.PI * 2);
+        const seasonDecl = Math.sin(((w.day || 1) / 365.0) * Math.PI * 2);
         const halfDayHrs = Math.max(7.5, Math.min(16.5, 12.0 + latNorm * seasonDecl * 3.6)) * 0.5;
         const locHr = dPhase * 24.0;
         const localIsNight = !(locHr >= (12.0 - halfDayHrs) && locHr <= (12.0 + halfDayHrs));
@@ -3705,10 +3706,10 @@
               wp.y = terrainHeight(wp.x, wp.z);
             }
           }
-          if (!wp) wp = pickNaturalWaypoint(anchor.x, anchor.z, 5.2, 'land');
+          if (!wp) wp = pickNaturalWaypoint(anchor.x, anchor.z, 14.5, 'land');
           ud.targetPos.set(wp.x, wp.y, wp.z);
           ud.targetHeading = Math.atan2(wp.x - rig.position.x, wp.z - rig.position.z);
-          ud.pauseUntil = t + 0.7 + Math.random() * 1.8;
+          ud.pauseUntil = t + 0.35 + Math.random() * 1.0;
           dx = ud.targetPos.x - rig.position.x;
           dz = ud.targetPos.z - rig.position.z;
           distSq = dx * dx + dz * dz;

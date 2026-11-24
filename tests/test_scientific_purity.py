@@ -265,12 +265,17 @@ def test_earth_solar_timezones_proto_writing_and_human_parity_metrics():
     west_p = world.local_solar_phase_at(-150.0, -100.0)
     east_p = world.local_solar_phase_at(150.0, -100.0)
     assert abs(west_p - east_p) > 0.2
-    # Boreal latitude daylight duration shifts realistically across seasons
-    world.tick_count = 10 * 200  # Summer peak
+    # Boreal latitude daylight duration shifts realistically across 365-day Earth seasons
+    world.tick_count = 91 * 24  # Summer peak (Day 92)
     summer_hrs = world.daylight_hours_at(145.0, -150.0)
-    world.tick_count = 30 * 200  # Winter
+    world.tick_count = 274 * 24  # Winter (Day 275)
     winter_hrs = world.daylight_hours_at(145.0, -150.0)
     assert summer_hrs > winter_hrs
+
+    # Expanded Earth biosphere: 42 wild fauna species & 22 flora species
+    from backend.world.physics import FAUNA_CATALOG, FLORA_SPECIES, DAYS_PER_YEAR, TICKS_PER_DAY
+    assert DAYS_PER_YEAR == 365 and TICKS_PER_DAY == 24
+    assert len(FAUNA_CATALOG) >= 42 and len(FLORA_SPECIES) >= 22
 
     # Empirical proto-writing clay tablet (reed/bone stylus + soft clay)
     insights = {"build_lore": 2}
@@ -278,10 +283,10 @@ def test_earth_solar_timezones_proto_writing_and_human_parity_metrics():
     tab, _, k_t, _ = world.attempt_empirical_experiment("clay_gray", "ivory_horn", ["clay_gray", "ivory_horn"], insights, 0.0, 0.0, "S-001")
     assert k_t == "breakthrough" and tab == "clay_tablet"
 
-    # Default speed is x10 & metrics expose clan_leaders, vocations, diplomacy, macro_population
+    # Default speed is x20 & metrics expose clan_leaders, vocations, diplomacy, macro_population
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
         obs = MiroFishObservatory(ledger_dir=Path(td), seed=4201, founders_per_lineage=3)
-        assert obs.speed_multiplier == 10
+        assert obs.speed_multiplier == 20
         m = obs.compute_scientific_metrics()
         assert "vocations" in m and "diplomacy_es" in m and "macro_population" in m
 
