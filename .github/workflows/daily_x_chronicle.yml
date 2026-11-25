@@ -1,0 +1,40 @@
+name: "Daily X Scientific Chronicle (PC-Off 24/7)"
+
+on:
+  schedule:
+    - cron: "0 17 * * *" # 17:00 UTC (18:00 CET prime global X window)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish-daily-x:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout main codebase
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Fetch latest live-telemetry chronicles
+        run: |
+          git fetch origin live-telemetry:live-telemetry
+          git checkout live-telemetry -- chronicles/latest_public_state.json chronicles/universe_xxv.sqlite
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install chart & X API dependencies
+        run: pip install matplotlib tweepy
+
+      - name: Generate real science chart & publish 2-tweet thread to @UniverseXXVLab
+        env:
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
+        run: python -m backend.social.x_publisher
