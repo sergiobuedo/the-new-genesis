@@ -457,6 +457,9 @@
             <span class="collapse-btn">▾</span>
           </h2>
           <div class="card-body">
+            <div id="living-stage-badge" style="margin-bottom:7px;padding:6px 9px;border-radius:8px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.38);font-size:10.6px;line-height:1.35;color:#ecfdf5;">
+              <strong style="color:var(--emerald);">🧭 Etapa Real Actual:</strong> <span id="living-stage-text">Calculando etapa emergente…</span>
+            </div>
             <div class="species-pills" id="species-pills-box" style="flex-wrap:wrap;" title="Haz clic en cualquier raza para volar directamente a su poblado / Click any race to fly to their settlement!">
               <div class="sp-pill" data-jump-lineage="Sylphid" style="border-color:#38bdf8"><strong style="color:#38bdf8">📍 Sylphid</strong><br><span id="sp-syl">7</span></div>
               <div class="sp-pill" data-jump-lineage="Lithokin" style="border-color:#fbbf24"><strong style="color:#fbbf24">📍 Lithokin</strong><br><span id="sp-lit">7</span></div>
@@ -828,11 +831,12 @@
         : `Everything discovered and built entirely on their own (0% interference) · ${msList.length} milestones recorded`;
 
       const eras = [
-        { id: 'paleo', icon: '🪨', nameEs: 'Paleolítico', nameEn: 'Paleolithic', unlocked: true },
-        { id: 'neo', icon: '🌾', nameEs: 'Neolítico / Agrario', nameEn: 'Neolithic / Agrarian', unlocked: !!(disc.first_agriculture || disc.struct_hearth || disc.struct_shelter || disc.first_barter_trade) },
-        { id: 'bronze', icon: '⚒️', nameEs: 'Edad del Bronce', nameEn: 'Bronze & Craft Age', unlocked: !!(disc.craft_bronze_tool || disc.craft_wheeled_cart || disc.struct_watercraft || disc.struct_edifice) },
-        { id: 'ind', icon: '📡', nameEs: 'Era Técnica / Señales', nameEn: 'Tech & Signal Era', unlocked: !!(disc.struct_comm_relay || disc.struct_land_vehicle || disc.craft_copper_coil || disc.craft_clinical_cure) },
-        { id: 'space', icon: '🛰️', nameEs: 'Era Espacial', nameEn: 'Spacefaring Era', unlocked: !!(disc.struct_air_craft || disc.struct_orbital_satellite) }
+        { id: 'paleo', icon: '🪨', nameEs: 'Etapa I · Banda Fundadora', nameEn: 'Stage I · Founder Band', unlocked: true },
+        { id: 'fire', icon: '🔥', nameEs: 'Etapa II · Fuego y Herramientas', nameEn: 'Stage II · Fire & Tools', unlocked: !!(disc.struct_hearth || disc.craft_composite_tool || disc.first_cooked_meal) },
+        { id: 'neo', icon: '🌾', nameEs: 'Etapa III · Asentamientos y Cultivo', nameEn: 'Stage III · Settlements & Farming', unlocked: !!(disc.first_agriculture || disc.struct_shelter || disc.first_barter_trade) },
+        { id: 'bronze', icon: '⚒️', nameEs: 'Etapa IV · Metalurgia y Escritura', nameEn: 'Stage IV · Metallurgy & Writing', unlocked: !!(disc.craft_bronze_tool || disc.craft_clay_tablet || disc.craft_wheeled_cart || disc.struct_watercraft || disc.struct_edifice) },
+        { id: 'ind', icon: '📡', nameEs: 'Etapa V · Medicina y Señales', nameEn: 'Stage V · Medicine & Signals', unlocked: !!(disc.struct_comm_relay || disc.struct_land_vehicle || disc.craft_copper_coil || disc.craft_clinical_cure) },
+        { id: 'space', icon: '🛰️', nameEs: 'Etapa VI · Vuelo y Órbita', nameEn: 'Stage VI · Flight & Orbit', unlocked: !!(disc.struct_air_craft || disc.struct_orbital_satellite) }
       ];
 
       const eraBarHtml = `
@@ -854,6 +858,7 @@
             <span>🤝 ${es ? 'Trueques' : 'Barter trades'}: <strong>${m.trade_count || 0}</strong></span>
             <span>🌾 ${es ? 'Cultivos' : 'Farms'}: <strong>${m.crops_planted || 0}</strong></span>
             <span>🧪 ${es ? 'Ensayos empíricos' : 'Experiments'}: <strong>${m.experiment_trials || 0}</strong></span>
+            <span>⚗️ ${es ? 'Compuestos abiertos' : 'Open compounds'}: <strong style="color:#38bdf8">${m.emergent_compounds_count || 0}</strong></span>
           </div>
         </div>`;
 
@@ -3786,6 +3791,21 @@
 
       const arch = currentLang === 'es' ? m.archetype_es : m.archetype_en;
       document.getElementById('ui-archetype').textContent = `🔒 ${arch || ''}`;
+
+      // Dynamic Emergent Living Stage (purely driven by their own unlocked breakthroughs!)
+      const dMap = m.discoveries || {};
+      const stageEl = document.getElementById('living-stage-text');
+      if (stageEl) {
+        const es = currentLang === 'es';
+        let st = es ? '🪨 Etapa I · Banda Fundadora (Recolectores)' : '🪨 Stage I · Founder Band (Foragers)';
+        if (dMap.struct_orbital_satellite || dMap.struct_air_craft) st = es ? '🛰️ Etapa VI · Vuelo y Era Espacial' : '🛰️ Stage VI · Flight & Spacefaring';
+        else if (dMap.struct_comm_relay || dMap.craft_copper_coil || dMap.craft_clinical_cure) st = es ? '📡 Etapa V · Medicina y Señales' : '📡 Stage V · Medicine & Signals';
+        else if (dMap.craft_bronze_tool || dMap.craft_clay_tablet || dMap.struct_edifice) st = es ? '⚒️ Etapa IV · Metalurgia, Escritura y Edificios' : '⚒️ Stage IV · Metallurgy, Writing & Edifices';
+        else if (dMap.first_agriculture || dMap.struct_shelter || dMap.first_barter_trade) st = es ? '🌾 Etapa III · Asentamientos, Cultivo y Comercio' : '🌾 Stage III · Settlements, Farming & Trade';
+        else if (dMap.struct_hearth || dMap.craft_composite_tool || dMap.first_cooked_meal) st = es ? '🔥 Etapa II · Dominio del Fuego y Herramientas' : '🔥 Stage II · Fire & Tool Mastery';
+        const nComp = m.emergent_compounds_count || 0;
+        stageEl.innerHTML = `${st} <span style="color:var(--muted);">· ${m.live_population} ${es ? 'seres reales 1:1' : 'real 1:1 beings'}${nComp > 0 ? ` · ⚗️ ${nComp}` : ''}</span>`;
+      }
 
       const sp = m.species_counts || {};
       const pillsBox = document.getElementById('species-pills-box');

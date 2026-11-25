@@ -46,7 +46,7 @@ def _draw_running_head_and_page(canvas, doc) -> None:
     canvas.setFont("Times-Roman", 11)
     margin = 2.54 * cm
     page_w, page_h = A4
-    canvas.drawString(margin, page_h - 1.45 * cm, "UNIVERSE XXV: LONGITUDINAL MULTI-SPECIES COSMOLOGY")
+    canvas.drawString(margin, page_h - 1.45 * cm, "THE NEW GENESIS: 1:1 EARTH AUTONOMOUS EVOLUTION")
     canvas.drawRightString(page_w - margin, page_h - 1.45 * cm, str(doc.page))
     canvas.restoreState()
 
@@ -277,17 +277,23 @@ def compile_weekly_apa_paper(
             "they inhabit a computational substrate? Building critically upon John B. Calhoun's "
             "landmark Universe 25 behavioral ecology experiments (Calhoun, 1973), generative agent "
             "architectures (Park et al., 2023), and simulation epistemology (Bostrom, 2003), this "
-            f"longitudinal monograph documents Issue #{issue_number} of Project Universe XXV. "
-            f"Three morphologically and reproductively distinct non-human sentient lineages—Sylphid, "
-            f"Lithokin, and Vespera—were initialized alongside wild herbivorous and nocturnal predator "
-            f"fauna across a continuous 3D planetary surface scaled to ten times Earth's area "
-            f"({PLANET_SURFACE_KM2:,.0f} km²) governed exclusively by real terrestrial geochemistry "
-            "(SiO2, FeS2, Al2Si2O5(OH)4, Cu, SnO2, Fe3O4, cellulose, and lignin). To eliminate "
+            f"longitudinal monograph documents Issue #{issue_number} of The New Genesis (Project Universe XXV). "
+            f"Autonomous non-human sentient lineages—Sylphid, Lithokin, Vespera, and their fertile hybrids—"
+            f"were initialized alongside 42 real terrestrial & Pleistocene fauna species and 22 flora species "
+            f"on an exact 1:1 scale Planet Earth ({PLANET_SURFACE_KM2:,.0f} km², Ø 12,742 km, 23.4° axial tilt, "
+            "24-hour/365-day calendar, and 9-month human gestation) embedded within a complete 8-planet Solar "
+            "System (including lunar tidal cycles and Jupiter–Venus Milankovitch orbital resonances) governed "
+            "by real terrestrial geochemistry and an Open-Ended Combinatorial Material Physics Engine. "
+            "Crucially, to uphold strict scientific honesty and eliminate artificial demographic extrapolation, "
+            "the experiment operates under Pure 1:1 Verifiable Reality: every single individual reported "
+            "(starting from a Paleolithic-analog founder sample of N₀ = 58 complete cognitive agents, zero "
+            "artificial multipliers) possesses full episodic memory, sexual genetics, real Earth (lat, lon) "
+            "geolocation, and cryptographically verifiable SQLite/SHA-256 history. To eliminate "
             "pre-trained human cultural contamination, an automated Epistemic Veil strips all meta-simulation "
-            "and modern lexical concepts, exposing agents solely to first-person phenomenological "
-            "sensory streams while enforcing progressive empirical mastery before physical breakthroughs "
+            "and human calendar preconceptions (pure planetary Year/Day, zero BCE/CE labels), exposing agents "
+            "solely to first-person sensory streams while enforcing empirical mastery before breakthroughs "
             f"occur. Across {len(epochs)} recorded planetary days (reaching Year {latest['year']}, "
-            f"Day {latest['day']}), experimental populations ({latest['live_pop']} active individuals) "
+            f"Day {latest['day']}), experimental populations ({latest['live_pop']} active 1:1 individuals) "
             f"are continuously benchmarked against a synchronized instinct-only Null-Control Twin "
             f"({latest['null_pop']} individuals). Quantitative analysis reveals spontaneous emergence "
             f"of cross-species Pidgin vocalizations ({latest['pidgin_words']} shared inter-lineage symbols), "
@@ -394,6 +400,37 @@ def compile_weekly_apa_paper(
             "iterated learning models of human language evolution (Kirby et al., 2008; Shannon, 1948).",
     ]
     for p in method_p1:
+        story.append(Paragraph(p, apa_body))
+
+    story.append(Paragraph("1.1 Exact 1:1 Earth Geophysics, 8-Planet Solar System & Justification of the 1:1 Founder Sample", apa_h2))
+    method_p1_earth = [
+        "To eliminate arbitrary game-world distortions, the planetary substrate reproduces exact 1:1 "
+            "Earth geophysical constants: mean radius R = 6,371 km, diameter 12,742 km, equatorial "
+            "circumference 40,075 km, total surface area 510,072,000 km², 23.4° axial tilt, longitudinal "
+            "solar timezones, a 24-hour / 365-day planetary calendar, and human-equivalent 9-month "
+            "(270-day) sexual gestation. The planet orbits within a full 8-planet Solar System (Sun, "
+            "Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn, Uranus, and Neptune) incorporating "
+            "lunar tidal cycles (29.53 days), 11-year solar irradiance variation, and long-term "
+            "Jupiter–Venus Milankovitch gravitational resonances. Every individual, settlement, and "
+            "discovery is mapped onto real terrestrial (latitude, longitude) coordinates and continental "
+            "regions alongside 42 real Earth & Pleistocene fauna species, 22 flora species, and an "
+            "Open-Ended Combinatorial Material Physics Engine that computes emergent physical properties "
+            "(hardness, tensile strength, thermal insulation, phytochemical potency, conductivity, and "
+            "buoyancy) from any free material pairing without hardcoded recipes.",
+        "A deliberate, transparent methodological decision governs the experimental sample size: "
+            "unlike simulations that display extrapolated demographic multipliers (e.g., claiming "
+            "'4,000,000 inhabitants' while simulating only a handful of agents), The New Genesis enforces "
+            "strict 1:1 Verifiable Reality. Starting from an authentic Paleolithic-analog founder cohort "
+            "(N₀ = 58 complete cognitive agents across six lineages), every single individual reported "
+            "on the public Observatory exists as an auditable record in SQLite with full episodic memory, "
+            "diploid genetics, acquired immunity, and autonomous LLM deliberation—zero artificial scaling. "
+            "Just as early Homo sapiens experienced severe Pleistocene demographic bottlenecks in small "
+            "foraging bands of 20–60 individuals before gradually expanding across millennia, observing "
+            "a compact, fully auditable 1:1 founder population under real winter mortality and zero "
+            "human intervention ensures every birth, extinction, word, and invention is 100% falsifiable "
+            "and scientifically defensible under open peer review.",
+    ]
+    for p in method_p1_earth:
         story.append(Paragraph(p, apa_body))
 
     story.append(Paragraph("2. Bicameral Neuro-Symbolic Execution and O(1) Spatial Scalability", apa_h2))
