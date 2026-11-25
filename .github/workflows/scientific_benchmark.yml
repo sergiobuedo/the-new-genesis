@@ -42,11 +42,15 @@ jobs:
 
       - name: Publish FAIR CSV & Summary JSON to live-telemetry branch
         run: |
+          mkdir -p /tmp/bench_out
+          cp chronicles/benchmark_results.csv chronicles/benchmark_summary.json /tmp/bench_out/
           git config user.name "Dr. Sergio Buedo Martínez (Observatory Daemon)"
           git config user.email "observatory@agobac-ia.es"
           git fetch origin live-telemetry:live-telemetry
-          git checkout live-telemetry
+          git checkout -f live-telemetry
+          mkdir -p chronicles
+          cp /tmp/bench_out/benchmark_results.csv /tmp/bench_out/benchmark_summary.json chronicles/
           git checkout main -- PROTOCOL.md || true
           git add -f chronicles/benchmark_results.csv chronicles/benchmark_summary.json PROTOCOL.md
-          git commit -m "science(benchmark): publish N=${{ github.event.inputs.seeds || '10' }} paired multi-seed FAIR dataset (Live vs Null)" || true
+          git commit -m "science(benchmark): publish N=${{ github.event.inputs.seeds || '10' }} paired multi-seed FAIR dataset (v2.0-protocol)" || true
           git push origin live-telemetry
