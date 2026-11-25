@@ -386,9 +386,13 @@
         <button id="btn-papers" class="btn-papers" title="APA 7th Scientific Monographs (Dr. Sergio Buedo Martínez)">📄 APA Papers</button>
         <button id="btn-snap" title="Save HD Photo">📸</button>
         <button id="btn-rec" title="Record 8s Video">🎬</button>
-        <select id="lang-select" aria-label="Language">
-          <option value="en" selected>EN</option>
-          <option value="es">ES</option>
+        <select id="lang-select" aria-label="Language" title="Idioma / Language / Langue / Idioma / 言語 / 语言">
+          <option value="en" selected>🇬🇧 EN</option>
+          <option value="es">🇪🇸 ES</option>
+          <option value="fr">🇫🇷 FR</option>
+          <option value="pt">🇵🇹 PT</option>
+          <option value="ja">🇯🇵 日本語</option>
+          <option value="zh">🇨🇳 中文</option>
         </select>
       </div>
     </header>
@@ -635,7 +639,10 @@
     if (params.get('clean') === '1') document.body.classList.add('clean-shot');
     const API_ORIGIN = params.get('api') || location.origin;
 
-    let currentLang = (params.get('lang') === 'en') ? 'en' : ((params.get('lang') === 'es' || (navigator.language || '').toLowerCase().startsWith('es')) ? 'es' : 'en');
+    const SUPPORTED_LANGS = ['en', 'es', 'fr', 'pt', 'ja', 'zh'];
+    const pLang = (params.get('lang') || '').toLowerCase().slice(0, 2);
+    const navLang = (navigator.language || 'en').toLowerCase().slice(0, 2);
+    let currentLang = SUPPORTED_LANGS.includes(pLang) ? pLang : (SUPPORTED_LANGS.includes(navLang) ? navLang : 'en');
     const UI_STRINGS = {
       en: {
         subjCardTitle: '🔬 Creature Needs & Daily Diary',
@@ -645,7 +652,8 @@
         lineagesTitle: '🧬 How Their Society Is Doing Today',
         dPsych: 'Mood & Needs', dSocio: 'Clans', dAnthro: 'Culture', dEcon: 'Survival', dPhilo: 'Thoughts',
         lexiconTitle: '🗣️ Words Invented From Scratch',
-        milestonesTitle: '🏛️ Milestones Achieved So Far'
+        milestonesTitle: '🏛️ Milestones Achieved So Far',
+        btnAdv: '🏛️ Advances', btnSci: '🔬 Scientist', btnWiz: '❓ Guide', btnPap: '📄 APA Papers'
       },
       es: {
         subjCardTitle: '🔬 Necesidades y Diario del Ser',
@@ -655,7 +663,52 @@
         lineagesTitle: '🧬 Cómo Se Encuentran Hoy',
         dPsych: 'Ánimo/Sueño', dSocio: 'Convivencia', dAnthro: 'Cultura', dEcon: 'Supervivencia', dPhilo: 'Mente',
         lexiconTitle: '🗣️ Palabras Inventadas por Ellos',
-        milestonesTitle: '🏛️ Resumen de Hitos Logrados'
+        milestonesTitle: '🏛️ Resumen de Hitos Logrados',
+        btnAdv: '🏛️ Avances', btnSci: '🔬 Científico', btnWiz: '❓ Guía', btnPap: '📄 APA Papers'
+      },
+      fr: {
+        subjCardTitle: '🔬 Besoins et Journal du Sujet',
+        tFocus: '🔬 Individu', tDaily: '📅 Journal',
+        nourish: 'Nourriture / Énergie', warmth: 'Chaleur Corporelle', sleepNeed: 'Repos / Sommeil', stress: 'Tension',
+        timeline: '📜 Histoire Vivante & Actions',
+        lineagesTitle: '🧬 État de Leur Société Aujourd’hui',
+        dPsych: 'Humeur', dSocio: 'Clans', dAnthro: 'Culture', dEcon: 'Survie', dPhilo: 'Pensées',
+        lexiconTitle: '🗣️ Mots Inventés de Zéro',
+        milestonesTitle: '🏛️ Avancées Accomplies',
+        btnAdv: '🏛️ Avancées', btnSci: '🔬 Scientifique', btnWiz: '❓ Guide', btnPap: '📄 Articles APA'
+      },
+      pt: {
+        subjCardTitle: '🔬 Necessidades e Diário do Ser',
+        tFocus: '🔬 Indivíduo', tDaily: '📅 Resumo Diário',
+        nourish: 'Comida / Energia', warmth: 'Calor Corporal', sleepNeed: 'Sono / Descanso', stress: 'Tensão',
+        timeline: '📜 História Viva e Ações',
+        lineagesTitle: '🧬 Como Está a Sociedade Hoje',
+        dPsych: 'Humor/Sono', dSocio: 'Clãs', dAnthro: 'Cultura', dEcon: 'Sobrevivência', dPhilo: 'Mente',
+        lexiconTitle: '🗣️ Palavras Inventadas do Zero',
+        milestonesTitle: '🏛️ Marcos Alcançados',
+        btnAdv: '🏛️ Avanços', btnSci: '🔬 Científico', btnWiz: '❓ Guia', btnPap: '📄 Artigos APA'
+      },
+      ja: {
+        subjCardTitle: '🔬 個体の状態と日誌',
+        tFocus: '🔬 個体', tDaily: '📅 日次記録',
+        nourish: '食料・エネルギー', warmth: '体温', sleepNeed: '休息・睡眠', stress: '緊張',
+        timeline: '📜 リアルタイム歴史と行動',
+        lineagesTitle: '🧬 現在の社会の状況',
+        dPsych: '心理・睡眠', dSocio: '集団', dAnthro: '文化', dEcon: '生存', dPhilo: '思考',
+        lexiconTitle: '🗣️ 独自に発明された言葉',
+        milestonesTitle: '🏛️ これまでの達成マイルストーン',
+        btnAdv: '🏛️ 進歩', btnSci: '🔬 科学データ', btnWiz: '❓ ガイド', btnPap: '📄 APA論文'
+      },
+      zh: {
+        subjCardTitle: '🔬 个体需求与每日日志',
+        tFocus: '🔬 个体', tDaily: '📅 每日摘要',
+        nourish: '食物 / 能量', warmth: '体温', sleepNeed: '休息 / 睡眠', stress: '压力',
+        timeline: '📜 实时历史与行动',
+        lineagesTitle: '🧬 社会现状概览',
+        dPsych: '情绪/睡眠', dSocio: '部落', dAnthro: '文化', dEcon: '生存', dPhilo: '思想',
+        lexiconTitle: '🗣️ 从零发明的语言词汇',
+        milestonesTitle: '🏛️ 已达成的文明里程碑',
+        btnAdv: '🏛️ 进展', btnSci: '🔬 科学视图', btnWiz: '❓ 指南', btnPap: '📄 APA论文'
       }
     };
 
@@ -1058,12 +1111,12 @@
                 Nadie les dice qué hacer, qué construir ni qué palabras inventar. Actúan por libre albedrío según su hambre, frío, miedo, curiosidad y empatía.
               </div>
               <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
-                <div style="font-weight:700;color:var(--emerald);margin-bottom:4px;">🧬 Biología y Ecosistema Real</div>
-                Viven en una Supertierra (10× la Tierra) con 24 especies animales, estaciones, clima, enfermedades, reproducción sexual (♂+♀), embarazos y familias.
+                <div style="font-weight:700;color:var(--emerald);margin-bottom:4px;">🧬 Tierra 1:1 y Realidad Verificable</div>
+                Un planeta Tierra exacto (510M km², Sistema Solar de 8 planetas, 42 especies de fauna, 22 de flora, 24h/365d y gestación de 9 meses) con <strong>paridad 1:1 real</strong> (cero cifras infladas).
               </div>
               <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
-                <div style="font-weight:700;color:var(--amber);margin-bottom:4px;">📜 Todo Queda Documentado</div>
-                El planeta sigue vivo 24/7 en la nube. Cada invento, palabra, trueque, parto o rito funerario queda registrado y sellado con SHA-256.
+                <div style="font-weight:700;color:var(--amber);margin-bottom:4px;">🔬 Ciencia Abierta Q1 (24/7)</div>
+                Evoluciona 24/7 en la nube con grupo de control instintivo (Null), benchmark multi-semilla, libro mayor SHA-256 y monografías APA 7.ª gratuitas.
               </div>
             </div>` : `
             <p style="margin-bottom:10px;">You are watching a live <strong>open computational anthropology & artificial life experiment</strong> led by Dr. Sergio Buedo Martínez.</p>
@@ -1073,12 +1126,12 @@
                 Nobody tells these beings what to build, say, or believe. Every action emerges from their own hunger, warmth, curiosity, and empathy.
               </div>
               <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
-                <div style="font-weight:700;color:var(--emerald);margin-bottom:4px;">🧬 Living Biosphere & Families</div>
-                A 10× Earth planet with 24 wild species, seasons, weather, natural diseases, male-female reproduction (♂+♀), pregnancy, and cultural inheritance.
+                <div style="font-weight:700;color:var(--emerald);margin-bottom:4px;">🧬 Exact 1:1 Earth & Verifiable Reality</div>
+                Exact 1:1 Planet Earth (510M km², 8-planet Solar System, 42 fauna & 22 flora species, 24h/365d, 9-month pregnancy) with <strong>pure 1:1 reality</strong> (zero inflated numbers).
               </div>
               <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
-                <div style="font-weight:700;color:var(--amber);margin-bottom:4px;">📜 24/7 Scientific Record</div>
-                The planet evolves continuously in the cloud, logging every word, trade, birth, and discovery into a SHA-256 verified archive.
+                <div style="font-weight:700;color:var(--amber);margin-bottom:4px;">🔬 Q1 Open Science (24/7)</div>
+                Evolves 24/7 in the cloud alongside an instinct-only Control Twin (Null), multi-seed benchmarks, SHA-256 ledger, and open APA 7th monographs.
               </div>
             </div>`
         },
@@ -1139,26 +1192,31 @@
             <div style="display:flex;flex-direction:column;gap:5px;max-height:175px;overflow-y:auto;margin-bottom:10px;">
               ${msList.slice().reverse().slice(0, 8).map(l => `<div style="padding:6px 9px;background:rgba(52,211,153,0.10);border-left:3px solid var(--emerald);border-radius:6px;font-size:11.5px;">✓ ${l}</div>`).join('') || `<div style="color:var(--muted)">${es ? 'Observando los primeros hitos...' : 'Observing first milestones...'}</div>`}
             </div>
-            <button id="wiz-open-advances" style="width:100%;padding:9px;border-radius:8px;border:1px solid var(--emerald);background:rgba(16,185,129,0.18);color:#ecfdf5;font-weight:700;cursor:pointer;">🏛️ ${es ? 'Abrir Panel Completo de Todos los Avances' : 'Open Full Civilizational Advances Panel'}</button>`
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button id="wiz-open-advances" style="flex:1 1 200px;padding:9px;border-radius:8px;border:1px solid var(--emerald);background:rgba(16,185,129,0.18);color:#ecfdf5;font-weight:700;cursor:pointer;">🏛️ ${es ? 'Ver Todos los Avances e Hitos' : 'Open All Advances & Milestones'}</button>
+              <button id="wiz-open-science" style="flex:1 1 200px;padding:9px;border-radius:8px;border:1px solid #a78bfa;background:rgba(167,139,250,0.18);color:#f5f3ff;font-weight:700;cursor:pointer;">🔬 ${es ? 'Abrir Gafas de Científico (Q1)' : 'Open Scientist View (Q1 Data)'}</button>
+            </div>`
         },
         {
           title: es ? '🎮 4/4 · Cómo Moverte y Entenderlo Todo Fácil' : '🎮 4/4 · How to Navigate & Explore Easily',
           html: es ? `
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px;">
               <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
-                <div style="font-weight:700;color:var(--accent);margin-bottom:4px;">🖱️ Cámara y Planeta 3D</div>
-                Arrastra para girar, haz zoom con rueda o pellizco. Si alejas mucho, verás el <strong>planeta 3D redondo</strong>. En PC usa <strong>flechas / WASD</strong>; en móvil mantén pulsado 1 dedo para desplazarte.
+                <div style="font-weight:700;color:var(--accent);margin-bottom:4px;">🖱️ Cámara, Globo y Caras</div>
+                • <strong>🌍 Globe</strong>: Tierra 1:1 y Sistema Solar.<br/>
+                • <strong>🦅 Map</strong>: Arrastra, haz zoom o usa flechas/WASD.<br/>
+                • <strong>🔍 Face</strong>: Primer plano de emociones y sombreros.
               </div>
               <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
                 <div style="font-weight:700;color:var(--emerald);margin-bottom:4px;">👆 Haz Clic en Cualquier Cosa</div>
-                Toca cualquier <strong>ser, animal, huerto, cueva o edificio</strong> para ver qué es, qué piensa, quién es su pareja y su historia.
+                Toca cualquier <strong>ser, animal, hoguera, cultivo o edificio</strong> (o pulsa una raza) para volar allí y leer qué piensa, quién es su pareja y su historia real.
               </div>
               <div style="background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:10px;">
                 <div style="font-weight:700;color:var(--amber);margin-bottom:4px;">🧭 Botones Clave Arriba</div>
-                • <strong>📋 Año/Día</strong>: Parte Diario por continentes y razas.<br/>
-                • <strong>🏛️ Avances</strong>: Todos sus hitos y era histórica.<br/>
-                • <strong>👁️ Menus</strong>: Oculta paneles para ver el mundo 3D limpio.<br/>
-                • <strong>Píldoras de Razas</strong>: Vuela directo a su continente.
+                • <strong>🏛️ Avances</strong>: Todos sus descubrimientos y etapa real.<br/>
+                • <strong>🔬 Científico</strong>: Benchmark N=10, p-valor y CSV FAIR.<br/>
+                • <strong>📄 APA Papers</strong>: Monografías científicas gratuitas.<br/>
+                • <strong>🇬🇧/🇪🇸/🇫🇷/🇵🇹/🇯🇵/🇨🇳</strong>: 6 idiomas arriba a la derecha.
               </div>
             </div>` : `
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px;">
@@ -1174,8 +1232,10 @@
                 <div style="font-weight:700;color:var(--amber);margin-bottom:4px;">🧭 Key Topbar Buttons</div>
                 • <strong>📋 Year/Day</strong>: Full Daily Planetary Briefing.<br/>
                 • <strong>🏛️ Avances</strong>: Complete civilizational progress showcase.<br/>
-                • <strong>👁️ Menus</strong>: Hide side panels for a clean 3D view.<br/>
-                • <strong>Race Pills</strong>: Fly straight to each continent.
+                • <strong>🏛️ Advances</strong>: All discoveries & emergent stage.<br/>
+                • <strong>🔬 Scientist</strong>: N=10 benchmark, p-value & FAIR CSV.<br/>
+                • <strong>📄 APA Papers</strong>: Open-access weekly monographs.<br/>
+                • <strong>🇬🇧/🇪🇸/🇫🇷/🇵🇹/🇯🇵/🇨🇳</strong>: 6 languages at top right.
               </div>
             </div>`
         }
@@ -1195,6 +1255,10 @@
       const btnAdvInWiz = document.getElementById('wiz-open-advances');
       if (btnAdvInWiz) {
         btnAdvInWiz.addEventListener('click', () => { closeWizard(); openAdvancesModal(); });
+      }
+      const btnSciInWiz = document.getElementById('wiz-open-science');
+      if (btnSciInWiz) {
+        btnSciInWiz.addEventListener('click', () => { closeWizard(); scienceModal.style.display = 'flex'; renderScienceModal(); });
       }
     }
 
@@ -3090,9 +3154,13 @@
         if (dict[k]) el.textContent = dict[k];
       });
       const bAdv = document.getElementById('btn-advances');
+      const bSci = document.getElementById('btn-science');
       const bWiz = document.getElementById('btn-wizard');
-      if (bAdv) bAdv.textContent = currentLang === 'es' ? '🏛️ Avances' : '🏛️ Progress';
-      if (bWiz) bWiz.textContent = currentLang === 'es' ? '❓ Guía' : '❓ Guide';
+      const bPap = document.getElementById('btn-papers');
+      if (bAdv && dict.btnAdv) bAdv.textContent = dict.btnAdv;
+      if (bSci && dict.btnSci) bSci.textContent = dict.btnSci;
+      if (bWiz && dict.btnWiz) bWiz.textContent = dict.btnWiz;
+      if (bPap && dict.btnPap) bPap.textContent = dict.btnPap;
     }
     applyUiLanguage();
 
@@ -3103,6 +3171,7 @@
         applyState(latestState);
       }
       if (advancesModal.style.display === 'flex') renderAdvancesModal();
+      if (scienceModal.style.display === 'flex') renderScienceModal();
       if (wizardModal.style.display === 'flex') renderWizardStep();
     });
 
