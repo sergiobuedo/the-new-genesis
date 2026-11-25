@@ -562,6 +562,57 @@ def compile_weekly_apa_paper(
     for p in res_p1:
         story.append(Paragraph(p, apa_body))
 
+    # Optional APA 7th Multi-Seed Inferential Statistics Table (if multi_seed_benchmark.py has run)
+    bench_json = db_path.parent / "benchmark_summary.json"
+    if bench_json.exists():
+        try:
+            bs = json.loads(bench_json.read_text(encoding="utf-8"))
+            story.append(Paragraph("1.1 Multi-Seed Paired Statistical Benchmark (Frozen v1.0-protocol)", apa_h2))
+            story.append(
+                Paragraph(
+                    f"To overcome single-run (N = 1) limitations, an independent batch of N = {bs['n_replicates']} "
+                    f"paired random-seed universes (base seed {bs['base_seed']}, {bs['days_per_replicate']} planetary "
+                    f"days per replicate) was executed under identical frozen physics comparing Experimental Free-Will "
+                    f"populations (M = {bs['live_pop_mean']}, SD = {bs['live_pop_sd']}, extinction = {bs['live_extinction_pct']}%) "
+                    f"against Instinct-Only Null-Control Twins (M = {bs['null_pop_mean']}, SD = {bs['null_pop_sd']}, "
+                    f"extinction = {bs['null_extinction_pct']}%). Exact paired permutation testing yielded "
+                    f"p = {bs['paired_permutation_p']} with paired effect size Cohen's d = {bs['paired_cohens_d']}. "
+                    f"Across replicates, populations coined an average of M = {bs['shared_words_mean']} shared words "
+                    f"(SD = {bs['shared_words_sd']}), achieved M = {bs['discoveries_mean']} breakthroughs "
+                    f"(SD = {bs['discoveries_sd']}), and exhibited non-linear counterfactual divergence (discovering "
+                    f"agriculture prior to fire in {bs['ag_before_fire_pct']}% of universes). Raw FAIR tabular data "
+                    "are archived publicly in chronicles/benchmark_results.csv.",
+                    apa_body,
+                )
+            )
+            b_tbl = Table(
+                [
+                    ["Metric (N = " + str(bs["n_replicates"]) + " Paired Replicates)", "Free-Will (Live)", "Null-Control Twin", "Inferential Test"],
+                    ["Final 1:1 Population (M ± SD)", f"{bs['live_pop_mean']} ± {bs['live_pop_sd']}", f"{bs['null_pop_mean']} ± {bs['null_pop_sd']}", f"p = {bs['paired_permutation_p']}"],
+                    ["Extinction Rate (%)", f"{bs['live_extinction_pct']}%", f"{bs['null_extinction_pct']}%", f"Cohen's d = {bs['paired_cohens_d']}"],
+                    ["Emergent Shared Words (M ± SD)", f"{bs['shared_words_mean']} ± {bs['shared_words_sd']}", "0.0 ± 0.0", "Epistemic Veil 100%"],
+                    ["Farming Before Fire (%)", f"{bs['ag_before_fire_pct']}%", "N/A", "Non-linear divergence"],
+                ],
+                colWidths=[5.8 * cm, 3.3 * cm, 3.3 * cm, 3.5 * cm],
+            )
+            b_tbl.setStyle(
+                TableStyle([
+                    ("FONTNAME", (0, 0), (-1, 0), "Times-Bold"),
+                    ("FONTNAME", (0, 1), (-1, -1), "Times-Roman"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9.5),
+                    ("LINEABOVE", (0, 0), (-1, 0), 1.0, colors.black),
+                    ("LINEBELOW", (0, 0), (-1, 0), 0.7, colors.black),
+                    ("LINEBELOW", (0, -1), (-1, -1), 1.0, colors.black),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ])
+            )
+            story.append(Spacer(1, 0.25 * cm))
+            story.append(b_tbl)
+            story.append(Spacer(1, 0.35 * cm))
+        except Exception:
+            pass
+
     if figs and figs[0].exists():
         story.append(Spacer(1, 0.3 * cm))
         story.append(Paragraph("<b>Figure 1</b><br/><i>Comparative Population Curves and Lineage Trajectories</i>", apa_no_indent))

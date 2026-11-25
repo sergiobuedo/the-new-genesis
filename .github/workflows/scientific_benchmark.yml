@@ -1,0 +1,52 @@
+name: "Multi-Seed Scientific Benchmark (N=10 Replicates, Q1 FAIR Data)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: "Number of independent paired random seeds (Live vs. Null)"
+        required: false
+        default: "10"
+      days:
+        description: "Planetary days simulated per replicate"
+        required: false
+        default: "120"
+
+permissions:
+  contents: write
+
+jobs:
+  run-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout frozen protocol codebase
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install scientific dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Verify Epistemic Veil & Scientific Integrity Suite (13/13)
+        run: python -m pytest tests/ -v
+
+      - name: Run N Paired Independent Replicates (Live vs. Null-Control Twin)
+        run: python -m backend.academia.multi_seed_benchmark --seeds "${{ github.event.inputs.seeds || '10' }}" --days "${{ github.event.inputs.days || '120' }}"
+
+      - name: Publish FAIR CSV & Summary JSON to live-telemetry branch
+        run: |
+          git config user.name "Dr. Sergio Buedo Martínez (Observatory Daemon)"
+          git config user.email "observatory@agobac-ia.es"
+          git fetch origin live-telemetry:live-telemetry
+          git checkout live-telemetry
+          git checkout main -- PROTOCOL.md || true
+          git add -f chronicles/benchmark_results.csv chronicles/benchmark_summary.json PROTOCOL.md
+          git commit -m "science(benchmark): publish N=${{ github.event.inputs.seeds || '10' }} paired multi-seed FAIR dataset (Live vs Null)" || true
+          git push origin live-telemetry
