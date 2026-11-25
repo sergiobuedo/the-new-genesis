@@ -4649,22 +4649,24 @@
         }
       }
 
-      // Smoothly animate the 2,500 GPU-instanced regional inhabitants across Earth's continents!
-      if (!globeGroup.visible && crowdData.length > 0 && Math.floor(t * 20) % 2 === 0) {
-        for (let i = 0; i < crowdData.length; i++) {
-          const cd = crowdData[i];
-          cd.ang += (Math.sin(t * 0.4 + i) * 0.02);
-          cd.x += Math.cos(cd.ang) * cd.spd * dt * 2.0;
-          cd.z += Math.sin(cd.ang) * cd.spd * dt * 2.0;
-          if (Math.hypot(cd.x - cd.baseX, cd.z - cd.baseZ) > 9.5) cd.ang += Math.PI * 0.85;
-          const cy = Math.max(0.05, terrainHeight(cd.x, cd.z));
-          crowdDummy.position.set(cd.x, cy + Math.abs(Math.sin(t * 4.5 + i)) * 0.02, cd.z);
-          crowdDummy.rotation.y = cd.ang;
-          crowdDummy.scale.setScalar(0.92);
-          crowdDummy.updateMatrix();
-          crowdInstanced.setMatrixAt(i, crowdDummy.matrix);
+      // Distance-based Structure LOD & Dynamic PointLight Budget (scales cleanly to hundreds of emergent buildings @ 60 FPS on mobile!)
+      if (!globeGroup.visible && structMeshes.size > 0 && Math.floor(t * 60) % 15 === 0) {
+        const cx = controls.target.x, cz = controls.target.z;
+        const hearthLights = [];
+        for (const sm of structMeshes.values()) {
+          const d2 = (sm.position.x - cx) ** 2 + (sm.position.z - cz) ** 2;
+          sm.visible = d2 < 44100; // 210m regional culling horizon
+          if (sm.visible) {
+            sm.traverse(obj => {
+              if (obj.isPointLight) hearthLights.push({ light: obj, d2 });
+            });
+          }
         }
-        crowdInstanced.instanceMatrix.needsUpdate = true;
+        // Keep only the nearest 6 dynamic PointLights active to protect mobile WebGL shader/GPU budget
+        hearthLights.sort((a, b) => a.d2 - b.d2);
+        for (let i = 0; i < hearthLights.length; i++) {
+          hearthLights[i].light.visible = (i < 6 && hearthLights[i].d2 < 7225);
+        }
       }
 
       if (!skipOrbitUpdate) controls.update();
