@@ -463,7 +463,7 @@
           </h2>
           <div class="card-body">
             <div id="living-stage-badge" style="margin-bottom:7px;padding:6px 9px;border-radius:8px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.38);font-size:10.6px;line-height:1.35;color:#ecfdf5;">
-              <strong style="color:var(--emerald);">🧭 Etapa Real Actual:</strong> <span id="living-stage-text">Calculando etapa emergente…</span>
+              <strong style="color:var(--emerald);">🧭 Etapa actual:</strong> <span id="living-stage-text">Calculando etapa emergente…</span>
             </div>
             <div class="species-pills" id="species-pills-box" style="flex-wrap:wrap;" title="Haz clic en cualquier raza para volar directamente a su poblado / Click any race to fly to their settlement!">
               <div class="sp-pill" data-jump-lineage="Sylphid" style="border-color:#38bdf8"><strong style="color:#38bdf8">📍 Sylphid</strong><br><span id="sp-syl">7</span></div>
@@ -656,15 +656,15 @@
         btnAdv: '🏛️ Advances', btnSci: '🔬 Scientist', btnWiz: '❓ Guide', btnPap: '📄 APA Papers'
       },
       es: {
-        subjCardTitle: '🔬 Necesidades y Diario del Ser',
-        tFocus: '🔬 Individuo', tDaily: '📅 Resumen Diario',
-        nourish: 'Comida / Energía', warmth: 'Calor Corporal', sleepNeed: 'Sueño / Descanso', stress: 'Tensión',
-        timeline: '📜 Historia Viva y Acciones',
-        lineagesTitle: '🧬 Cómo Se Encuentran Hoy',
-        dPsych: 'Ánimo/Sueño', dSocio: 'Convivencia', dAnthro: 'Cultura', dEcon: 'Supervivencia', dPhilo: 'Mente',
-        lexiconTitle: '🗣️ Palabras Inventadas por Ellos',
-        milestonesTitle: '🏛️ Resumen de Hitos Logrados',
-        btnAdv: '🏛️ Avances', btnSci: '🔬 Científico', btnWiz: '❓ Guía', btnPap: '📄 APA Papers'
+        subjCardTitle: '🔬 Necesidades y diario del ser',
+        tFocus: '🔬 Individuo', tDaily: '📅 Resumen diario',
+        nourish: 'Comida / energía', warmth: 'Calor corporal', sleepNeed: 'Sueño / descanso', stress: 'Tensión',
+        timeline: '📜 Historia viva y acciones',
+        lineagesTitle: '🧬 Cómo se encuentran hoy',
+        dPsych: 'Ánimo', dSocio: 'Convivencia', dAnthro: 'Cultura', dEcon: 'Supervivencia', dPhilo: 'Mente',
+        lexiconTitle: '🗣️ Palabras inventadas por ellos',
+        milestonesTitle: '🏛️ Hitos logrados hasta hoy',
+        btnAdv: '🏛️ Avances', btnSci: '🔬 Modo científico', btnWiz: '❓ Guía', btnPap: '📄 Papers APA'
       },
       fr: {
         subjCardTitle: '🔬 Besoins et Journal du Sujet',
@@ -1012,11 +1012,11 @@
       const w = (latestState && latestState.world) || {};
       const m = (latestState && latestState.metrics) || {};
       document.getElementById('sci-modal-title').textContent = es
-        ? '🔬 Gafas de Científico · Auditoría Empírica Q1 (v1.0-protocol)'
-        : '🔬 Scientist View · Q1 Empirical Audit (v1.0-protocol)';
+        ? '🔬 Modo científico · Auditoría empírica (v2.0-protocol)'
+        : '🔬 Scientist view · Empirical audit (v2.0-protocol)';
       document.getElementById('sci-modal-sub').textContent = es
-        ? 'Paridad 1:1 verificable · Benchmark multi-semilla pareado (Live vs. Null) · Datos abiertos FAIR'
-        : 'Verifiable 1:1 parity · Paired multi-seed benchmark (Live vs. Null) · Open FAIR datasets';
+        ? 'Conteo real 1:1 · Benchmark multi-semilla pareado (Live vs. Null) · Datos abiertos CSV'
+        : '1:1 individual accounting · Paired multi-seed benchmark (Live vs. Null) · Open CSV data';
 
       if (!cachedBench) {
         sciBody.innerHTML = `<div style="color:var(--muted);padding:12px;">${es ? 'Cargando datos inferenciales en vivo desde live-telemetry…' : 'Loading live inferential statistics from live-telemetry…'}</div>`;

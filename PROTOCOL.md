@@ -1,34 +1,32 @@
-# Research Protocol & Pre-Registration: The New Genesis (Project Universe XXV)
+# Research protocol and pre-registration: The New Genesis (Project Universe XXV)
 
-**Protocol Version:** `v2.0-protocol` (Unbiased Causal Control Baseline — Biological Physics Equalized)  
-**Principal Investigator:** Dr. Sergio Buedo Martínez (PhD in Social Education, Anthropologist & Computational Systems Researcher)  
-**Public Repository (Open Code & Data):** https://github.com/sergiobuedo/the-new-genesis  
-**Live 24/7 Read-Only Observatory:** https://agobac-ia.es  
-**Target Registries:** Open Science Framework (OSF) / Zenodo Archival DOI  
+**Protocol version:** `v2.0-protocol` (unbiased causal control baseline)  
+**Principal investigator:** Dr. Sergio Buedo Martínez  
+**Repository and open data:** https://github.com/sergiobuedo/the-new-genesis  
+**Public observatory:** https://agobac-ia.es  
 
 ---
 
-## 1. Scientific Objective
-To empirically measure whether autonomous, mortal cognitive agents—operating under **strict epistemic isolation** (zero pre-trained human lexical or meta-simulation hints) and **0% human intervention**—spontaneously develop shared symbolic language, cooperative provisioning, cumulative material culture, and higher demographic resilience than a synchronized **instinct-only Null-Control Twin** under identical 1:1 Earth geophysical conditions.
+## 1. Aim of the study
+This project tests whether autonomous, mortal software agents operating without human language cues or external intervention develop shared vocal symbols, cooperative habits, and cumulative material practices that improve survival compared with an instinct-only control population living under the same environment.
 
-## 2. Pre-Registered Falsifiable Hypotheses
-Across $N \ge 10$ independent random-seed paired replicates (`Live` vs. `Null-Control Twin`) evaluated under the frozen `v1.0-protocol` codebase:
+## 2. Pre-registered hypotheses
+All inferential tests are evaluated across $N \ge 10$ independent random-seed paired runs (`Live` vs. `Null`) using the frozen `v2.0-protocol` codebase:
 
-- **H1 (Cultural Survival Advantage):** Experimental populations equipped with episodic memory, social learning, symbolic vocalization, and autonomous cognition (`Live`) will achieve significantly higher final population survival and lower extinction rates than instinct-only control populations (`Null`) exposed to identical seasons, predation, and disease (paired non-parametric test, $\alpha = 0.05$, one-tailed).
-- **H2 (Spontaneous Lexical Emergence Under Epistemic Isolation):** Experimental populations (`Live`) will converge on shared phonetic lexicons (consensus $\ge 50\%$, zero English/Spanish cheat words permitted by `EpistemicGuard`) significantly above zero across independent seeds.
-- **H3 (Non-Linear Counterfactual Technological Divergence):** Because the engine enforces no predetermined human technology tree, the discovery order of foundational survival breakthroughs (e.g., seed-planting/agriculture vs. controlled fire/hearth ignition) will exhibit measurable variance across independent seeds rather than reproducing a single deterministic human sequence.
+- **H1 (Survival under cultural transmission):** Populations with episodic memory, phonetic communication, social learning, and autonomous deliberation (`Live`) will retain more living individuals and suffer fewer extinctions than matched instinct-only controls (`Null`) across seasonal stress ($\alpha = 0.05$, one-tailed paired test).
+- **H2 (Spontaneous lexical convergence):** Under lexical isolation (no human words allowed on the public acoustic channel), `Live` populations will converge on shared phonetic terms above zero across independent seeds.
+- **H3 (Non-linear discovery order):** Because the simulation contains no fixed technology tree, the sequence in which populations discover core survival practices (for example, planting seeds versus controlling fire) will vary across independent runs rather than following a single human historical order.
 
-## 3. Experimental Architecture & Controls
-1. **Exact 1:1 Earth & 8-Planet Solar System Physics:** Mean radius $R = 6{,}371\text{ km}$, surface $510{,}072{,}000\text{ km}^2$, $23.4^\circ$ axial tilt, $24\text{h}/365\text{d}$ calendar, 9-month ($270\text{d}$) sexual gestation, 42 terrestrial/Pleistocene fauna species, 22 flora species, real `(lat, lon)` continental region mapping, and an Open-Ended Combinatorial Material Physics Engine (`backend/world/combinatorics.py`).
-2. **Pure 1:1 Verifiable Reality (Zero Artificial Multipliers):** Every reported individual corresponds 1:1 to a complete simulated agent persisted in `SQLite-WAL` and hashed into an append-only `SHA-256` event chain. No extrapolated demographic multipliers are used.
-3. **Epistemic Veil (`EpistemicGuard`):** Verified by automated test suite (`tests/test_scientific_purity.py`, 13/13 tests). Agents receive only first-person phenomenological sensory vectors and pure planetary `Year / Day` time (zero `BCE/CE` or human historical labels).
-4. **Unbiased Causal Null-Control Twin (`v2.0-protocol`):** Every experimental run spawns an identical twin ecosystem (`enable_culture = False`) with **100% identical biological and physical survival capabilities** (mammalian lactation, parental provisioning, thermal huddling, zoopharmacognosy, shelter-seeking, and hungry hunting). The **sole experimental difference** between `Live` and `Null` is symbolic cognition (LLM System-2 deliberation, shared phonetic language, cumulative cross-generational teaching, barter diplomacy, and intentional material experimentation), eliminating coded biological confounds.
+## 3. Experimental setup and controls
+1. **Planetary and biological parameters:** The environment uses Earth's physical dimensions ($R = 6{,}371\text{ km}$, surface area $510{,}072{,}000\text{ km}^2$, $23.4^\circ$ axial tilt, 24-hour days, 365-day years, and 270-day gestation) within an eight-planet solar system model (lunar tides and long-term orbital variation). Agents occupy real `(lat, lon)` regions alongside 42 fauna species, 22 flora species, and a continuous material-combination model (`backend/world/combinatorics.py`).
+2. **One-to-one population accounting:** Every individual reported in the interface or in the dataset corresponds directly to one simulated agent recorded in `SQLite-WAL` and hashed in `event_chain.jsonl` (`SHA-256`). No population multipliers are applied.
+3. **Epistemic isolation:** Automated tests (`tests/test_scientific_purity.py`, 13/13 passing) verify that agent prompts exclude simulation terms, human historical labels (`BCE`/`CE`), and modern material names. Time is tracked simply as planetary year and day.
+4. **Equalized causal control (`v2.0-protocol`):** Both `Live` and `Null` populations share the exact same physical and biological survival rules: maternal nursing, parental provisioning, group huddling for warmth, instinctive use of healing plants, shelter-seeking in bad weather, and hunting when hungry. The only variable switched off in `Null` is symbolic cognition (LLM deliberation, phonetic language, cross-generational teaching, barter, and intentional material experimentation).
 
-## 4. Transparent Methodological Limitations (Peer-Review Disclosure)
-To uphold strict academic integrity, the following limitations are explicitly declared:
-- **Hybrid ABM + LLM Architecture:** Core biological homeostasis (metabolism, mammalian lactation, gestation, predation) is governed by explicit Python ecological equations, while higher-order social/cultural deliberation uses a local quantized LLM (`qwen2.5:1.5b`) when available. This experiment therefore studies **emergent cultural, linguistic, and ecological dynamics in hybrid multi-agent systems**, not biological abiogenesis from raw physics.
-- **Pre-Trained Model Residual Priors:** Even with strict lexical scrubbing (`EpistemicGuard`), any pre-trained LLM retains latent statistical reasoning patterns learned from human corpora.
-- **Live Observatory Continuity Cut:** In the continuous public Observatory (`seed=4201`), a biological bug-fix (`v23.4`, correcting leftover pre-365-day lactation/mentorship day thresholds) occurred at Day 2,692. Accordingly, formal inferential claims must rely on the **frozen `v1.0-protocol` Multi-Seed Benchmark (`benchmark_results.csv`)** rather than extrapolating from the single longitudinal pilot (`N = 1`).
+## 4. Methodological limitations
+- **Hybrid architecture (ABM + LLM):** Core physiology and ecology are governed by explicit Python rules, whereas higher-level social and cultural decisions rely on a local language model (`qwen2.5:1.5b`). The study therefore evaluates emergent dynamics in hybrid multi-agent systems, not biological evolution from scratch.
+- **Residual model priors:** Even when lexical filters strip human terminology from prompts and speech, a pre-trained language model retains general reasoning patterns from its training corpus.
+- **Longitudinal observatory cut:** The continuous public run (`seed = 4201`) received a biological bug fix (`v23.4`) at Day 2,692 to correct leftover day thresholds for infant care and mentorship. Formal statistical claims therefore rely on the frozen multi-seed benchmark (`chronicles/benchmark_results.csv`) rather than on the single longitudinal run.
 
-## 5. Open Data & Reproducibility (FAIR Principles)
-All multi-seed raw replicate outputs are exported as standard tabular CSV (`chronicles/benchmark_results.csv`) and summary JSON (`chronicles/benchmark_summary.json`) for independent verification in R, SPSS, or Python.
+## 5. Data availability
+Raw replicate outputs are published in open tabular format (`chronicles/benchmark_results.csv` and `chronicles/benchmark_summary.json`) so any researcher can replicate the statistical analysis in R, SPSS, or Python.

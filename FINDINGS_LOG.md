@@ -1,32 +1,31 @@
-# Empirical Findings Log — The New Genesis (Q1 Paper & Book Archive)
+# Laboratory findings log — The New Genesis
 
-**Principal Investigator:** Dr. Sergio Buedo Martínez  
-**Purpose:** Chronological, peer-review-grade archive of strictly verified, non-trivial empirical findings (with exact protocol version, sample size $N$, inferential statistics, Run IDs, and limitations) to support future Q1 journal submissions (*JASSS*, *Artificial Life*, *Complexity*) and book manuscripts.
-
----
-
-## Finding #1 — Cultural Exploration as a High-Variance ("High-Risk, High-Reward") Evolutionary Strategy
-- **Date (UTC):** 2026-11-25
-- **Protocol:** `v2.0-protocol` (Unbiased Causal Control — 100% identical mammalian lactation, huddling, zoopharmacognosy, shelter-seeking, and hungry hunting in both `Live` and `Null`; ONLY symbolic cognition, LLM deliberation, language, and cumulative cultural transmission differ).
-- **Evidence Source:** GitHub Actions Benchmark `Run #45677395421` (`N = 10` independent paired universes, `base_seed = 1001..1010`, `365` planetary days = 1 full year including winter, `3,650` total planetary days). FAIR CSV archived in `live-telemetry:chronicles/benchmark_results.csv`.
-- **Quantitative Result:**
-  - `Live` (Cultural/Symbolic): $M = 6.30 \pm 3.62$ survivors (`0%` extinction; range `1–11`).
-  - `Null` (Instinct-Only Control): $M = 4.70 \pm 1.25$ survivors (`0%` extinction; range `3–7`).
-  - Mean paired advantage: $+1.60$ individuals ($+34\%$), paired Cohen's $d = 0.4653$, exact paired permutation $p = 0.2051$ (not yet significant at $\alpha = 0.05$ after a single winter).
-- **Non-Trivial Emergent Insight (Unprogrammed):** Culture dramatically **tripled demographic variance** ($SD = 3.62$ vs. $1.25$ in `Null`). Investing metabolic energy into exploration, communication, and experimentation caused two cultural bands (`Seeds 1002, 1006`) to dip to a single survivor, whereas bands achieving key early breakthroughs (`Seeds 1004, 1005, 1008`) **doubled instinct-only survival** (`10–11` vs. `5`). This mirrors real anthropological trade-offs between conservative instinctual optima and risky cultural innovation.
-- **Next Verification Needed:** Run `N = 20–30` replicates across `730` planetary days (2 full winters) under `v2.0-protocol` to test whether the $+34\%$ survival advantage crosses $p < 0.05$.
+**Principal investigator:** Dr. Sergio Buedo Martínez  
+**Scope:** Running record of verified empirical observations from frozen multi-seed benchmarks and the continuous observatory, maintained as primary material for journal manuscripts and book chapters.
 
 ---
 
-## Finding #2 — Reproducible Non-Linear Counterfactual Technological Divergence (Agriculture Prior to Fire)
-- **Date (UTC):** 2026-11-25
-- **Protocol:** Confirmed across BOTH `v1.0-protocol` (`Run #45674333229`, `120d`) and `v2.0-protocol` (`Run #45677395421`, `365d`), plus the continuous longitudinal Observatory (`seed = 4201`, Day `4,923` → fire mastered later at Day `6,196`).
-- **Quantitative Result:** Across `N = 10` independent universes without a hardcoded technology tree, **`20.0%` (`Seeds 1004, 1005`) spontaneously discovered seed-planting (`first_agriculture`) prior to controlled fire ignition (`struct_hearth`)**.
-- **Notable Co-Occurrence:** Both early-farming universes (`1004` and `1005`) ranked among the top 3 highest-surviving populations after winter (`10` and `11` survivors vs. `5` in their paired `Null` twins).
+## Finding 1 — Cultural exploration increases demographic variance (higher risk, higher ceiling)
+- **Date:** 2026-11-25  
+- **Protocol:** `v2.0-protocol` (biological rules equalized between `Live` and `Null`; only symbolic cognition, language, and cultural transmission differ).  
+- **Source:** GitHub Actions benchmark `Run #45677395421` (`N = 10` paired universes, seeds `1001–1010`, 365 planetary days each, 3,650 days total). Raw data in `live-telemetry:chronicles/benchmark_results.csv`.  
+- **Results:**
+  - `Live`: $M = 6.30 \pm 3.62$ survivors (0% extinction; range 1–11).
+  - `Null`: $M = 4.70 \pm 1.25$ survivors (0% extinction; range 3–7).
+  - Mean paired difference: $+1.60$ individuals (+34%), paired Cohen's $d = 0.47$, exact paired permutation $p = 0.205$ (not statistically significant at $\alpha = 0.05$ after a single winter).
+- **Interpretation:** Removing biological handicaps from `Null` eliminated artificial control extinctions and revealed a more interesting pattern: cultural populations showed nearly three times the demographic spread of instinct-only controls ($SD = 3.62$ vs. $1.25$). Spending energy on exploration and tinkering pushed two bands (`seeds 1002, 1006`) down to a single survivor, while bands that landed early practical breakthroughs (`seeds 1004, 1005, 1008`) roughly doubled control survival (10–11 vs. 5).
+- **Follow-up:** Run `N = 20–30` paired seeds over 730 days (two winters) to test whether the survival gap reaches significance over longer horizons.
 
 ---
 
-## Finding #3 — Spontaneous Phonetic Lexicon Emergence Under Strict Epistemic Isolation
-- **Date (UTC):** 2026-11-25
-- **Protocol:** `v2.0-protocol` (`Run #45677395421`, `EpistemicGuard` `13/13` tests passing, zero English/Spanish cheat words permitted on acoustic channel).
-- **Quantitative Result:** Shared phonetic words emerged spontaneously in **`80%` (`8/10`)** of unbiased 365-day universes ($M = 1.90 \pm 1.10$ shared words vs. `0.0` in `Null`) and **`100%` (`10/10`)** of 120-day universes ($M = 2.20 \pm 0.79$). In the continuous Observatory (`seed = 4201`), shared vocabulary expanded to `13–17` words by Year 21 (e.g., `"ta"` = *stranger*).
+## Finding 2 — Non-linear discovery order: planting seeds before controlling fire
+- **Date:** 2026-11-25  
+- **Protocol:** Observed in both `v1.0-protocol` (`Run #45674333229`, 120 days) and `v2.0-protocol` (`Run #45677395421`, 365 days), as well as the continuous observatory (`seed = 4201`, where planting appeared by Day 4,923 and cooking over fire on Day 6,196).  
+- **Results:** Without a fixed technology tree, 20% of independent runs (`seeds 1004, 1005`) discovered seed planting before hearth ignition. Notably, both runs finished among the three highest-surviving populations after winter (10 and 11 survivors vs. 5 in their matched controls).
+
+---
+
+## Finding 3 — Spontaneous phonetic vocabulary under lexical isolation
+- **Date:** 2026-11-25  
+- **Protocol:** `v2.0-protocol` (`Run #45677395421`, `EpistemicGuard` passing 13/13 unit tests).  
+- **Results:** Shared phonetic words emerged in 8 of 10 unbiased 365-day runs ($M = 1.90 \pm 1.10$ words vs. 0 in `Null`) and in 10 of 10 runs at Day 120 ($M = 2.20 \pm 0.79$). In the continuous observatory (`seed = 4201`), shared vocabulary reached 13–17 words by Year 21 (for instance, `"ta"` denoting a stranger).
