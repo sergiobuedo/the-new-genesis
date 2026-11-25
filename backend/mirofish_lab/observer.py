@@ -444,6 +444,15 @@ class PopulationSimulation:
                             importance=4,
                         )
                 else:
+                    # Realistic campfire deterrence (lit hearth within 10m deters snakes, scorpions & predators)
+                    near_fire = any(
+                        st.kind == "hearth" and st.fuel > 0 and math.hypot(st.x - victim.x, st.y - victim.y) < 10.0
+                        for st in self.world.structures.values()
+                    )
+                    last_strike = getattr(pred, "_last_strike_tick", -9999)
+                    if near_fire or (self.world.tick_count - last_strike) < 48:
+                        continue
+                    pred._last_strike_tick = self.world.tick_count
                     self.predator_attacks += 1
                     dmg = float(spec.get("danger", 20.0))
                     victim.integrity = max(0.0, victim.integrity - dmg)
@@ -841,14 +850,35 @@ class PopulationSimulation:
             self._move_smooth(agent, sx, sy, nearby_others, speed=0.26 * spd_mul)
             return
 
-        # 1D. Cooperative Family & Spousal Provisioning (Parents feed Newborns/Juveniles & Males provision Pregnant Mates!)
-        if self.enable_culture and agent.energy > 60.0 and agent.genome.empathy > 0.38:
+        # 1D. Mammalian Maternal Lactation, Alloparental Infant Care (<2 yrs) & Spousal Provisioning
+        if self.enable_culture and agent.energy > 42.0 and agent.age_days >= 180.0:
+            infant_needy = next(
+                (
+                    o for o in nearby_others
+                    if o.age_days < 730.0
+                    and (o.energy < 68.0 or o.hydration < 65.0 or o.warmth < 58.0)
+                    and (o.id in agent.children_ids or agent.lineage == o.lineage or agent.genome.empathy > 0.42)
+                ),
+                None,
+            )
+            if infant_needy is not None:
+                infant_needy.energy = min(100.0, infant_needy.energy + 24.0)
+                infant_needy.hydration = min(100.0, infant_needy.hydration + 18.0)
+                infant_needy.warmth = min(100.0, infant_needy.warmth + 18.0)
+                agent.energy = max(25.0, agent.energy - 5.5)
+                self.sharing_count += 1
+                self.gifts_today += 1
+                agent.action_label = f"Nursing & warming infant {infant_needy.id}"
+                agent.pause_ticks = 2
+                return
+
+        if self.enable_culture and agent.energy > 58.0 and agent.genome.empathy > 0.35:
             family_hungry = next(
                 (
                     o for o in nearby_others
                     if (
-                        (o.age_days < 11.0 and o.energy < 58.0 and (o.id in agent.children_ids or agent.trust_bonds.get(o.id, 0.0) >= 0.55))
-                        or (o.id == agent.partner_id and (o.is_pregnant or o.energy < 62.0))
+                        (o.age_days < 730.0 and o.energy < 62.0 and (o.id in agent.children_ids or agent.trust_bonds.get(o.id, 0.0) >= 0.45))
+                        or (o.id == agent.partner_id and (o.is_pregnant or o.energy < 64.0))
                     )
                 ),
                 None,
@@ -1330,7 +1360,7 @@ class PopulationSimulation:
                     return
 
             # C. Acoustic Communication & Elder Cumulative Cultural Mentorship (Henrich Collective Brain!)
-            if agent.age_days >= 50.0 and partner.age_days < 20.0 and agent.insight_map and bond >= 0.15:
+            if agent.age_days >= 180.0 and partner.age_days < 730.0 and agent.insight_map and bond >= 0.15:
                 for k_lore, lvl in agent.insight_map.items():
                     if partner.insight_map.get(k_lore, 0) < lvl:
                         partner.insight_map[k_lore] = lvl
@@ -1745,7 +1775,7 @@ class PopulationSimulation:
             for mal in males:
                 if mal.id in used_males:
                     continue
-                if math.hypot(fem.x - mal.x, fem.y - mal.y) > 4.6:
+                if math.hypot(fem.x - mal.x, fem.y - mal.y) > 16.0:
                     continue
                 # Westermarck incest taboo (waived only if lineage is in <=4 critical bottleneck)
                 if lin_counts.get(fem.lineage, 0) > 4 and self._are_close_kin(fem, mal):
