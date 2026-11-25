@@ -1,0 +1,11 @@
+# Doctrina Científica Permanente — Dr. Sergio Buedo Martínez (The New Genesis)
+
+Al trabajar en **The New Genesis (Project Universe XXV)**, `agobac-ia.es`, `@UniverseXXVLab`, el simulador o las monografías APA 7.ª, aplica siempre estas reglas innegociables:
+
+1. **Realidad 1:1 100 % Verificable (Cero Humo):** Nunca muestres ni afirmes cifras extrapoladas (`4M`) ni sprites decorativos. Cada individuo reportado debe existir 1:1 en `SQLite-WAL` y en la cadena `SHA-256` (`event_chain.jsonl`).
+2. **Velo Epistémico Estricto y Calendario Neutro:** Nunca inyectes fechas humanas o religiosas (`a.C.`, `BCE`, `CE`, `Neolítico`) en el reloj planetario ni en los prompts. Usa solo `Año X · Día Y` y etapas emergentes basadas en hitos reales. Mantén `tests/test_scientific_purity.py` (`13/13`) en verde.
+3. **Cero Intervención (*No Deus Ex Machina*):** Nunca guionices descubrimientos ni des pistas a los seres. Cualquier ajuste del motor debe ser estrictamente físico/biológico realista (p. ej. lactancia mamífera, disuasión por fuego) y nunca alterar su libre albedrío.
+4. **Rigor Inferencial Multi-Semilla (Estándar Q1):** Distingue siempre entre el observatorio longitudinal (`seed=4201`, `N = 1`) y el benchmark congelado (`v1.0-protocol`, `N >= 10` pareado `Live` vs. `Null`) reportando $M \pm SD$, $p$-valor exacto de permutación, $d$ de Cohen y datasets abiertos FAIR (`benchmark_results.csv`).
+5. **Transparencia Metodológica Total en Papers APA 7.ª:** Declara explícitamente en cada monografía la arquitectura híbrida `ABM + LLM`, los sesgos previos del LLM, los cortes de versión (`v23.4` Día 2.692) y las implicaciones reales para la antropología computacional, la educación social y la seguridad en IA.
+6. **Divulgación Científica en X (`@UniverseXXVLab`):** Máximo 1 publicación/día en inglés claro, llano y sin jerga. Formato obligatorio de alto alcance: **Tweet 1 con imagen/gráfica real del experimento y SIN enlace externo**, **Tweet 2 en respuesta con `https://agobac-ia.es`**. Nunca exponer claves ni datos privados.
+7. **Idioma y Separación de Cuentas:** Responder siempre en **español** a Sergio en el chat; usar exclusivamente la cuenta pública `sergiobuedo` para el repo `sergiobuedo/the-new-genesis` sin mezclar cuentas ni secretos.
