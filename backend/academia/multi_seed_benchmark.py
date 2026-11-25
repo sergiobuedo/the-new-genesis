@@ -93,7 +93,12 @@ def run_single_replicate(seed: int, days: int, founders_per_lineage: int = 7) ->
                 "discoveries_count": len(disc),
                 "emergent_compounds": int(m.get("emergent_compounds_count", 0)),
                 "mean_stress": round(float(m.get("mean_stress", 0.0)), 2),
+                "gini_index": round(float(m.get("gini_index", 0.0)), 4),
+                "social_clustering": round(float(m.get("social_clustering", 0.0)), 4),
+                "crowding_sink_index": round(float(m.get("crowding_sink_index", 0.0)), 4),
                 "altruism_acts": int(m.get("altruism_acts", 0)),
+                "inter_species_peace": int(m.get("inter_species_peace", 0)),
+                "conflict_acts": int(m.get("conflict_acts", 0)),
                 "ag_day": ag_day if ag_day is not None else "",
                 "fire_day": fire_day if fire_day is not None else "",
                 "ag_before_fire": int(ag_before_fire),
@@ -151,6 +156,10 @@ def run_multi_seed_benchmark(
         "shared_words_sd": round(statistics.stdev(words_list), 2) if num_seeds >= 2 else 0.0,
         "discoveries_mean": round(statistics.mean(disc_list), 2),
         "discoveries_sd": round(statistics.stdev(disc_list), 2) if num_seeds >= 2 else 0.0,
+        "gini_mean": round(statistics.mean(float(r["gini_index"]) for r in rows), 4),
+        "clustering_mean": round(statistics.mean(float(r["social_clustering"]) for r in rows), 4),
+        "altruism_mean": round(statistics.mean(float(r["altruism_acts"]) for r in rows), 2),
+        "conflict_mean": round(statistics.mean(float(r["conflict_acts"]) for r in rows), 2),
         "ag_before_fire_pct": round(100.0 * sum(r["ag_before_fire"] for r in rows) / num_seeds, 1),
     }
 
