@@ -497,8 +497,9 @@ class PopulationSimulation:
     def _update_physiology_and_psychology(self, agent: KobAgent, local_crowd: int, nearby_others: Optional[List[KobAgent]] = None) -> None:
         agent.age_days = round((self.world.tick_count / float(TICKS_PER_DAY)) + (1 - agent.born_day), 2)
         cold_res = LINEAGE_SPECS[agent.lineage]["ColdBias"]
-        cloak_bonus = 10.0 if (self.enable_culture and agent.has_cloak) else 0.0
-        huddle_bonus = min(6.0, local_crowd * 2.2) if self.enable_culture else 0.0
+        # Unbiased Causal Control (v2.0-protocol): Physical laws (huddling, clothing insulation) apply identically to Live & Null!
+        cloak_bonus = 10.0 if agent.has_cloak else 0.0
+        huddle_bonus = min(6.0, local_crowd * 2.2)
         effective_temp = self.world.local_temperature_at(agent.x, agent.y) + cold_res + cloak_bonus + huddle_bonus
 
         burn = 0.024 if agent.is_sleeping else 0.055
@@ -715,7 +716,8 @@ class PopulationSimulation:
         # 1A. Self-Medication & Empathetic Caregiving when injured or sick!
         remedy_codes = ("clinical_cure", "antiseptic_balm", "herbal_remedy", "medicinal_herb")
         held_remedy = next((c for c in remedy_codes if c in agent.inventory), None)
-        if self.enable_culture and held_remedy and (agent.integrity < 78.0 or agent.illness):
+        # Zoopharmacognosy: both Live and Null instinctively consume healing herbs if carried while injured/sick
+        if held_remedy and (agent.integrity < 78.0 or agent.illness):
             agent.inventory.remove(held_remedy)
             heal_val = BLIND_MATERIALS[held_remedy].healing
             agent.integrity = min(100.0, agent.integrity + (heal_val * 45.0 if heal_val <= 1.0 else heal_val))
@@ -850,8 +852,8 @@ class PopulationSimulation:
             self._move_smooth(agent, sx, sy, nearby_others, speed=0.26 * spd_mul)
             return
 
-        # 1D. Mammalian Maternal Lactation, Alloparental Infant Care (<2 yrs) & Spousal Provisioning
-        if self.enable_culture and agent.energy > 42.0 and agent.age_days >= 180.0:
+        # 1D. Mammalian Maternal Lactation & Parental Provisioning (identical mammalian biology in both Live & Null!)
+        if agent.energy > 42.0 and agent.age_days >= 180.0:
             infant_needy = next(
                 (
                     o for o in nearby_others
@@ -872,7 +874,7 @@ class PopulationSimulation:
                 agent.pause_ticks = 2
                 return
 
-        if self.enable_culture and agent.energy > 58.0 and agent.genome.empathy > 0.35:
+        if agent.energy > 58.0 and agent.genome.empathy > 0.35:
             family_hungry = next(
                 (
                     o for o in nearby_others
@@ -897,18 +899,17 @@ class PopulationSimulation:
         # 2. Seek warmth or cave/subterranean shelter when freezing or caught in a storm/blizzard!
         if agent.warmth < 50.0 or (self.world.weather in ("storm", "snow") and agent.stress > 45.0 and not self.world.is_sheltered_at(agent.x, agent.y)):
             warm_targets: List[Tuple[float, float]] = [(cv.x, cv.y) for cv in self.world.caves.values()]
-            if self.enable_culture:
-                for st in self.world.structures.values():
-                    if (st.kind == "hearth" and st.fuel > 0) or st.kind in ("shelter", "edifice", "burrow_network"):
-                        warm_targets.append((st.x, st.y))
-                        if st.kind == "hearth" and st.fuel < 35.0 and math.hypot(st.x - agent.x, st.y - agent.y) < 2.4:
-                            fuel_idx = next(
-                                (i for i, c in enumerate(agent.inventory) if BLIND_MATERIALS[c].flammability > 0.6),
-                                None,
-                            )
-                            if fuel_idx is not None:
-                                agent.inventory.pop(fuel_idx)
-                                st.fuel = min(100.0, st.fuel + 45.0)
+            for st in self.world.structures.values():
+                if (st.kind == "hearth" and st.fuel > 0) or st.kind in ("shelter", "edifice", "burrow_network"):
+                    warm_targets.append((st.x, st.y))
+                    if self.enable_culture and st.kind == "hearth" and st.fuel < 35.0 and math.hypot(st.x - agent.x, st.y - agent.y) < 2.4:
+                        fuel_idx = next(
+                            (i for i, c in enumerate(agent.inventory) if BLIND_MATERIALS[c].flammability > 0.6),
+                            None,
+                        )
+                        if fuel_idx is not None:
+                            agent.inventory.pop(fuel_idx)
+                            st.fuel = min(100.0, st.fuel + 45.0)
             warm_targets.extend(self.world.thermal_vents)
             if warm_targets:
                 nearest = min(warm_targets, key=lambda p: math.hypot(p[0] - agent.x, p[1] - agent.y))
@@ -1096,7 +1097,8 @@ class PopulationSimulation:
                 return
 
         # 4A. Emergent Shoreline Fishing & Shellfish Gathering
-        if self.enable_culture and (agent.current_intent == "hunt" or agent.energy < 60.0) and nearby_animals:
+        # Biological foraging/hunting when hungry is identical in Live & Null (cultural hunting intent remains Live-only)
+        if ((self.enable_culture and agent.current_intent == "hunt") or agent.energy < 60.0) and nearby_animals:
             aquatic = [
                 an for an in nearby_animals if an.species in ("silverfin_shoal", "tidecrawler", "pearlclam", "damweaver") and an.alive
             ]

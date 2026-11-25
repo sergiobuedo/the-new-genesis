@@ -1,6 +1,6 @@
 # Research Protocol & Pre-Registration: The New Genesis (Project Universe XXV)
 
-**Protocol Version:** `v1.0-protocol` (Frozen Engine Baseline)  
+**Protocol Version:** `v2.0-protocol` (Unbiased Causal Control Baseline — Biological Physics Equalized)  
 **Principal Investigator:** Dr. Sergio Buedo Martínez (PhD in Social Education, Anthropologist & Computational Systems Researcher)  
 **Public Repository (Open Code & Data):** https://github.com/sergiobuedo/the-new-genesis  
 **Live 24/7 Read-Only Observatory:** https://agobac-ia.es  
@@ -22,7 +22,7 @@ Across $N \ge 10$ independent random-seed paired replicates (`Live` vs. `Null-Co
 1. **Exact 1:1 Earth & 8-Planet Solar System Physics:** Mean radius $R = 6{,}371\text{ km}$, surface $510{,}072{,}000\text{ km}^2$, $23.4^\circ$ axial tilt, $24\text{h}/365\text{d}$ calendar, 9-month ($270\text{d}$) sexual gestation, 42 terrestrial/Pleistocene fauna species, 22 flora species, real `(lat, lon)` continental region mapping, and an Open-Ended Combinatorial Material Physics Engine (`backend/world/combinatorics.py`).
 2. **Pure 1:1 Verifiable Reality (Zero Artificial Multipliers):** Every reported individual corresponds 1:1 to a complete simulated agent persisted in `SQLite-WAL` and hashed into an append-only `SHA-256` event chain. No extrapolated demographic multipliers are used.
 3. **Epistemic Veil (`EpistemicGuard`):** Verified by automated test suite (`tests/test_scientific_purity.py`, 13/13 tests). Agents receive only first-person phenomenological sensory vectors and pure planetary `Year / Day` time (zero `BCE/CE` or human historical labels).
-4. **Synchronized Null-Control Twin:** Every experimental run spawns an identical twin ecosystem (`enable_culture = False`) driven strictly by biological homeostatic instincts under the same random seed and climate.
+4. **Unbiased Causal Null-Control Twin (`v2.0-protocol`):** Every experimental run spawns an identical twin ecosystem (`enable_culture = False`) with **100% identical biological and physical survival capabilities** (mammalian lactation, parental provisioning, thermal huddling, zoopharmacognosy, shelter-seeking, and hungry hunting). The **sole experimental difference** between `Live` and `Null` is symbolic cognition (LLM System-2 deliberation, shared phonetic language, cumulative cross-generational teaching, barter diplomacy, and intentional material experimentation), eliminating coded biological confounds.
 
 ## 4. Transparent Methodological Limitations (Peer-Review Disclosure)
 To uphold strict academic integrity, the following limitations are explicitly declared:

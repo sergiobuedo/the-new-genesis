@@ -133,7 +133,7 @@ def run_multi_seed_benchmark(
     disc_list = [float(r["discoveries_count"]) for r in rows]
 
     summary = {
-        "protocol_version": "v1.0-protocol",
+        "protocol_version": "v2.0-protocol",
         "generated_utc": datetime.now(timezone.utc).isoformat(),
         "n_replicates": num_seeds,
         "days_per_replicate": days,
