@@ -37,6 +37,8 @@ def push_live_telemetry_snapshot(commit_msg: str) -> None:
             "chronicles/world_init.json",
             "chronicles/universe_xxv.sqlite",
             "chronicles/event_chain.jsonl",
+            "chronicles/benchmark_results.csv",
+            "chronicles/benchmark_summary.json",
             "chronicles/papers/",
         ],
         cwd=str(ROOT_DIR),
