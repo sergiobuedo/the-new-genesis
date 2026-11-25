@@ -1261,7 +1261,7 @@
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.08;
+    renderer.toneMappingExposure = 1.38;
     wrap.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
@@ -3821,25 +3821,26 @@
         skySunMesh.position.set(Math.cos(sunAng) * 260, Math.sin(sunAng) * 210 + 25, -180);
         skySunMesh.visible = !localIsNight;
         if (localIsNight) {
-          skyUniforms.topColor.value.setHex(lIllum > 0.75 ? 0x0f172a : 0x030712);
-          skyUniforms.horizonColor.value.setHex(lIllum > 0.75 ? 0x1e293b : 0x0f172a);
-          skyUniforms.bottomColor.value.setHex(0x020617);
-          scene.background.setHex(lIllum > 0.75 ? 0x1e293b : 0x0f172a);
-          scene.fog.color.setHex(lIllum > 0.75 ? 0x1e293b : 0x0f172a);
-          sunLight.intensity = 0.25 + lIllum * 0.55;
-          hemiLight.intensity = 0.50 + lIllum * 0.42;
-          cloudMat.opacity = 0.28;
+          // Luminous moonlit night so mobile & desktop screens remain 100% clear and legible at night!
+          skyUniforms.topColor.value.setHex(0x1e293b);
+          skyUniforms.horizonColor.value.setHex(0x334155);
+          skyUniforms.bottomColor.value.setHex(0x1e293b);
+          scene.background.setHex(0x283548);
+          scene.fog.color.setHex(0x334155);
+          sunLight.intensity = 1.10 + lIllum * 0.45;
+          hemiLight.intensity = 1.25 + lIllum * 0.35;
+          cloudMat.opacity = 0.42;
         } else {
           const overcast = ['rain', 'storm', 'fog'].includes(wState);
           const isGolden = dPhase < 0.14 || (dPhase > 0.40 && dPhase < 0.52);
-          skyUniforms.topColor.value.setHex(overcast ? 0x475569 : (isGolden ? 0x1d4ed8 : 0x0284c7));
-          skyUniforms.horizonColor.value.setHex(overcast ? 0x94a3b8 : (isGolden ? 0xfdba74 : (isWinter ? 0xe2e8f0 : 0xbae6fd)));
-          skyUniforms.bottomColor.value.setHex(overcast ? 0x64748b : 0x94a3b8);
-          scene.background.setHex(overcast ? 0x94a3b8 : (isWinter ? 0xcbd5e1 : 0x7dd3fc));
-          scene.fog.color.setHex(overcast ? 0x94a3b8 : (isGolden ? 0xfed7aa : (isWinter ? 0xe2e8f0 : 0xbae6fd)));
-          sunLight.intensity = overcast ? 1.15 : (isGolden ? 1.85 : 2.05);
-          hemiLight.intensity = overcast ? 1.05 : 1.20;
-          cloudMat.opacity = overcast ? 0.88 : 0.68;
+          skyUniforms.topColor.value.setHex(overcast ? 0x64748b : (isGolden ? 0x2563eb : 0x0284c7));
+          skyUniforms.horizonColor.value.setHex(overcast ? 0xcbd5e1 : (isGolden ? 0xfdba74 : (isWinter ? 0xf1f5f9 : 0xbae6fd)));
+          skyUniforms.bottomColor.value.setHex(overcast ? 0x94a3b8 : 0xcbd5e1);
+          scene.background.setHex(overcast ? 0x94a3b8 : (isWinter ? 0xe2e8f0 : 0x7dd3fc));
+          scene.fog.color.setHex(overcast ? 0xb4c2d1 : (isGolden ? 0xfed7aa : (isWinter ? 0xf1f5f9 : 0xbae6fd)));
+          sunLight.intensity = overcast ? 1.55 : (isGolden ? 2.10 : 2.35);
+          hemiLight.intensity = overcast ? 1.35 : 1.48;
+          cloudMat.opacity = overcast ? 0.85 : 0.65;
         }
       }
 
