@@ -1520,9 +1520,11 @@ class PopulationSimulation:
                             agent.illness_severity = 0.0
                             self.cures_applied += 1
                         elif comp.functional_class == "insulating_weave":
-                            agent.has_cloak = True
+                            if "warm_cloak" not in agent.inventory:
+                                agent.inventory.append("warm_cloak")
                         elif comp.functional_class in ("composite_edge", "proto_alloy"):
-                            agent.has_tool = True
+                            if "composite_tool" not in agent.inventory:
+                                agent.inventory.append("composite_tool")
                         agent.add_memory(f"Synthesized novel {comp.functional_class} {comp.compound_id} ({comp.formula})", self.world.day, permanent=True)
                         self._record_event(
                             "breakthrough",
