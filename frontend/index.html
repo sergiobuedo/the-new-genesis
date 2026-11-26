@@ -3005,17 +3005,36 @@
           g.add(dome);
         }
       } else if (st.kind === 'edifice') {
-        const stories = Math.min(6, Math.max(2, st.stories || 2));
-        const stoneMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.65 });
-        const winMat = new THREE.MeshStandardMaterial({ color: 0xbae6fd, emissive: 0x38bdf8, emissiveIntensity: 0.9 });
+        // Multi-Story Masonry & Timber Hall with Pilasters, Recessed Windows & Cutaway Roof
+        const stories = Math.min(5, Math.max(2, st.stories || 2));
+        const stoneMatE = new THREE.MeshStandardMaterial({ color: 0xd6d3d1, bumpMap: stoneBumpTex, bumpScale: 0.10, roughness: 0.82 });
+        const trimMatE = new THREE.MeshStandardMaterial({ color: 0x78350f, bumpMap: barkBumpTex, bumpScale: 0.06, roughness: 0.88 });
+        const winMatE = new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xf59e0b, emissiveIntensity: 0.85, roughness: 0.35 });
+        const plinth = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.16, 1.72), new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.9 }));
+        plinth.position.y = 0.08; g.add(plinth);
         for (let lv = 0; lv < stories; lv++) {
-          const w = 1.35 - lv * 0.08;
-          const blk = new THREE.Mesh(new THREE.BoxGeometry(w, 0.72, w), stoneMat);
-          blk.position.y = 0.36 + lv * 0.74; blk.castShadow = true;
-          const win = new THREE.Mesh(new THREE.BoxGeometry(w * 1.02, 0.22, w * 0.65), winMat);
-          win.position.y = 0.42 + lv * 0.74;
-          g.add(blk, win);
+          const w = 1.48 - lv * 0.06;
+          const yBase = 0.16 + lv * 0.78;
+          const blk = new THREE.Mesh(new THREE.BoxGeometry(w, 0.74, w), stoneMatE);
+          blk.position.y = yBase + 0.37; blk.castShadow = true; blk.receiveShadow = true; g.add(blk);
+          const cornice = new THREE.Mesh(new THREE.BoxGeometry(w + 0.12, 0.08, w + 0.12), trimMatE);
+          cornice.position.y = yBase + 0.75; g.add(cornice);
+          for (const side of [-1, 1]) {
+            const winX = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.32, w + 0.03), winMatE);
+            winX.position.set(side * (w * 0.24), yBase + 0.40, 0); g.add(winX);
+            const winZ = new THREE.Mesh(new THREE.BoxGeometry(w + 0.03, 0.32, 0.28), winMatE);
+            winZ.position.set(0, yBase + 0.40, side * (w * 0.24)); g.add(winZ);
+          }
         }
+        const roofE = new THREE.Mesh(
+          new THREE.ConeGeometry(1.18, 0.72, 4),
+          new THREE.MeshStandardMaterial({ color: 0x9a3412, bumpMap: stoneBumpTex, bumpScale: 0.08, roughness: 0.86, transparent: true, opacity: 1.0 })
+        );
+        roofE.rotation.y = Math.PI / 4;
+        roofE.position.y = 0.16 + stories * 0.78 + 0.36;
+        roofE.castShadow = true;
+        g.add(roofE);
+        g.userData.cutawayRoof = roofE;
       } else if (st.kind === 'comm_relay') {
         const isEm = (st.tech_tier || 2) >= 4;
         if (isEm) {
@@ -3085,38 +3104,94 @@
         g.add(flame, light);
         g.userData.flame = flame; g.userData.light = light;
       } else if (st.kind === 'shelter') {
-        // AAA Timber-Framed Stone & Woven-Thatch Hut with Warm Glowing Doorway!
-        const wall = new THREE.Mesh(new THREE.CylinderGeometry(0.86, 0.94, 0.72, 12), new THREE.MeshStandardMaterial({ color: 0xd6d3d1, bumpMap: stoneBumpTex, bumpScale: 0.10, roughness: 0.88 }));
-        wall.position.y = 0.36; wall.castShadow = true; wall.receiveShadow = true;
-        const roof = new THREE.Mesh(new THREE.ConeGeometry(1.18, 0.88, 14), new THREE.MeshStandardMaterial({ color: 0xb45309, bumpMap: barkBumpTex, bumpScale: 0.12, roughness: 0.92 }));
-        roof.position.y = 1.12; roof.castShadow = true;
-        const door = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.48, 0.12), new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xd97706, emissiveIntensity: 0.85 }));
-        door.position.set(0, 0.25, 0.86);
-        const frameL = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.56, 6), trunkMat); frameL.position.set(-0.20, 0.28, 0.90);
-        const frameR = frameL.clone(); frameR.position.x = 0.20;
-        g.add(wall, roof, door, frameL, frameR);
+        // Architectural Hollow Stone-and-Timber Dwelling with Walkable Open Doorway, Interior Furniture & Auto-Cutaway Roof!
+        const floorMatS = new THREE.MeshStandardMaterial({ color: 0x78716c, bumpMap: stoneBumpTex, bumpScale: 0.08, roughness: 0.92 });
+        const wallMatS = new THREE.MeshStandardMaterial({ color: 0xd6cfc2, bumpMap: stoneBumpTex, bumpScale: 0.12, roughness: 0.88, side: THREE.DoubleSide });
+        const timberMatS = new THREE.MeshStandardMaterial({ color: 0x5c3a21, bumpMap: barkBumpTex, bumpScale: 0.08, roughness: 0.90 });
+        const thatchMatS = new THREE.MeshStandardMaterial({ color: 0xa16207, bumpMap: barkBumpTex, bumpScale: 0.15, roughness: 0.94, transparent: true, opacity: 1.0, side: THREE.DoubleSide });
+
+        // Raised flagstone foundation + interior woven floor rug
+        const floor = new THREE.Mesh(new THREE.CylinderGeometry(1.22, 1.30, 0.10, 18), floorMatS);
+        floor.position.y = 0.05; floor.receiveShadow = true; g.add(floor);
+        const rug = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.68, 0.02, 14), new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.95 }));
+        rug.position.y = 0.11; g.add(rug);
+
+        // Hollow C-shaped stone wall with genuine open doorway facing +Z
+        const wall = new THREE.Mesh(new THREE.CylinderGeometry(1.08, 1.14, 0.88, 20, 1, true, 0.42, Math.PI * 2 - 0.84), wallMatS);
+        wall.position.y = 0.54; wall.castShadow = true; wall.receiveShadow = true; g.add(wall);
+
+        // 8 vertical timber structural posts + door lintel + sill
+        for (let p = 0; p < 8; p++) {
+          const ang = 0.42 + (p / 7) * (Math.PI * 2 - 0.84);
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.96, 7), timberMatS);
+          post.position.set(Math.sin(ang) * 1.11, 0.54, Math.cos(ang) * 1.11);
+          post.castShadow = true; g.add(post);
+        }
+        const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.11, 0.16), timberMatS);
+        lintel.position.set(0, 0.96, 1.02); lintel.castShadow = true; g.add(lintel);
+
+        // Interior furnishings visible through doorway & cutaway roof: indoor firepit, sleeping bench & clay jar!
+        const inFireBase = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.08, 8), floorMatS);
+        inFireBase.position.set(0, 0.14, -0.08); g.add(inFireBase);
+        const inEmber = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xea580c, emissiveIntensity: 2.2 }));
+        inEmber.scale.set(1.0, 0.55, 1.0); inEmber.position.set(0, 0.19, -0.08); g.add(inEmber);
+        const bench = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.16, 0.34), timberMatS);
+        bench.position.set(-0.32, 0.18, -0.58); bench.rotation.y = 0.25; g.add(bench);
+        const pelt = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.06, 0.28), new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.95 }));
+        pelt.position.set(-0.32, 0.28, -0.58); pelt.rotation.y = 0.25; g.add(pelt);
+        const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 0.28, 10), new THREE.MeshStandardMaterial({ color: 0xc2410c, roughness: 0.72 }));
+        jar.position.set(0.54, 0.24, -0.35); g.add(jar);
+
+        // Layered overhanging woven-thatch roof with smoke vent (auto-fades to cutaway when camera zooms close!)
+        const roofGrp = new THREE.Group();
+        const roofCone = new THREE.Mesh(new THREE.ConeGeometry(1.48, 0.96, 16, 1, true), thatchMatS);
+        roofCone.position.y = 1.44; roofCone.castShadow = true; roofGrp.add(roofCone);
+        const roofCap = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 0.18, 10), timberMatS);
+        roofCap.position.y = 1.92; roofGrp.add(roofCap);
+        g.add(roofGrp);
+        g.userData.cutawayRoof = roofGrp;
+        g.userData.cutawayMat = thatchMatS;
       } else if (st.kind === 'granary') {
-        const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.30, 0.65, 14), new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.6 }));
-        pot.position.y = 0.32; g.add(pot);
+        // Elevated Timber-Stilt Clay Granary Silo with Conical Woven Lid
+        const stiltMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21, roughness: 0.9 });
+        for (const [sx, sz] of [[-0.32, -0.32], [0.32, -0.32], [-0.32, 0.32], [0.32, 0.32]]) {
+          const stilt = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.42, 6), stiltMat);
+          stilt.position.set(sx, 0.21, sz); g.add(stilt);
+        }
+        const deckG = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.08, 0.92), stiltMat);
+        deckG.position.y = 0.44; g.add(deckG);
+        const silo = new THREE.Mesh(new THREE.CylinderGeometry(0.40, 0.36, 0.78, 14), new THREE.MeshStandardMaterial({ color: 0xb45309, bumpMap: stoneBumpTex, bumpScale: 0.08, roughness: 0.78 }));
+        silo.position.y = 0.86; silo.castShadow = true; g.add(silo);
+        const lid = new THREE.Mesh(new THREE.ConeGeometry(0.52, 0.34, 14), new THREE.MeshStandardMaterial({ color: 0xa16207, roughness: 0.92 }));
+        lid.position.y = 1.42; lid.castShadow = true; g.add(lid);
       } else if (st.kind === 'palisade') {
-        const logMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 });
-        for (let lx = -0.7; lx <= 0.71; lx += 0.28) {
-          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 1.35, 6), logMat);
-          post.position.set(lx, 0.65, 0); post.castShadow = true; g.add(post);
+        // Sharpened Timber Palisade Wall with Horizontal Cross-Beams
+        const logMat = new THREE.MeshStandardMaterial({ color: 0x6b3e1f, bumpMap: barkBumpTex, bumpScale: 0.08, roughness: 0.92 });
+        for (let lx = -0.85; lx <= 0.86; lx += 0.24) {
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.11, 1.32, 7), logMat);
+          post.position.set(lx, 0.66, 0); post.castShadow = true; g.add(post);
+          const tip = new THREE.Mesh(new THREE.ConeGeometry(0.095, 0.26, 7), logMat);
+          tip.position.set(lx, 1.45, 0); g.add(tip);
+        }
+        for (const by of [0.42, 0.98]) {
+          const beam = new THREE.Mesh(new THREE.BoxGeometry(1.92, 0.11, 0.12), logMat);
+          beam.position.set(0, by, 0.08); g.add(beam);
         }
       } else if (st.kind === 'cairn') {
-        for (const [sy, sr] of [[0.14, 0.42], [0.38, 0.30], [0.58, 0.18]]) {
-          const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(sr, 0), new THREE.MeshStandardMaterial({ color: 0xcbd5e1, bumpMap: stoneBumpTex, bumpScale: 0.08, roughness: 0.85 }));
-          rock.position.y = sy; rock.castShadow = true; g.add(rock);
+        // Natural Weathered Stone Burial Mound with Tribute Wildflower
+        const cairnMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, bumpMap: stoneBumpTex, bumpScale: 0.12, roughness: 0.92, flatShading: true });
+        for (const [rx, ry, rz, sr] of [[0, 0.16, 0, 0.40], [-0.24, 0.14, 0.18, 0.26], [0.26, 0.14, 0.12, 0.24], [0.06, 0.14, -0.26, 0.28], [0, 0.42, 0, 0.26], [0.02, 0.62, -0.02, 0.15]]) {
+          const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(sr, 0), cairnMat);
+          rock.position.set(rx, ry, rz); rock.rotation.set(rx * 2, rz * 3, ry); rock.castShadow = true; g.add(rock);
         }
-        const memRing = new THREE.Mesh(new THREE.RingGeometry(0.48, 0.60, 24), new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
-        memRing.rotation.x = Math.PI / 2; memRing.position.y = 0.04;
-        const flower = new THREE.Mesh(new THREE.SphereGeometry(0.10, 8, 8), new THREE.MeshStandardMaterial({ color: 0xf472b6, emissive: 0xdb2777, emissiveIntensity: 0.5 }));
-        flower.position.set(0.32, 0.16, 0.28);
-        g.add(memRing, flower);
+        const flower = new THREE.Mesh(new THREE.SphereGeometry(0.08, 7, 7), new THREE.MeshStandardMaterial({ color: 0xf472b6, roughness: 0.7 }));
+        flower.position.set(0.32, 0.14, 0.30); g.add(flower);
       } else {
-        const stele = new THREE.Mesh(new THREE.BoxGeometry(0.38, 1.65, 0.24), new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.45 }));
-        stele.position.y = 0.82; stele.castShadow = true; g.add(stele);
+        // Carved Basalt Monolith on Stepped Stone Pedestal
+        const baseM = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.18, 0.84), new THREE.MeshStandardMaterial({ color: 0x64748b, bumpMap: stoneBumpTex, bumpScale: 0.08, roughness: 0.9 }));
+        baseM.position.y = 0.09; g.add(baseM);
+        const stele = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.26, 1.75, 4), new THREE.MeshStandardMaterial({ color: 0x475569, bumpMap: stoneBumpTex, bumpScale: 0.12, roughness: 0.82 }));
+        stele.rotation.y = Math.PI / 4; stele.position.y = 1.05; stele.castShadow = true; g.add(stele);
       }
       g.position.set(st.x, initY, st.y);
       surfaceWorld.add(g);
@@ -4820,6 +4895,16 @@
           const d2 = (sm.position.x - cx) ** 2 + (sm.position.z - cz) ** 2;
           sm.visible = d2 < 44100; // 210m regional culling horizon
           if (sm.visible) {
+            // Automatic Roof Cutaway: when zooming close to a cabin/building (<16m), fade roof so interior is clearly visible!
+            if (sm.userData.cutawayRoof) {
+              const camDist = camera.position.distanceTo(sm.position);
+              const wantFade = camDist < 16.0;
+              if (sm.userData.cutawayMat) {
+                sm.userData.cutawayMat.opacity = wantFade ? 0.18 : 1.0;
+              } else if (sm.userData.cutawayRoof.material) {
+                sm.userData.cutawayRoof.material.opacity = wantFade ? 0.18 : 1.0;
+              }
+            }
             sm.traverse(obj => {
               if (obj.isPointLight) hearthLights.push({ light: obj, d2 });
             });
