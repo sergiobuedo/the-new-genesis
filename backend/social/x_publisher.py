@@ -119,16 +119,16 @@ def compose_viral_science_thread(state: Dict[str, Any]) -> Tuple[str, str]:
         contrast = f"Free-Will beings: {live_pop} alive ({couples} couples, {preg} expecting) vs. Instinct-only Control Twin: {null_pop}."
 
     extra = (
-        f"Open-ended compounds synthesized: {compounds}."
+        f"Open compounds synthesized: {compounds}."
         if compounds > 0
-        else ("They discovered farming BEFORE fire." if ("first_agriculture" in disc and "struct_hearth" not in disc) else f"Total unscripted breakthroughs: {len(disc)}.")
+        else ("They built their first permanent shelters!" if m.get("structures", {}).get("shelter", 0) > 0 else f"Unscripted breakthroughs: {len(disc)}.")
     )
 
     tweet1 = (
         f"Year {yr}, Day {day:,} · The New Genesis 🔬🌍\n\n"
         f"{contrast}\n"
         f"Invented words: {words}{top_w}. {extra}\n\n"
-        f"0% human intervention. What do you think they discover next?"
+        f"0% human intervention. What happens next?"
     )
     if len(tweet1) > 272:
         tweet1 = tweet1[:269].rstrip() + "…"
