@@ -112,12 +112,14 @@ def run_multi_seed_benchmark(
     days: int = 120,
     base_seed: int = 1001,
     output_dir: Path = Path("chronicles"),
+    model_tag: str = "abm_v2_baseline",
 ) -> Dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     rows: List[Dict[str, Any]] = []
     for i in range(num_seeds):
         sd = base_seed + i
         row = run_single_replicate(seed=sd, days=days)
+        row["model_tag"] = model_tag
         rows.append(row)
         print(
             f"[Seed {sd}] Day {days}: Live={row['live_final_pop']} vs Null={row['null_final_pop']} "
@@ -139,6 +141,7 @@ def run_multi_seed_benchmark(
 
     summary = {
         "protocol_version": "v2.0-protocol",
+        "model_tag": model_tag,
         "generated_utc": datetime.now(timezone.utc).isoformat(),
         "n_replicates": num_seeds,
         "days_per_replicate": days,
@@ -174,6 +177,7 @@ if __name__ == "__main__":
     parser.add_argument("--seeds", type=int, default=10, help="Number of independent random seeds (default: 10)")
     parser.add_argument("--days", type=int, default=120, help="Planetary days per replicate (default: 120)")
     parser.add_argument("--base-seed", type=int, default=1001, help="Starting seed integer (default: 1001)")
+    parser.add_argument("--model-tag", type=str, default="abm_v2_baseline", help="Model/ablation arm identifier (e.g. qwen2.5:1.5b, llama3.2:1b)")
     args = parser.parse_args()
     root = Path(__file__).resolve().parent.parent.parent
-    run_multi_seed_benchmark(num_seeds=args.seeds, days=args.days, base_seed=args.base_seed, output_dir=root / "chronicles")
+    run_multi_seed_benchmark(num_seeds=args.seeds, days=args.days, base_seed=args.base_seed, output_dir=root / "chronicles", model_tag=args.model_tag)

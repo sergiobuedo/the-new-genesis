@@ -10,7 +10,11 @@ on:
       days:
         description: "Planetary days simulated per replicate"
         required: false
-        default: "120"
+        default: "730"
+      model_tag:
+        description: "Model or ablation arm label (e.g. abm_v2_baseline, qwen2.5-1.5b, llama3.2-1b)"
+        required: false
+        default: "abm_v2_baseline"
 
 permissions:
   contents: write
@@ -18,7 +22,7 @@ permissions:
 jobs:
   run-benchmark:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Checkout frozen protocol codebase
         uses: actions/checkout@v4
@@ -38,7 +42,7 @@ jobs:
         run: python -m pytest tests/ -v
 
       - name: Run N Paired Independent Replicates (Live vs. Null-Control Twin)
-        run: python -m backend.academia.multi_seed_benchmark --seeds "${{ github.event.inputs.seeds || '10' }}" --days "${{ github.event.inputs.days || '120' }}"
+        run: python -m backend.academia.multi_seed_benchmark --seeds "${{ github.event.inputs.seeds || '20' }}" --days "${{ github.event.inputs.days || '730' }}" --model-tag "${{ github.event.inputs.model_tag || 'abm_v2_baseline' }}"
 
       - name: Publish FAIR CSV & Summary JSON to live-telemetry branch
         run: |
