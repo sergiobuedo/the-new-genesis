@@ -1581,6 +1581,88 @@
     const terrainBumpTex = makeOrganicNoiseTexture(256, '#808080', '#b8b8b8', '#484848', 46, true);
     const barkBumpTex = makeOrganicNoiseTexture(128, '#78350f', '#451a03', '#a16207', 2, true);
     const stoneBumpTex = makeOrganicNoiseTexture(128, '#64748b', '#94a3b8', '#334155', 2, true);
+
+    // v27.0 Procedural PBR Architectural Textures (512x512 generated once in GPU memory — 0 KB network cost!)
+    function makeMasonryTexture() {
+      const c = document.createElement('canvas'); c.width = 512; c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#57534e'; ctx.fillRect(0, 0, 512, 512); // mortar base
+      const rows = 10; const rowH = 512 / rows;
+      let s = 1337; const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+      const palette = ['#d6cfc2', '#c8bfb0', '#bdb4a4', '#d8ccb8', '#a8a29e', '#c2b59b'];
+      for (let r = 0; r < rows; r++) {
+        let x = (r % 2) * -32;
+        while (x < 512) {
+          const bw = 54 + rnd() * 44;
+          const bh = rowH - 5;
+          ctx.fillStyle = palette[Math.floor(rnd() * palette.length)];
+          ctx.beginPath();
+          ctx.roundRect(x + 2.5, r * rowH + 2.5, bw - 5, bh, 6);
+          ctx.fill();
+          // Top highlight + bottom shadow for real stone depth
+          ctx.fillStyle = 'rgba(255,255,255,0.14)';
+          ctx.fillRect(x + 5, r * rowH + 4, bw - 10, 4);
+          ctx.fillStyle = 'rgba(15,23,42,0.18)';
+          ctx.fillRect(x + 5, r * rowH + bh - 3, bw - 10, 4);
+          x += bw;
+        }
+      }
+      // Subtle mossy weathering near foundation base
+      const grad = ctx.createLinearGradient(0, 400, 0, 512);
+      grad.addColorStop(0, 'rgba(54,83,20,0)'); grad.addColorStop(1, 'rgba(54,83,20,0.42)');
+      ctx.fillStyle = grad; ctx.fillRect(0, 400, 512, 112);
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(3, 1.4);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    function makeThatchTexture() {
+      const c = document.createElement('canvas'); c.width = 512; c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#854d0e'; ctx.fillRect(0, 0, 512, 512);
+      let s = 4242; const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+      // Layered horizontal shingle shadow courses
+      for (let band = 0; band < 8; band++) {
+        const y0 = band * 64;
+        const g = ctx.createLinearGradient(0, y0, 0, y0 + 64);
+        g.addColorStop(0, '#713f12'); g.addColorStop(0.2, '#a16207'); g.addColorStop(0.85, '#ca8a04'); g.addColorStop(1, '#422006');
+        ctx.fillStyle = g; ctx.fillRect(0, y0, 512, 64);
+      }
+      // Fine directional reed/straw fibers
+      const straws = ['#eab308', '#ca8a04', '#a16207', '#713f12', '#fde047'];
+      for (let i = 0; i < 1600; i++) {
+        ctx.strokeStyle = straws[Math.floor(rnd() * straws.length)];
+        ctx.lineWidth = 1.2 + rnd() * 2.2;
+        const x = rnd() * 512, y = rnd() * 512, len = 18 + rnd() * 34;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (rnd() - 0.5) * 6, y + len); ctx.stroke();
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(4, 2);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    function makeTimberTexture() {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#5c3a21'; ctx.fillRect(0, 0, 256, 256);
+      let s = 777; const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+      for (let i = 0; i < 240; i++) {
+        ctx.strokeStyle = rnd() > 0.5 ? 'rgba(69,26,3,0.45)' : 'rgba(180,83,9,0.22)';
+        ctx.lineWidth = 1 + rnd() * 2.5;
+        const x = rnd() * 256;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + (rnd() - 0.5) * 5, 256); ctx.stroke();
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(2, 2);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    const masonryAlbedoTex = makeMasonryTexture();
+    const thatchAlbedoTex = makeThatchTexture();
+    const timberAlbedoTex = makeTimberTexture();
     const waterRippleTex = makeWaterRippleTexture(256);
     const contactShadowMat = new THREE.MeshBasicMaterial({ map: makeContactShadowTexture(), transparent: true, depthWrite: false });
     const contactShadowGeo = new THREE.PlaneGeometry(0.95, 0.95);
@@ -3007,8 +3089,8 @@
       } else if (st.kind === 'edifice') {
         // Multi-Story Masonry & Timber Hall with Pilasters, Recessed Windows & Cutaway Roof
         const stories = Math.min(5, Math.max(2, st.stories || 2));
-        const stoneMatE = new THREE.MeshStandardMaterial({ color: 0xd6d3d1, bumpMap: stoneBumpTex, bumpScale: 0.10, roughness: 0.82 });
-        const trimMatE = new THREE.MeshStandardMaterial({ color: 0x78350f, bumpMap: barkBumpTex, bumpScale: 0.06, roughness: 0.88 });
+        const stoneMatE = new THREE.MeshStandardMaterial({ map: masonryAlbedoTex, color: 0xe7e5e4, bumpMap: stoneBumpTex, bumpScale: 0.14, roughness: 0.82 });
+        const trimMatE = new THREE.MeshStandardMaterial({ map: timberAlbedoTex, color: 0x78350f, bumpMap: barkBumpTex, bumpScale: 0.08, roughness: 0.88 });
         const winMatE = new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xf59e0b, emissiveIntensity: 0.85, roughness: 0.35 });
         const plinth = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.16, 1.72), new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.9 }));
         plinth.position.y = 0.08; g.add(plinth);
@@ -3104,51 +3186,94 @@
         g.add(flame, light);
         g.userData.flame = flame; g.userData.light = light;
       } else if (st.kind === 'shelter') {
-        // Architectural Hollow Stone-and-Timber Dwelling with Walkable Open Doorway, Interior Furniture & Auto-Cutaway Roof!
-        const floorMatS = new THREE.MeshStandardMaterial({ color: 0x78716c, bumpMap: stoneBumpTex, bumpScale: 0.08, roughness: 0.92 });
-        const wallMatS = new THREE.MeshStandardMaterial({ color: 0xd6cfc2, bumpMap: stoneBumpTex, bumpScale: 0.12, roughness: 0.88, side: THREE.DoubleSide });
-        const timberMatS = new THREE.MeshStandardMaterial({ color: 0x5c3a21, bumpMap: barkBumpTex, bumpScale: 0.08, roughness: 0.90 });
-        const thatchMatS = new THREE.MeshStandardMaterial({ color: 0xa16207, bumpMap: barkBumpTex, bumpScale: 0.15, roughness: 0.94, transparent: true, opacity: 1.0, side: THREE.DoubleSide });
+        // v27.0 Procedural Architecture Dwelling: Stacked Stone Masonry, Weathered Oak Framing, Chimney, Shuttered Window, Yard Props & Cutaway Thatch Roof!
+        let hSeed = 0;
+        for (let ci = 0; ci < String(st.id || '').length; ci++) hSeed = ((hSeed << 5) - hSeed + String(st.id).charCodeAt(ci)) | 0;
+        const sRnd = (n) => Math.abs(Math.sin(hSeed * 0.13 + n * 12.9898) * 43758.5453) % 1;
+        const roofPitch = 0.92 + sRnd(1) * 0.24;
+        const wallTint = [0xefeae0, 0xe7dfd0, 0xd9d2c5, 0xe5d9c3][Math.floor(sRnd(2) * 4)];
+        const roofTint = [0xd99b26, 0xc28524, 0xb87321, 0xc9963b][Math.floor(sRnd(3) * 4)];
 
-        // Raised flagstone foundation + interior woven floor rug
-        const floor = new THREE.Mesh(new THREE.CylinderGeometry(1.22, 1.30, 0.10, 18), floorMatS);
-        floor.position.y = 0.05; floor.receiveShadow = true; g.add(floor);
-        const rug = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.68, 0.02, 14), new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.95 }));
-        rug.position.y = 0.11; g.add(rug);
+        const floorMatS = new THREE.MeshStandardMaterial({ map: masonryAlbedoTex, color: 0x9ca3af, bumpMap: stoneBumpTex, bumpScale: 0.10, roughness: 0.92 });
+        const wallMatS = new THREE.MeshStandardMaterial({ map: masonryAlbedoTex, color: wallTint, bumpMap: stoneBumpTex, bumpScale: 0.16, roughness: 0.88, side: THREE.DoubleSide });
+        const timberMatS = new THREE.MeshStandardMaterial({ map: timberAlbedoTex, color: 0x7c4a26, bumpMap: barkBumpTex, bumpScale: 0.10, roughness: 0.88 });
+        const thatchMatS = new THREE.MeshStandardMaterial({ map: thatchAlbedoTex, color: roofTint, bumpMap: barkBumpTex, bumpScale: 0.18, roughness: 0.94, transparent: true, opacity: 1.0, side: THREE.DoubleSide });
 
-        // Hollow C-shaped stone wall with genuine open doorway facing +Z
-        const wall = new THREE.Mesh(new THREE.CylinderGeometry(1.08, 1.14, 0.88, 20, 1, true, 0.42, Math.PI * 2 - 0.84), wallMatS);
-        wall.position.y = 0.54; wall.castShadow = true; wall.receiveShadow = true; g.add(wall);
+        // Stepped cobblestone plinth + entry stone step + woven interior rug
+        const plinthS = new THREE.Mesh(new THREE.CylinderGeometry(1.32, 1.42, 0.12, 18), floorMatS);
+        plinthS.position.y = 0.06; plinthS.receiveShadow = true; g.add(plinthS);
+        const stepS = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.09, 0.42), floorMatS);
+        stepS.position.set(0, 0.05, 1.38); stepS.receiveShadow = true; g.add(stepS);
+        const rug = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, 0.025, 16), new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.95 }));
+        rug.position.y = 0.13; g.add(rug);
 
-        // 8 vertical timber structural posts + door lintel + sill
+        // Hollow C-shaped stacked masonry wall with open doorway facing +Z
+        const wall = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.18, 0.94, 22, 1, true, 0.40, Math.PI * 2 - 0.80), wallMatS);
+        wall.position.y = 0.59; wall.castShadow = true; wall.receiveShadow = true; g.add(wall);
+
+        // 8 weathered oak posts + top wall-plate ring + carved doorway jambs, lintel & porch awning
         for (let p = 0; p < 8; p++) {
-          const ang = 0.42 + (p / 7) * (Math.PI * 2 - 0.84);
-          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.96, 7), timberMatS);
-          post.position.set(Math.sin(ang) * 1.11, 0.54, Math.cos(ang) * 1.11);
+          const ang = 0.40 + (p / 7) * (Math.PI * 2 - 0.80);
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.072, 1.02, 7), timberMatS);
+          post.position.set(Math.sin(ang) * 1.15, 0.60, Math.cos(ang) * 1.15);
           post.castShadow = true; g.add(post);
         }
-        const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.11, 0.16), timberMatS);
-        lintel.position.set(0, 0.96, 1.02); lintel.castShadow = true; g.add(lintel);
+        const topRing = new THREE.Mesh(new THREE.TorusGeometry(1.14, 0.055, 6, 20), timberMatS);
+        topRing.rotation.x = Math.PI / 2; topRing.position.y = 1.06; g.add(topRing);
+        const lintel = new THREE.Mesh(new THREE.BoxGeometry(1.06, 0.12, 0.22), timberMatS);
+        lintel.position.set(0, 1.04, 1.08); lintel.castShadow = true; g.add(lintel);
+        // Porch awning posts + small timber overhang
+        for (const px of [-0.46, 0.46]) {
+          const pPost = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.052, 0.96, 6), timberMatS);
+          pPost.position.set(px, 0.54, 1.44); pPost.castShadow = true; g.add(pPost);
+        }
+        const awning = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.08, 0.46), timberMatS);
+        awning.position.set(0, 1.00, 1.32); awning.rotation.x = 0.22; awning.castShadow = true; g.add(awning);
 
-        // Interior furnishings visible through doorway & cutaway roof: indoor firepit, sleeping bench & clay jar!
-        const inFireBase = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.08, 8), floorMatS);
-        inFireBase.position.set(0, 0.14, -0.08); g.add(inFireBase);
-        const inEmber = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xea580c, emissiveIntensity: 2.2 }));
-        inEmber.scale.set(1.0, 0.55, 1.0); inEmber.position.set(0, 0.19, -0.08); g.add(inEmber);
-        const bench = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.16, 0.34), timberMatS);
-        bench.position.set(-0.32, 0.18, -0.58); bench.rotation.y = 0.25; g.add(bench);
-        const pelt = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.06, 0.28), new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.95 }));
-        pelt.position.set(-0.32, 0.28, -0.58); pelt.rotation.y = 0.25; g.add(pelt);
-        const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 0.28, 10), new THREE.MeshStandardMaterial({ color: 0xc2410c, roughness: 0.72 }));
-        jar.position.set(0.54, 0.24, -0.35); g.add(jar);
+        // Shuttered side window with warm candlelight glow
+        const winFrame = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.38, 0.42), timberMatS);
+        winFrame.position.set(1.14, 0.66, 0.08); g.add(winFrame);
+        const winPane = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.28, 0.30), new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xf59e0b, emissiveIntensity: 1.15 }));
+        winPane.position.set(1.15, 0.66, 0.08); g.add(winPane);
 
-        // Layered overhanging woven-thatch roof with smoke vent (auto-fades to cutaway when camera zooms close!)
+        // Stone chimney stack rising through rear roof eaves
+        const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.32, 1.85, 0.32), floorMatS);
+        chimney.position.set(-0.78, 0.98, -0.78); chimney.castShadow = true; g.add(chimney);
+        const chimCap = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.09, 0.42), floorMatS);
+        chimCap.position.set(-0.78, 1.94, -0.78); g.add(chimCap);
+
+        // Yard props outside the door: stacked split firewood logs + terracotta amphora
+        for (let fl = 0; fl < 3; fl++) {
+          const flog = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.44, 6), timberMatS);
+          flog.rotation.z = Math.PI / 2;
+          flog.position.set(-0.92, 0.14 + (fl === 2 ? 0.08 : 0), 1.05 + (fl === 1 ? 0.11 : (fl === 2 ? 0.055 : 0)));
+          g.add(flog);
+        }
+        const extJar = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.14, 0.30, 10), new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.72 }));
+        extJar.position.set(0.86, 0.21, 1.08); g.add(extJar);
+
+        // Interior furnishings visible through doorway & cutaway roof: stone firepit, sleeping bench with pelt & clay jar
+        const inFireBase = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.09, 9), floorMatS);
+        inFireBase.position.set(0, 0.16, -0.06); g.add(inFireBase);
+        const inEmber = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xea580c, emissiveIntensity: 2.4 }));
+        inEmber.scale.set(1.0, 0.55, 1.0); inEmber.position.set(0, 0.22, -0.06); g.add(inEmber);
+        const bench = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.16, 0.36), timberMatS);
+        bench.position.set(-0.34, 0.20, -0.60); bench.rotation.y = 0.25; g.add(bench);
+        const pelt = new THREE.Mesh(new THREE.BoxGeometry(0.70, 0.07, 0.30), new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.95 }));
+        pelt.position.set(-0.34, 0.30, -0.60); pelt.rotation.y = 0.25; g.add(pelt);
+        const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.15, 0.30, 10), new THREE.MeshStandardMaterial({ color: 0xc2410c, roughness: 0.70 }));
+        jar.position.set(0.56, 0.26, -0.36); g.add(jar);
+
+        // Layered overhanging woven-thatch roof with exposed wooden rafters (auto-fades to cutaway when camera zooms <16m!)
         const roofGrp = new THREE.Group();
-        const roofCone = new THREE.Mesh(new THREE.ConeGeometry(1.48, 0.96, 16, 1, true), thatchMatS);
-        roofCone.position.y = 1.44; roofCone.castShadow = true; roofGrp.add(roofCone);
-        const roofCap = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 0.18, 10), timberMatS);
-        roofCap.position.y = 1.92; roofGrp.add(roofCap);
+        const roofCone = new THREE.Mesh(new THREE.ConeGeometry(1.62, roofPitch, 18, 1, true), thatchMatS);
+        roofCone.position.y = 1.06 + roofPitch * 0.5; roofCone.castShadow = true; roofGrp.add(roofCone);
+        const roofTrim = new THREE.Mesh(new THREE.TorusGeometry(1.56, 0.05, 6, 18), timberMatS);
+        roofTrim.rotation.x = Math.PI / 2; roofTrim.position.y = 1.08; roofGrp.add(roofTrim);
+        const roofCap = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.28, 0.18, 10), timberMatS);
+        roofCap.position.y = 1.06 + roofPitch + 0.04; roofGrp.add(roofCap);
         g.add(roofGrp);
+        g.rotation.y = (sRnd(4) - 0.5) * 1.4; // Unique natural orientation per cabin
         g.userData.cutawayRoof = roofGrp;
         g.userData.cutawayMat = thatchMatS;
       } else if (st.kind === 'granary') {
