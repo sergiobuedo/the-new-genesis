@@ -629,6 +629,7 @@ class WorldStructure:
     tech_tier: int = 1      # 1..5 cumulative civilizational tier
     is_vehicle: bool = False
     vehicle_speed: float = 0.0
+    build_progress: float = 1.0  # 0.25 (foundation/posts) -> 1.0 (completed roofed dwelling)
     vehicle_domain: str = "land"  # "land" | "water" | "air" | "orbit"
     vehicle_target: Optional[Tuple[float, float]] = None
     signal_range: float = 0.0  # > 0 enables long-distance speech & lore transmission!

@@ -2985,6 +2985,19 @@
       return g;
     }
 
+    function applyBuildProgress(g, prog) {
+      const p = (prog === undefined || prog === null) ? 1.0 : Math.max(0.1, Math.min(1.0, prog));
+      if (g.userData.buildWall) {
+        g.userData.buildWall.visible = p >= 0.40;
+        g.userData.buildWall.scale.y = p < 0.75 ? 0.52 : 1.0;
+      }
+      if (g.userData.buildTopRing) g.userData.buildTopRing.visible = p >= 0.75;
+      if (g.userData.buildRoof) g.userData.buildRoof.visible = p >= 1.0;
+      if (g.userData.buildInterior) {
+        for (const item of g.userData.buildInterior) item.visible = p >= 0.85;
+      }
+    }
+
     function createStructureMesh(st) {
       const g = new THREE.Group();
       g.scale.setScalar(0.58);
@@ -3283,6 +3296,11 @@
         g.rotation.y = (sRnd(4) - 0.5) * 1.4; // Unique natural orientation per cabin
         g.userData.cutawayRoof = roofGrp;
         g.userData.cutawayMat = thatchMatS;
+        g.userData.buildWall = wall;
+        g.userData.buildTopRing = topRing;
+        g.userData.buildRoof = roofGrp;
+        g.userData.buildInterior = [rug, inFireBase, inEmber, bench, pelt, jar];
+        applyBuildProgress(g, st.build_progress !== undefined ? st.build_progress : 1.0);
       } else if (st.kind === 'granary') {
         // Elevated Timber-Stilt Clay Granary Silo with Conical Woven Lid
         const stiltMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21, roughness: 0.9 });
@@ -4363,6 +4381,7 @@
         sIds.add(st.id);
         let sm = structMeshes.get(st.id);
         if (!sm) { sm = createStructureMesh(st); structMeshes.set(st.id, sm); }
+        applyBuildProgress(sm, st.build_progress !== undefined ? st.build_progress : 1.0);
         sm.userData.data = st;
         if (st.is_vehicle && (!isCloudMode || isNewServerTick)) {
           sm.userData.serverAnchor = { x: st.x, z: st.y };

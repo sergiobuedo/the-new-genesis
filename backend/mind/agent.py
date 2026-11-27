@@ -232,8 +232,8 @@ class KobAgent:
 
     @property
     def is_fertile(self) -> bool:
-        """Human-like reproductive window: fertile from ~14 to 48 Earth years (menopause -> Grandmother Hypothesis!)."""
-        if self.age_days < 30.0:
+        """Human-like reproductive window: fertile from 14 to 48 Earth years (menopause -> Grandmother Hypothesis!)."""
+        if self.age_years < 14.0:
             return False
         if self.sex == "F" and self.age_years > 48.0:
             return False
@@ -241,8 +241,10 @@ class KobAgent:
 
     @property
     def life_stage(self) -> str:
-        if self.age_days < 180.0:
+        if self.age_days < 365.0:
             return "Infant"
+        if self.age_years < 5.0:
+            return "Child"
         if self.age_years < 14.0:
             return "Juvenile"
         if self.age_years < 48.0:

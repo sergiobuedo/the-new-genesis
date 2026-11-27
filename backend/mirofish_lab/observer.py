@@ -113,10 +113,12 @@ class PopulationSimulation:
                 cx + math.cos(ang) * rad, cy + math.sin(ang) * rad
             )
             genome = KobGenome.random_founder(self.world.rng, lineage=lineage)
+            init_age_days = round(self.world.rng.uniform(6570.0, 8760.0), 1)  # Realistic 18-24 yr young adult founders
             ag = KobAgent(
                 id=aid,
                 generation=1,
-                born_day=self.world.day,
+                born_day=self.world.day - int(init_age_days),
+                age_days=init_age_days,
                 x=sx,
                 y=sy,
                 genome=genome,
@@ -712,6 +714,61 @@ class PopulationSimulation:
         if agent.is_sleeping:
             agent.action_label = "Sleeping deeply to restore strength"
             return
+
+        # 0B. Authentic Human Infancy (0-1 yr carried by mother/shelter) & Early Childhood (1-5 yrs near camp)
+        if agent.age_days < 365.0:
+            mother_id = agent.parents[0] if agent.parents else None
+            mother = self.agents.get(mother_id) if mother_id else None
+            if mother is not None and mother.alive:
+                # Carried / cradled right beside mother (< 0.85m)
+                agent.x = round(mother.x + math.cos(mother.heading + 1.4) * 0.55, 2)
+                agent.y = round(mother.y + math.sin(mother.heading + 1.4) * 0.55, 2)
+                agent.action_label = f"Carried & cared for by mother {mother.id}"
+                return
+            # Orphaned infant stays sheltered at nearest hut or hearth
+            safe_spot = next((s for s in nearby_structs if s.kind in ("shelter", "hearth")), None)
+            if safe_spot is not None:
+                self._move_smooth(agent, safe_spot.x, safe_spot.y, nearby_others, speed=0.14)
+                agent.action_label = "Resting safely inside camp shelter"
+                return
+        elif agent.age_days < 1825.0:
+            # Young child (1-5 yrs): plays & learns safely near parents/camp, never hunts, builds or pairs
+            parent_ref = next((self.agents[pid] for pid in (agent.parents or ()) if pid in self.agents and self.agents[pid].alive), None)
+            if parent_ref is not None and math.hypot(parent_ref.x - agent.x, parent_ref.y - agent.y) > 4.5:
+                self._move_smooth(agent, parent_ref.x, parent_ref.y, nearby_others, speed=0.22 * spd_mul)
+                agent.action_label = f"Following & learning from parent {parent_ref.id}"
+                return
+            if self.world.rng.random() < 0.72:
+                agent.action_label = "Playing & observing elders near camp"
+                return
+
+        # 0C. Progressive Step-by-Step Construction (adults & juveniles collaboratively finish huts/edifices!)
+        if agent.age_days >= 1825.0 and agent.energy > 45.0:
+            unfinished = next(
+                (s for s in nearby_structs if s.kind in ("shelter", "edifice") and getattr(s, "build_progress", 1.0) < 1.0),
+                None,
+            )
+            if unfinished is not None:
+                if math.hypot(unfinished.x - agent.x, unfinished.y - agent.y) > 2.2:
+                    self._move_smooth(agent, unfinished.x, unfinished.y, nearby_others, speed=0.26 * spd_mul)
+                    agent.action_label = f"Carrying timber & stone to {unfinished.kind} ({int(unfinished.build_progress * 100)}%)"
+                else:
+                    unfinished.build_progress = min(1.0, round(unfinished.build_progress + 0.15, 2))
+                    agent.energy = max(20.0, agent.energy - 1.4)
+                    agent.action_fx = "fire"
+                    pct = int(unfinished.build_progress * 100)
+                    agent.action_label = f"Building {unfinished.kind} ({pct}%)"
+                    agent.pause_ticks = 3
+                    if unfinished.build_progress >= 1.0:
+                        self._record_event(
+                            "construction",
+                            f"Completed {unfinished.sensory_name} ({unfinished.id}) — roof & hearth finished by {agent.lineage} {agent.id}!",
+                            [agent.id],
+                            unfinished.x,
+                            unfinished.y,
+                            importance=4,
+                        )
+                return
 
         # 1A. Self-Medication & Empathetic Caregiving when injured or sick!
         remedy_codes = ("clinical_cure", "antiseptic_balm", "herbal_remedy", "medicinal_herb")
@@ -1546,6 +1603,8 @@ class PopulationSimulation:
                         agent.inventory.append(crafted)
                         m_key = f"craft_{crafted}"
                     else:
+                        if struct.kind in ("shelter", "edifice"):
+                            struct.build_progress = 0.25  # Starts at Phase 1: stone foundation & corner timber posts!
                         m_key = f"struct_{struct.kind}"  # type: ignore[union-attr]
                     # Observational / Vicarious Social Learning (Bandura & Henrich Cultural Ratchet!):
                     # Nearby witnesses imitate & acquire the inventor's empirical insights naturally!
@@ -1754,8 +1813,7 @@ class PopulationSimulation:
             a
             for a in living_all
             if a.sex == "F"
-            and (self.world.day - a.born_day) >= 7
-            and a.age_years <= 48.0
+            and a.is_fertile
             and not a.is_pregnant
             and a.energy > 52.0
             and a.warmth > 46.0
@@ -1765,10 +1823,10 @@ class PopulationSimulation:
             b
             for b in living_all
             if b.sex == "M"
+            and b.is_fertile
             and b.energy > 48.0
             and b.warmth > 44.0
             and b.stress < 78.0
-            and (self.world.day - b.born_day) >= 7
         ]
         used_males = set()
         for fem in females:
@@ -3125,6 +3183,7 @@ class MiroFishObservatory:
                     "vehicle_domain": s.vehicle_domain,
                     "signal_range": s.signal_range,
                     "stories": s.stories,
+                    "build_progress": round(getattr(s, "build_progress", 1.0), 2),
                     "chambers": s.chambers,
                     "blueprint_3d": s.blueprint_3d,
                 }
