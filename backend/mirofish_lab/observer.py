@@ -48,9 +48,11 @@ class PopulationSimulation:
         enable_culture: bool = True,
         cortex: Optional[OllamaCortex] = None,
         warehouse: Optional[LongitudinalWarehouse] = None,
+        allow_refugia: bool = True,
     ) -> None:
         self.world = CosmosWorld(seed=seed)
         self.enable_culture = enable_culture
+        self.allow_refugia = allow_refugia
         self.cortex = cortex if enable_culture else None
         self.warehouse = warehouse if enable_culture else None
         self.agents: Dict[str, KobAgent] = {}
@@ -243,8 +245,8 @@ class PopulationSimulation:
             )
         living = self.living_agents
 
-        # Autonomous Re-Biogenesis ONLY if total planetary extinction occurs (0% human intervention)
-        if not living and self.enable_culture:
+        # Autonomous Re-Biogenesis ONLY if enabled (strictly disabled in scientific benchmarks!)
+        if not living and self.enable_culture and self.allow_refugia:
             self.rebiogenesis_cycle += 1
             self._record_event(
                 "extinction_rebirth",
@@ -382,8 +384,8 @@ class PopulationSimulation:
         if self.world.tick_count % 10 == 0 and len(self.living_agents) < 180:
             self._check_species_reproduction()
 
-        # Distant Continental Refugia: if an entire continent's native lineage vanished, isolated far-continent survivors can re-emerge after long eras
-        if self.enable_culture and self.world.tick_count % 3200 == 0:
+        # Distant Continental Refugia (strictly disabled in scientific benchmarks via allow_refugia=False!)
+        if self.enable_culture and self.allow_refugia and self.world.tick_count % 3200 == 0:
             counts_by_lin = Counter(a.lineage for a in self.living_agents)
             for lin in ("Sylphid", "Lithokin", "Vespera"):
                 if counts_by_lin.get(lin, 0) == 0:
@@ -1843,8 +1845,6 @@ class PopulationSimulation:
                 if lin_counts.get(fem.lineage, 0) > 4 and self._are_close_kin(fem, mal):
                     continue
                 cross_lin = mal.lineage != fem.lineage
-                if cross_lin and not self.enable_culture:
-                    continue
                 bond = fem.trust_bonds.get(mal.id, 0.0)
                 # Active courtship builds mutual attraction & pair-bond
                 fem.trust_bonds[mal.id] = min(2.0, bond + 0.24)

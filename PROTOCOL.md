@@ -1,6 +1,6 @@
 # Research protocol and pre-registration: The New Genesis (Project Universe XXV)
 
-**Protocol version:** `v2.0-protocol` (unbiased causal control baseline)  
+**Protocol version:** `v3.0-protocol` (zero-refugia, authentic human ontogeny, and unbiased causal control)  
 **Principal investigator:** Dr. Sergio Buedo Martínez  
 **Repository and open data:** https://github.com/sergiobuedo/the-new-genesis  
 **Public observatory:** https://agobac-ia.es  
