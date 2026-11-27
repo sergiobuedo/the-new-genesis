@@ -360,7 +360,8 @@
         <div class="stat-pill" id="pill-day-briefing" style="cursor:pointer;border-color:var(--accent);background:rgba(56,189,248,0.16)" title="Pulsa para ver el Parte Diario por Zonas, Razas y Clima / Click for Daily Briefing">📋 <strong id="ui-time">Y1 · Day 1</strong> ▾</div>
         <div class="stat-pill"><strong id="ui-season">Spring</strong> (<span id="ui-temp">19.0°C</span>)</div>
         <div class="stat-pill" id="ui-astro" title="Solar Orbit, Lunar Cycle & Live Weather">☀️ Clear · 🌕 Moon · 1.00 AU</div>
-        <div class="stat-pill">Live: <strong id="ui-pop">21</strong> · Null: <strong id="ui-ctrl">21</strong></div>
+        <div class="stat-pill" id="pill-metapop" style="border-color:rgba(52,211,153,0.55);background:rgba(16,185,129,0.12);" title="Real 1:1 Vectorized Global Metapopulation (Live vs Null, zero fake multipliers)">🌍 1:1: <strong id="ui-mp-live" style="color:#34d399;">100,000</strong> vs <strong id="ui-mp-null">100,000</strong></div>
+        <div class="stat-pill" title="3D Focal Band Microscope (ABM + LLM)">🔬 3D: <strong id="ui-pop">45</strong> · Null: <strong id="ui-ctrl">45</strong></div>
         <div class="stat-pill hide-sm" title="Living Wild Animal Species out of 24 Total">Fauna: <strong id="ui-fauna">24/24</strong></div>
         <div class="stat-pill hide-sm" title="Exact 1:1 Planet Earth (Ø 12,742 km · Circ. 40,075 km · 510.07M km²)">Earth 1:1: <strong id="ui-km2">1850 km²</strong> / 510M km²</div>
         <div class="stat-pill hide-sm">Cortex: <strong id="ui-llm">GPU</strong></div>
@@ -4169,6 +4170,14 @@
       // Pure 1:1 Verifiable Population — exact count of real simulated individuals (zero extrapolation!)
       document.getElementById('ui-pop').textContent = `${m.live_population}`;
       document.getElementById('ui-ctrl').textContent = m.control_population;
+      const elMpL = document.getElementById('ui-mp-live');
+      const elMpN = document.getElementById('ui-mp-null');
+      if (elMpL && m.metapopulation_live && m.metapopulation_live.total_population) {
+        elMpL.textContent = m.metapopulation_live.total_population.toLocaleString();
+      }
+      if (elMpN && m.metapopulation_null && m.metapopulation_null.total_population) {
+        elMpN.textContent = m.metapopulation_null.total_population.toLocaleString();
+      }
       if (m.wild_species_alive !== undefined) {
         document.getElementById('ui-fauna').textContent = `${m.wild_species_alive}/${m.wild_species_total || 42}`;
       }
