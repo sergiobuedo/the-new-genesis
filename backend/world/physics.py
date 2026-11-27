@@ -1177,9 +1177,9 @@ class CosmosWorld:
         pollinator_factor = max(0.35, min(1.25, pollinator_pop / 5.0))
         weather_growth = 1.35 if self.weather == "rain" else (0.52 if self.weather in ("drought", "snow") else 1.0)
 
-        if self.tick_count % 22 == 0 and self.chunks and len(self.resources) < len(self.chunks) * 16:
+        if self.tick_count % 22 == 0 and self.chunks and len(self.resources) < len(self.chunks) * 65:
             chunk_keys = list(self.chunks.keys())
-            # v4.0-protocol: Area-proportional ecological primary productivity with realistic carrying-capacity cap
+            # v4.0-protocol: Area-proportional ecological primary productivity with high non-blocking carrying-capacity cap
             per_chunk_rate = 2 if self.season_index != 3 else 1
             base_trials = min(90, max(36, len(chunk_keys) * per_chunk_rate))
             trials = max(8, int(round(base_trials * pollinator_factor * weather_growth)))

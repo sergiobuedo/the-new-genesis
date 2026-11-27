@@ -138,6 +138,36 @@ class PopulationSimulation:
                 self.agents[id_b].trust_bonds[id_a] = 0.35
         return spawned
 
+    def admit_real_migrant(self, migrant: Dict[str, Any]) -> str:
+        """Admits 1 real adult migrant deducted 1:1 from the global vectorized metapopulation."""
+        lin = migrant.get("lineage", "Sylphid")
+        if lin not in ENCLAVE_HOMELANDS:
+            lin = self.world.rng.choice(("Sylphid", "Lithokin", "Vespera"))
+        cx, cy = ENCLAVE_HOMELANDS[lin]
+        prefix = LINEAGE_SPECS[lin]["prefix"]
+        self._agent_seq += 1
+        aid = f"{prefix}-{self._agent_seq:03d}"
+        ang = self.world.rng.uniform(0, 2 * math.pi)
+        rad = self.world.rng.uniform(2.0, 6.5)
+        sx, sy = self.world.find_nearest_dry_spot(cx + math.cos(ang) * rad, cy + math.sin(ang) * rad)
+        genome = KobGenome.random_founder(self.world.rng, lineage=lin)
+        genome.vitality = round(float(migrant.get("vitality", genome.vitality)), 3)
+        age_d = round(float(migrant.get("age_days", 7300.0)), 1)
+        ag = KobAgent(
+            id=aid,
+            generation=1,
+            born_day=self.world.day - int(age_d),
+            age_days=age_d,
+            x=sx,
+            y=sy,
+            genome=genome,
+            sex=migrant.get("sex", "F"),
+            heading=round(ang, 3),
+            steer_side=1.0 if self.world.rng.random() < 0.5 else -1.0,
+        )
+        self.agents[aid] = ag
+        return aid
+
     def _spawn_multi_species_founders(self, per_lineage: int) -> None:
         for lineage in ("Sylphid", "Lithokin", "Vespera"):
             self._spawn_lineage_enclave(lineage, per_lineage)
@@ -2392,6 +2422,29 @@ class MiroFishObservatory:
                 self.live_metapop.step_day(season_index=self.live.world.season_index, focal_cultural_bonus=focal_bonus)
             if self.null_metapop is not None:
                 self.null_metapop.step_day(season_index=self.control.world.season_index, focal_cultural_bonus=0.0)
+            # Symmetric 1:1 inter-band migration from global 100k metapopulation into focal valley (once per season if band < 24)
+            if self.live.world.day % 90 == 0:
+                for sim_arm, mp_arm, is_live_arm in (
+                    (self.live, self.live_metapop, True),
+                    (self.control, self.null_metapop, False),
+                ):
+                    if mp_arm is not None and mp_arm.population >= 1000 and len(sim_arm.living_agents) < 24:
+                        arrivals: List[str] = []
+                        for lin in ("Sylphid", "Lithokin", "Vespera", "Sylphid", "Lithokin", "Vespera"):
+                            if len(sim_arm.living_agents) >= 24:
+                                break
+                            mig = mp_arm.dispatch_real_migrant(lin)
+                            if mig is not None:
+                                arrivals.append(sim_arm.admit_real_migrant(mig))
+                        if arrivals and is_live_arm:
+                            sim_arm._record_event(
+                                "migration",
+                                f"Inter-band migration: {len(arrivals)} adults ({', '.join(arrivals[:4])}) arrived from neighboring continental bands (deducted 1:1 from global metapopulation).",
+                                arrivals,
+                                0.0,
+                                0.0,
+                                importance=4,
+                            )
             metrics = self.compute_scientific_metrics()
             self._cached_metrics = metrics
             self.warehouse.record_epoch(metrics)
