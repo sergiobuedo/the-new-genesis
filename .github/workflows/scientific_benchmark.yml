@@ -11,10 +11,14 @@ on:
         description: "Planetary days simulated per replicate"
         required: false
         default: "730"
-      model_tag:
-        description: "Model or ablation arm label (e.g. abm_v2_baseline, qwen2.5-1.5b, llama3.2-1b)"
+      founders_per_lineage:
+        description: "Initial adult founders per lineage (7 = 21 total Allee arm, 15 = 45 total Dunbar band)"
         required: false
-        default: "abm_v2_baseline"
+        default: "7"
+      model_tag:
+        description: "Model or ablation arm label (e.g. v3_dunbar45, abm_v3_baseline, qwen2.5-1.5b)"
+        required: false
+        default: "abm_v3_baseline"
 
 permissions:
   contents: write
@@ -42,7 +46,7 @@ jobs:
         run: python -m pytest tests/ -v
 
       - name: Run N Paired Independent Replicates (Live vs. Null-Control Twin)
-        run: python -m backend.academia.multi_seed_benchmark --seeds "${{ github.event.inputs.seeds || '20' }}" --days "${{ github.event.inputs.days || '730' }}" --model-tag "${{ github.event.inputs.model_tag || 'abm_v2_baseline' }}"
+        run: python -m backend.academia.multi_seed_benchmark --seeds "${{ github.event.inputs.seeds || '20' }}" --days "${{ github.event.inputs.days || '730' }}" --founders-per-lineage "${{ github.event.inputs.founders_per_lineage || '7' }}" --model-tag "${{ github.event.inputs.model_tag || 'abm_v3_baseline' }}"
 
       - name: Publish FAIR CSV & Summary JSON to live-telemetry branch
         run: |
@@ -53,8 +57,17 @@ jobs:
           git fetch origin live-telemetry:live-telemetry
           git checkout -f live-telemetry
           mkdir -p chronicles
-          cp /tmp/bench_out/benchmark_results.csv /tmp/bench_out/benchmark_summary.json chronicles/
+          # Preserve previous v3.0 21-founder Allee arm if not yet archived
+          if [ -f chronicles/benchmark_results.csv ] && [ ! -f chronicles/benchmark_results_v3_allee21.csv ]; then
+            cp chronicles/benchmark_results.csv chronicles/benchmark_results_v3_allee21.csv
+            cp chronicles/benchmark_summary.json chronicles/benchmark_summary_v3_allee21.json || true
+          fi
+          TAG="${{ github.event.inputs.model_tag || 'abm_v3_baseline' }}"
+          cp /tmp/bench_out/benchmark_results.csv chronicles/benchmark_results.csv
+          cp /tmp/bench_out/benchmark_summary.json chronicles/benchmark_summary.json
+          cp /tmp/bench_out/benchmark_results.csv "chronicles/benchmark_results_${TAG}.csv"
+          cp /tmp/bench_out/benchmark_summary.json "chronicles/benchmark_summary_${TAG}.json"
           git checkout main -- PROTOCOL.md || true
-          git add -f chronicles/benchmark_results.csv chronicles/benchmark_summary.json PROTOCOL.md
-          git commit -m "science(benchmark): publish N=${{ github.event.inputs.seeds || '10' }} paired multi-seed FAIR dataset (v2.0-protocol)" || true
+          git add -f chronicles/benchmark_results*.csv chronicles/benchmark_summary*.json PROTOCOL.md
+          git commit -m "science(benchmark): publish N=${{ github.event.inputs.seeds || '20' }} paired multi-seed FAIR dataset (v3.0-protocol, ${TAG})" || true
           git push origin live-telemetry

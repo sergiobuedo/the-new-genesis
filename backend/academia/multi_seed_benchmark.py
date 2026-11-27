@@ -85,6 +85,8 @@ def run_single_replicate(seed: int, days: int, founders_per_lineage: int = 7) ->
             return {
                 "seed": seed,
                 "days_simulated": days,
+                "founders_per_lineage": founders_per_lineage,
+                "initial_founders_total": founders_per_lineage * 3,
                 "live_final_pop": int(m["live_population"]),
                 "null_final_pop": int(m["control_population"]),
                 "pop_diff_live_minus_null": int(m["live_population"]) - int(m["control_population"]),
@@ -115,17 +117,18 @@ def run_multi_seed_benchmark(
     days: int = 120,
     base_seed: int = 1001,
     output_dir: Path = Path("chronicles"),
-    model_tag: str = "abm_v2_baseline",
+    model_tag: str = "abm_v3_baseline",
+    founders_per_lineage: int = 7,
 ) -> Dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     rows: List[Dict[str, Any]] = []
     for i in range(num_seeds):
         sd = base_seed + i
-        row = run_single_replicate(seed=sd, days=days)
+        row = run_single_replicate(seed=sd, days=days, founders_per_lineage=founders_per_lineage)
         row["model_tag"] = model_tag
         rows.append(row)
         print(
-            f"[Seed {sd}] Day {days}: Live={row['live_final_pop']} vs Null={row['null_final_pop']} "
+            f"[Seed {sd}] Day {days} (Founders={founders_per_lineage*3}): Live={row['live_final_pop']} vs Null={row['null_final_pop']} "
             f"| Words={row['shared_words']} | Disc={row['discoveries_count']} | AgBeforeFire={row['ag_before_fire']}"
         )
 
@@ -148,6 +151,8 @@ def run_multi_seed_benchmark(
         "generated_utc": datetime.now(timezone.utc).isoformat(),
         "n_replicates": num_seeds,
         "days_per_replicate": days,
+        "founders_per_lineage": founders_per_lineage,
+        "initial_founders_total": founders_per_lineage * 3,
         "base_seed": base_seed,
         "live_pop_mean": round(statistics.mean(live_pops), 2),
         "live_pop_sd": round(statistics.stdev(live_pops), 2) if num_seeds >= 2 else 0.0,
@@ -180,7 +185,15 @@ if __name__ == "__main__":
     parser.add_argument("--seeds", type=int, default=10, help="Number of independent random seeds (default: 10)")
     parser.add_argument("--days", type=int, default=120, help="Planetary days per replicate (default: 120)")
     parser.add_argument("--base-seed", type=int, default=1001, help="Starting seed integer (default: 1001)")
-    parser.add_argument("--model-tag", type=str, default="abm_v2_baseline", help="Model/ablation arm identifier (e.g. qwen2.5:1.5b, llama3.2:1b)")
+    parser.add_argument("--founders-per-lineage", type=int, default=7, help="Initial adult founders per lineage (3 lineages total; default: 7 = 21 total, 15 = 45 Dunbar band)")
+    parser.add_argument("--model-tag", type=str, default="abm_v3_baseline", help="Model/ablation arm identifier (e.g. v3_dunbar45, qwen2.5:1.5b, llama3.2:1b)")
     args = parser.parse_args()
     root = Path(__file__).resolve().parent.parent.parent
-    run_multi_seed_benchmark(num_seeds=args.seeds, days=args.days, base_seed=args.base_seed, output_dir=root / "chronicles", model_tag=args.model_tag)
+    run_multi_seed_benchmark(
+        num_seeds=args.seeds,
+        days=args.days,
+        base_seed=args.base_seed,
+        output_dir=root / "chronicles",
+        model_tag=args.model_tag,
+        founders_per_lineage=args.founders_per_lineage,
+    )
