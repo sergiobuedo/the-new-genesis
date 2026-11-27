@@ -4211,15 +4211,22 @@
       }
 
       const sp = m.species_counts || {};
+      const mpLin = (m.metapopulation_live && m.metapopulation_live.by_lineage) ? m.metapopulation_live.by_lineage : {};
       const pillsBox = document.getElementById('species-pills-box');
       if (pillsBox) {
-        const raceColors = { Sylphid: '#38bdf8', Lithokin: '#fbbf24', Vespera: '#c084fc' };
-        const allLins = Array.from(new Set(['Sylphid', 'Lithokin', 'Vespera', ...Object.keys(sp)]));
+        const raceColors = { Sylphid: '#38bdf8', Lithokin: '#fbbf24', Vespera: '#c084fc', Hybrid: '#34d399' };
+        const baseLins = ['Sylphid', 'Lithokin', 'Vespera'];
+        if (mpLin.Hybrid > 0) baseLins.push('Hybrid');
+        const allLins = Array.from(new Set([...baseLins, ...Object.keys(sp)]));
         pillsBox.innerHTML = allLins.map(lin => {
           const cnt = sp[lin] || 0;
-          const isHyb = lin.includes('-');
+          const mpCnt = mpLin[lin] || 0;
+          const isHyb = lin.includes('-') || lin === 'Hybrid';
           const col = raceColors[lin] || (isHyb ? '#34d399' : '#f472b6');
-          return `<div class="sp-pill" data-jump-lineage="${lin}" style="border-color:${col};min-width:84px;flex:1 1 auto;opacity:${cnt === 0 ? '0.45' : '1'}"><strong style="color:${col}">📍 ${lin}${isHyb ? ' ✨' : ''}</strong><br><span>${cnt}</span></div>`;
+          const countHtml = mpCnt > 0
+            ? `<strong style="color:#f8fafc;">🌍 ${mpCnt.toLocaleString()}</strong> <span style="font-size:10px;color:var(--muted);">(🔬 ${cnt})</span>`
+            : `<span>${cnt}</span>`;
+          return `<div class="sp-pill" data-jump-lineage="${lin}" style="border-color:${col};min-width:96px;flex:1 1 auto;opacity:${(cnt === 0 && mpCnt === 0) ? '0.45' : '1'}"><strong style="color:${col}">📍 ${lin}${isHyb ? ' ✨' : ''}</strong><br>${countHtml}</div>`;
         }).join('');
         pillsBox.querySelectorAll('[data-jump-lineage]').forEach(pill => {
           pill.addEventListener('click', () => flyToLineage(pill.dataset.jumpLineage));
