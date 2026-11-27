@@ -177,8 +177,8 @@ def test_human_like_sexual_reproduction_gestation_and_family_inheritance():
 
     fem = females[0]
     mal = next(m for m in males if m.lineage != fem.lineage)
-    fem.x, fem.y = -135.0, -115.0
-    mal.x, mal.y = -134.2, -115.0
+    fem.x, fem.y = 50.0, 50.0
+    mal.x, mal.y = 50.8, 50.0
     fem.born_day = -15
     mal.born_day = -15
     fem.trust_bonds[mal.id] = 0.85
