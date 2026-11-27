@@ -1679,15 +1679,15 @@ class PopulationSimulation:
                 self._move_smooth(agent, float(best_xy[0]), float(best_xy[1]), nearby_others, speed=0.25 * spd_mul)
                 return
 
-        # 8B. Active Human-Like Opposite-Sex Mate-Seeking, Courtship & Family Nesting (♂ + ♀)
+        # 8B. Active Human-Like Opposite-Sex Mate-Seeking, Courtship & Family Nesting (♂ + ♀, adults >= 14y only!)
         if (
-            agent.age_days >= 7.0
+            agent.is_fertile
             and not agent.is_pregnant
             and agent.energy > 52.0
             and agent.warmth > 46.0
             and agent.stress < 75.0
         ):
-            opp_nearby = any(o.sex != agent.sex and not o.is_pregnant and o.age_days >= 7.0 for o in nearby_others)
+            opp_nearby = any(o.sex != agent.sex and not o.is_pregnant and o.is_fertile for o in nearby_others)
             if not opp_nearby:
                 lin_pop = sum(1 for o in self.living_agents if o.lineage == agent.lineage)
                 candidates_mate = [
@@ -1696,7 +1696,7 @@ class PopulationSimulation:
                     if o.id != agent.id
                     and o.sex != agent.sex
                     and not o.is_pregnant
-                    and o.age_days >= 7.0
+                    and o.is_fertile
                     and (lin_pop <= 4 or not self._are_close_kin(agent, o))
                     and math.hypot(o.x - agent.x, o.y - agent.y) <= 95.0
                 ]
@@ -2197,8 +2197,8 @@ class MiroFishObservatory:
 
             # If upgrading from a legacy save without pair-bonds, naturally bond co-located adult ♀+♂ peers
             if not any(a.partner_id for a in self.live.living_agents):
-                females_up = [a for a in self.live.living_agents if a.sex == "F" and a.age_days >= 7.0]
-                males_up = [b for b in self.live.living_agents if b.sex == "M" and b.age_days >= 7.0]
+                females_up = [a for a in self.live.living_agents if a.sex == "F" and a.is_fertile]
+                males_up = [b for b in self.live.living_agents if b.sex == "M" and b.is_fertile]
                 paired_m = set()
                 preg_seeded = 0
                 for fem in females_up:
@@ -2662,7 +2662,7 @@ class MiroFishObservatory:
         # Emergent Clan Leaders (highest-prestige adult per lineage, never assigned!)
         clan_leaders: Dict[str, Dict[str, Any]] = {}
         for lin_name in species_counts.keys():
-            cands = [a for a in living if a.lineage == lin_name and a.age_days >= 14.0]
+            cands = [a for a in living if a.lineage == lin_name and a.age_years >= 18.0]
             if cands:
                 top_l = max(cands, key=lambda x: (x.prestige, x.age_days, len(x.trust_bonds)))
                 clan_leaders[lin_name] = {
