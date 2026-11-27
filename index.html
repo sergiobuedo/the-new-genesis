@@ -463,7 +463,7 @@
           </h2>
           <div class="card-body">
             <div id="living-stage-badge" style="margin-bottom:7px;padding:6px 9px;border-radius:8px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.38);font-size:10.6px;line-height:1.35;color:#ecfdf5;">
-              <strong style="color:var(--emerald);">🧭 Etapa actual:</strong> <span id="living-stage-text">Calculando etapa emergente…</span>
+              <strong id="living-stage-lbl" style="color:var(--emerald);">🧭 Etapa actual:</strong> <span id="living-stage-text">Calculando etapa emergente…</span>
             </div>
             <div class="species-pills" id="species-pills-box" style="flex-wrap:wrap;" title="Haz clic en cualquier raza para volar directamente a su poblado / Click any race to fly to their settlement!">
               <div class="sp-pill" data-jump-lineage="Sylphid" style="border-color:#38bdf8"><strong style="color:#38bdf8">📍 Sylphid</strong><br><span id="sp-syl">7</span></div>
@@ -3230,17 +3230,24 @@
         const awning = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.08, 0.46), timberMatS);
         awning.position.set(0, 1.00, 1.32); awning.rotation.x = 0.22; awning.castShadow = true; g.add(awning);
 
-        // Shuttered side window with warm candlelight glow
-        const winFrame = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.38, 0.42), timberMatS);
-        winFrame.position.set(1.14, 0.66, 0.08); g.add(winFrame);
-        const winPane = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.28, 0.30), new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xf59e0b, emissiveIntensity: 1.15 }));
-        winPane.position.set(1.15, 0.66, 0.08); g.add(winPane);
+        // Archaeological Stage Fidelity (v27.1): Glass window & masonry chimney only appear once unlocked by their own discoveries!
+        const discLive = (latestState && latestState.metrics && latestState.metrics.discoveries) || {};
+        const hasGlass = !!(discLive.craft_silica_glass || (st.tech_tier || 1) >= 3);
+        const hasMasonryChimney = !!(discLive.craft_bronze_tool || discLive.struct_edifice || (st.tech_tier || 1) >= 2);
 
-        // Stone chimney stack rising through rear roof eaves
-        const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.32, 1.85, 0.32), floorMatS);
-        chimney.position.set(-0.78, 0.98, -0.78); chimney.castShadow = true; g.add(chimney);
-        const chimCap = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.09, 0.42), floorMatS);
-        chimCap.position.set(-0.78, 1.94, -0.78); g.add(chimCap);
+        if (hasGlass) {
+          const winFrame = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.38, 0.42), timberMatS);
+          winFrame.position.set(1.14, 0.66, 0.08); g.add(winFrame);
+          const winPane = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.28, 0.30), new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xf59e0b, emissiveIntensity: 1.15 }));
+          winPane.position.set(1.15, 0.66, 0.08); g.add(winPane);
+        }
+
+        if (hasMasonryChimney) {
+          const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.32, 1.85, 0.32), floorMatS);
+          chimney.position.set(-0.78, 0.98, -0.78); chimney.castShadow = true; g.add(chimney);
+          const chimCap = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.09, 0.42), floorMatS);
+          chimCap.position.set(-0.78, 1.94, -0.78); g.add(chimCap);
+        }
 
         // Yard props outside the door: stacked split firewood logs + terracotta amphora
         for (let fl = 0; fl < 3; fl++) {
@@ -4158,6 +4165,8 @@
       // Dynamic Emergent Living Stage (purely driven by their own unlocked breakthroughs!)
       const dMap = m.discoveries || {};
       const stageEl = document.getElementById('living-stage-text');
+      const stageLbl = document.getElementById('living-stage-lbl');
+      if (stageLbl) stageLbl.textContent = currentLang === 'es' ? '🧭 Etapa actual:' : '🧭 Current stage:';
       if (stageEl) {
         const es = currentLang === 'es';
         let st = es ? '🪨 Etapa I · Banda Fundadora (Recolectores)' : '🪨 Stage I · Founder Band (Foragers)';
