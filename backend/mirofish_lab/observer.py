@@ -2422,20 +2422,21 @@ class MiroFishObservatory:
                 self.live_metapop.step_day(season_index=self.live.world.season_index, focal_cultural_bonus=focal_bonus)
             if self.null_metapop is not None:
                 self.null_metapop.step_day(season_index=self.control.world.season_index, focal_cultural_bonus=0.0)
-            # Symmetric 1:1 inter-band migration from global 100k metapopulation into focal valley (once per season if band < 24)
-            if self.live.world.day % 90 == 0:
+            # Symmetric 1:1 inter-band migration from global 100k metapopulation into focal valleys (target ~24/enclave = 72 lively Dunbar band)
+            if self.live.world.day % 60 == 0:
                 for sim_arm, mp_arm, is_live_arm in (
                     (self.live, self.live_metapop, True),
                     (self.control, self.null_metapop, False),
                 ):
-                    if mp_arm is not None and mp_arm.population >= 1000 and len(sim_arm.living_agents) < 24:
+                    if mp_arm is not None and mp_arm.population >= 1000 and len(sim_arm.living_agents) < 72:
                         arrivals: List[str] = []
-                        for lin in ("Sylphid", "Lithokin", "Vespera", "Sylphid", "Lithokin", "Vespera"):
-                            if len(sim_arm.living_agents) >= 24:
-                                break
-                            mig = mp_arm.dispatch_real_migrant(lin)
-                            if mig is not None:
-                                arrivals.append(sim_arm.admit_real_migrant(mig))
+                        for _ in range(4):
+                            for lin in ("Sylphid", "Lithokin", "Vespera"):
+                                if len(sim_arm.living_agents) >= 72:
+                                    break
+                                mig = mp_arm.dispatch_real_migrant(lin)
+                                if mig is not None:
+                                    arrivals.append(sim_arm.admit_real_migrant(mig))
                         if arrivals and is_live_arm:
                             sim_arm._record_event(
                                 "migration",
