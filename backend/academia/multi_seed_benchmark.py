@@ -69,6 +69,8 @@ def run_single_replicate(seed: int, days: int, founders_per_lineage: int = 7) ->
             ledger_dir=Path(td),
             seed=seed,
             founders_per_lineage=founders_per_lineage,
+            enable_metapopulation=False,
+            allow_refugia=False,
         )
         # v3.0-protocol: ZERO artificial refugia or re-biogenesis in BOTH Live and Null (extinction is 100% real!)
         obs.live.allow_refugia = False
@@ -146,7 +148,7 @@ def run_multi_seed_benchmark(
     disc_list = [float(r["discoveries_count"]) for r in rows]
 
     summary = {
-        "protocol_version": "v3.0-protocol",
+        "protocol_version": "v4.0-protocol",
         "model_tag": model_tag,
         "generated_utc": datetime.now(timezone.utc).isoformat(),
         "n_replicates": num_seeds,

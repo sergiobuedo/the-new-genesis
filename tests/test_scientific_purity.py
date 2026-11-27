@@ -311,6 +311,36 @@ def test_pure_1to1_reality_earth_geography_and_open_combinatorics():
     assert comp_rev is not None and comp_rev.compound_id == comp.compound_id
 
 
+def test_vectorized_metapopulation_1to1_conservation_and_null_purity():
+    """Verify v4.0-protocol 100,000-individual 1:1 vectorized metapopulation (zero fake multipliers, Null cultural_skill==0)."""
+    import tempfile
+    from pathlib import Path
+    from backend.world.metapopulation import VectorizedMetapopulation
+
+    mp_live = VectorizedMetapopulation(initial_pop=10_000, seed=4202, enable_culture=True)
+    mp_null = VectorizedMetapopulation(initial_pop=10_000, seed=4202, enable_culture=False)
+    assert mp_live.population == 10_000 and mp_null.population == 10_000
+    assert mp_null.summary()["mean_cultural_skill"] == 0.0
+
+    for d in range(30):
+        mp_live.step_day(season_index=0)
+        mp_null.step_day(season_index=0)
+    assert mp_null.summary()["mean_cultural_skill"] == 0.0
+    assert mp_live.population == int(mp_live.age_days.shape[0])
+
+    # Strict 1:1 conservation on migrant transfer + NPZ checkpoint roundtrip
+    before = mp_live.population
+    mig = mp_live.dispatch_real_migrant("Sylphid")
+    assert mig is not None and mp_live.population == before - 1
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
+        cp = Path(td) / "mp_test.npz"
+        mp_live.save_checkpoint(cp)
+        restored = VectorizedMetapopulation.load_checkpoint(cp)
+        assert restored.population == mp_live.population
+        assert restored.day == mp_live.day
+
+
+
 
 
 

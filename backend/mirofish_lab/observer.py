@@ -20,6 +20,7 @@ from backend.mind.epistemic_guard import normalize_phonetic_utterance
 from backend.mirofish_lab.storage import LongitudinalWarehouse
 from backend.world.combinatorics import VALID_PROCESSES, synthesize_open_compound
 from backend.world.earth_geography import earth_location_summary
+from backend.world.metapopulation import VectorizedMetapopulation
 from backend.world.physics import (
     BLIND_MATERIALS,
     ENCLAVE_HOMELANDS,
@@ -454,7 +455,8 @@ class PopulationSimulation:
                         for st in self.world.structures.values()
                     )
                     last_strike = getattr(pred, "_last_strike_tick", -9999)
-                    if near_fire or (self.world.tick_count - last_strike) < 48:
+                    # v4.0-protocol: Realistic predator hunt/ambush interval (192 ticks = 8 days)
+                    if near_fire or (self.world.tick_count - last_strike) < 192:
                         continue
                     pred._last_strike_tick = self.world.tick_count
                     self.predator_attacks += 1
@@ -506,7 +508,8 @@ class PopulationSimulation:
         huddle_bonus = min(6.0, local_crowd * 2.2)
         effective_temp = self.world.local_temperature_at(agent.x, agent.y) + cold_res + cloak_bonus + huddle_bonus
 
-        burn = 0.024 if agent.is_sleeping else 0.055
+        # v4.0-protocol: Calibrated human basal metabolic burn (~3-4 weeks starvation window, Gurven & Kaplan 2007)
+        burn = 0.016 if agent.is_sleeping else 0.036
         agent.energy = max(0.0, agent.energy - burn)
         agent.protein_balance = max(10.0, agent.protein_balance - (0.012 if agent.is_sleeping else 0.026))
         agent.action_fx = ""
@@ -561,9 +564,9 @@ class PopulationSimulation:
 
         max_lifespan_days = self.compute_era_lifespan_years(agent.genome.vitality) * 365.0
         if agent.energy <= 1.0 or agent.hydration <= 1.0 or agent.warmth <= 1.0:
-            agent.integrity -= 0.50
-        elif agent.energy > 55.0 and agent.hydration > 45.0 and agent.warmth > 50.0 and not agent.illness:
-            agent.integrity = min(100.0, agent.integrity + 0.12)
+            agent.integrity -= 0.22
+        elif agent.energy > 50.0 and agent.hydration > 42.0 and agent.warmth > 46.0 and not agent.illness:
+            agent.integrity = min(100.0, agent.integrity + 0.16)
 
         if agent.age_days > max_lifespan_days:
             agent.integrity -= 0.35
@@ -575,7 +578,7 @@ class PopulationSimulation:
                 if self.world.rng.random() < 0.045:
                     contracted = "cold_fever"
             elif agent.integrity < 72.0 and "wound_sepsis" not in agent.antibodies:
-                if self.world.rng.random() < 0.055:
+                if self.world.rng.random() < 0.014:
                     contracted = "wound_sepsis"
             elif (
                 (local_crowd >= 6 or any(math.hypot(cp.x - agent.x, cp.y - agent.y) <= 5.5 for cp in self.world.corpses.values()))
@@ -618,9 +621,9 @@ class PopulationSimulation:
                             peer.illness_severity = 18.0
                             self.disease_cases += 1
                             peer.add_memory(f"Caught contagious {agent.illness.replace('_', ' ')} from {agent.id}.", self.world.day)
-            # Immune progression vs severity
-            immune_fight = (0.14 + agent.genome.vitality * 0.16) * (1.5 if agent.is_sleeping else 1.0) * (1.25 if agent.warmth > 58.0 and agent.energy > 50.0 else 0.55)
-            pathogen_push = 0.24 if agent.illness in ("camp_plague", "wound_sepsis") else 0.18
+            # Immune progression vs severity (v4.0-protocol: realistic human immunocompetence — healthy adults usually recover; malnourished/cold remain vulnerable)
+            immune_fight = (0.19 + agent.genome.vitality * 0.16) * (1.45 if agent.is_sleeping else 1.0) * (1.20 if agent.warmth > 48.0 and agent.energy > 38.0 else 0.72)
+            pathogen_push = 0.21 if agent.illness in ("camp_plague", "wound_sepsis") else 0.16
             agent.illness_severity = max(0.0, min(100.0, agent.illness_severity + pathogen_push - immune_fight))
             if agent.illness_severity >= 48.0:
                 agent.integrity -= 0.14 if agent.illness == "camp_plague" else 0.09
@@ -2001,7 +2004,15 @@ class PopulationSimulation:
 class MiroFishObservatory:
     """Universe XXV v3.0 Master Observatory with Bilingual Daily Logs & Archetypes."""
 
-    def __init__(self, ledger_dir: Path, seed: int = 4201, founders_per_lineage: int = 7) -> None:
+    def __init__(
+        self,
+        ledger_dir: Path,
+        seed: int = 4202,
+        founders_per_lineage: int = 15,
+        enable_metapopulation: bool = True,
+        metapop_size: int = 100_000,
+        allow_refugia: bool = False,
+    ) -> None:
         self.ledger_dir = ledger_dir
         self.ledger_dir.mkdir(parents=True, exist_ok=True)
         self.ledger_file = self.ledger_dir / "event_chain.jsonl"
@@ -2016,6 +2027,7 @@ class MiroFishObservatory:
             enable_culture=True,
             cortex=self.cortex,
             warehouse=self.warehouse,
+            allow_refugia=allow_refugia,
         )
         self.control = PopulationSimulation(
             seed=seed,
@@ -2023,7 +2035,23 @@ class MiroFishObservatory:
             enable_culture=False,
             cortex=None,
             warehouse=None,
+            allow_refugia=allow_refugia,
         )
+        self.live_metapop: Optional[VectorizedMetapopulation] = None
+        self.null_metapop: Optional[VectorizedMetapopulation] = None
+        if enable_metapopulation:
+            lp = self.ledger_dir / "metapopulation_live_100k.npz"
+            np_path = self.ledger_dir / "metapopulation_null_100k.npz"
+            self.live_metapop = (
+                VectorizedMetapopulation.load_checkpoint(lp)
+                if lp.exists()
+                else VectorizedMetapopulation(initial_pop=metapop_size, seed=seed, enable_culture=True)
+            )
+            self.null_metapop = (
+                VectorizedMetapopulation.load_checkpoint(np_path)
+                if np_path.exists()
+                else VectorizedMetapopulation(initial_pop=metapop_size, seed=seed, enable_culture=False)
+            )
 
         self.speed_multiplier: int = 20  # Default x20 Earth-time pace (365d/yr, 24h/day, 9m pregnancy)!
         self.last_hash: str = "0" * 64
@@ -2359,6 +2387,11 @@ class MiroFishObservatory:
 
         if self.live.world.day > self._last_logged_day:
             self._last_logged_day = self.live.world.day
+            if self.live_metapop is not None:
+                focal_bonus = min(1.0, len(self.live.discoveries) / 40.0)
+                self.live_metapop.step_day(season_index=self.live.world.season_index, focal_cultural_bonus=focal_bonus)
+            if self.null_metapop is not None:
+                self.null_metapop.step_day(season_index=self.control.world.season_index, focal_cultural_bonus=0.0)
             metrics = self.compute_scientific_metrics()
             self._cached_metrics = metrics
             self.warehouse.record_epoch(metrics)
@@ -2379,9 +2412,16 @@ class MiroFishObservatory:
             )
 
             if self.live.world.day % 10 == 0:
+                self.save_metapop_checkpoints()
                 report = self.generate_era_report(metrics)
                 self.reports.append(report)
                 self._append_ledger_entry("SEASON_REPORT", report)
+
+    def save_metapop_checkpoints(self) -> None:
+        if self.live_metapop is not None:
+            self.live_metapop.save_checkpoint(self.ledger_dir / "metapopulation_live_100k.npz")
+        if self.null_metapop is not None:
+            self.null_metapop.save_checkpoint(self.ledger_dir / "metapopulation_null_100k.npz")
 
     async def _run_cortex_for_agent(self, agent: KobAgent, prompt: str) -> None:
         try:
@@ -3008,6 +3048,8 @@ class MiroFishObservatory:
             "llm_deliberations": self.cortex.total_calls,
             "epistemic_scrubs": self.cortex.epistemic_scrubs,
             "ledger_head_hash": self.last_hash[:16],
+            "metapopulation_live": self.live_metapop.summary() if self.live_metapop is not None else None,
+            "metapopulation_null": self.null_metapop.summary() if self.null_metapop is not None else None,
         }
 
     def generate_era_report(self, metrics: Dict[str, Any]) -> Dict[str, Any]:

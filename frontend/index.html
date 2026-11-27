@@ -4194,7 +4194,11 @@
         else if (dMap.first_agriculture || dMap.struct_shelter || dMap.first_barter_trade) st = es ? '🌾 Etapa III · Asentamientos, Cultivo y Comercio' : '🌾 Stage III · Settlements, Farming & Trade';
         else if (dMap.struct_hearth || dMap.craft_composite_tool || dMap.first_cooked_meal) st = es ? '🔥 Etapa II · Dominio del Fuego y Herramientas' : '🔥 Stage II · Fire & Tool Mastery';
         const nComp = m.emergent_compounds_count || 0;
-        stageEl.innerHTML = `${st} <span style="color:var(--muted);">· ${m.live_population} ${es ? 'seres reales 1:1' : 'real 1:1 beings'}${nComp > 0 ? ` · ⚗️ ${nComp}` : ''}</span>`;
+        const mpLive = m.metapopulation_live && m.metapopulation_live.total_population ? m.metapopulation_live.total_population : 0;
+        const popLabel = mpLive > 0
+          ? `🌍 ${mpLive.toLocaleString()} ${es ? 'metapoblación 1:1' : '1:1 metapopulation'} · 🔬 ${m.live_population} ${es ? 'banda focal 3D' : '3D focal band'}`
+          : `${m.live_population} ${es ? 'seres reales 1:1' : 'real 1:1 beings'}`;
+        stageEl.innerHTML = `${st} <span style="color:var(--muted);">· ${popLabel}${nComp > 0 ? ` · ⚗️ ${nComp}` : ''}</span>`;
       }
 
       const sp = m.species_counts || {};

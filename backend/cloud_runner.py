@@ -39,6 +39,8 @@ def push_live_telemetry_snapshot(commit_msg: str) -> None:
             "chronicles/event_chain.jsonl",
             "chronicles/benchmark_results.csv",
             "chronicles/benchmark_summary.json",
+            "chronicles/metapopulation_live_100k.npz",
+            "chronicles/metapopulation_null_100k.npz",
             "chronicles/papers/",
         ],
         cwd=str(ROOT_DIR),
@@ -58,7 +60,15 @@ async def run_cloud_burst(duration_seconds: int = 660, speed: int = 5) -> None:
     CHRONICLES_DIR.mkdir(parents=True, exist_ok=True)
     PAPERS_DIR.mkdir(parents=True, exist_ok=True)
 
-    obs = MiroFishObservatory(ledger_dir=CHRONICLES_DIR, seed=4201, founders_per_lineage=7)
+    # v4.0-protocol Clean Era II Longitudinal Genesis: 45 focal-band adults (Dunbar scale) + 100,000 1:1 vectorized metapopulation
+    obs = MiroFishObservatory(
+        ledger_dir=CHRONICLES_DIR,
+        seed=4202,
+        founders_per_lineage=15,
+        enable_metapopulation=True,
+        metapop_size=100_000,
+        allow_refugia=False,
+    )
     obs.speed_multiplier = speed
     await obs.cortex.probe()
 
@@ -121,6 +131,7 @@ async def run_cloud_burst(duration_seconds: int = 660, speed: int = 5) -> None:
             )
 
         snap = snap_now
+        obs.save_metapop_checkpoints()
         (CHRONICLES_DIR / "latest_public_state.json").write_text(
             json.dumps(snap, ensure_ascii=False), encoding="utf-8"
         )
