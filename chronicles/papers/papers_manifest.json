@@ -1,5 +1,17 @@
 [
   {
+    "issue": 2,
+    "title": "Universe XXV (Monograph #2): Longitudinal Multi-Species Emergence Under Epistemic Isolation",
+    "author": "Dr. Sergio Buedo Martínez",
+    "date": "November 22, 2026",
+    "pages": 18,
+    "verified_dois": 15,
+    "filename": "Universe_XXV_Monograph_02_Dr_Sergio_Buedo_Martinez.pdf",
+    "url": "/papers/Universe_XXV_Monograph_02_Dr_Sergio_Buedo_Martinez.pdf",
+    "sha256": "56bb15d92674c514",
+    "locked_readonly": true
+  },
+  {
     "issue": 1,
     "title": "Universe XXV (Monograph #1): Longitudinal Multi-Species Emergence Under Epistemic Isolation",
     "author": "Dr. Sergio Buedo Martínez",
